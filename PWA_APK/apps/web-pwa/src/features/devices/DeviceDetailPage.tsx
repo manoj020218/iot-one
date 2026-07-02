@@ -9,15 +9,20 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
 import { DeviceFirmwarePanel } from "./components/DeviceFirmwarePanel";
+import { DeviceMatterPanel } from "./components/DeviceMatterPanel";
 import { PidDynamicPageRenderer } from "./components/PidDynamicPageRenderer";
 import {
+  getMatterStatus,
   getDevicePidProfile,
   getResolvedFirmwarePlan,
   getManagedDevice,
+  requestMatterBridgeSync,
+  requestMatterCommissioning,
   requestFirmwareUpdate,
   type DeviceFirmwarePlan,
   type DevicePidProfile
 } from "./services/deviceManagementApi";
+import type { MatterDeviceStatus } from "@jenix/shared";
 
 export function DeviceDetailPage() {
   const { session } = useAuth();
@@ -26,6 +31,7 @@ export function DeviceDetailPage() {
   const [device, setDevice] = useState<DeviceRecord | null>(null);
   const [pidProfile, setPidProfile] = useState<DevicePidProfile | null>(null);
   const [firmwarePlan, setFirmwarePlan] = useState<DeviceFirmwarePlan | null>(null);
+  const [matterStatus, setMatterStatus] = useState<MatterDeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,17 +54,21 @@ export function DeviceDetailPage() {
 
     let active = true;
 
-    setLoading(true);
+      setLoading(true);
     setError(null);
     void getManagedDevice(session, deviceId)
       .then(async (record) => {
         const profile = await getDevicePidProfile(record.pid);
-        const plan = await getResolvedFirmwarePlan(session, record, profile);
+        const [plan, matter] = await Promise.all([
+          getResolvedFirmwarePlan(session, record, profile),
+          getMatterStatus(session, record, profile)
+        ]);
 
         if (active) {
           setDevice(record);
           setPidProfile(profile);
           setFirmwarePlan(plan);
+          setMatterStatus(matter);
         }
       })
       .catch((requestError: unknown) => {
@@ -85,7 +95,7 @@ export function DeviceDetailPage() {
     <AppShell
       eyebrow="Device Detail"
       title={device?.displayName ?? deviceId ?? "Device"}
-      description="Phase 10 extends device detail pages with OTA resolution on top of PID metadata, while preserving safe fallback rendering for unsupported dynamic pages."
+      description="Phase 11 extends device detail pages with Matter readiness, bridge placeholders, OTA resolution, and PID-driven rendering on a shared device contract."
       aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}
     >
       <section className="tabs-strip">
@@ -113,7 +123,7 @@ export function DeviceDetailPage() {
       </section>
       {loading ? <section className="panel">Loading device detail...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
-      {!loading && device && pidProfile && firmwarePlan ? (
+      {!loading && device && pidProfile && firmwarePlan && matterStatus ? (
         <>
           <section className="panel device-detail-hero">
             <div className="device-card-head">
@@ -145,7 +155,7 @@ export function DeviceDetailPage() {
               </div>
               <div>
                 <dt>Matter</dt>
-                <dd>{device.matterEnabled ? "Enabled" : "Disabled"}</dd>
+                <dd>{matterStatus.enabled ? matterStatus.mode : "Disabled"}</dd>
               </div>
               <div>
                 <dt>Cloud</dt>
@@ -170,6 +180,20 @@ export function DeviceDetailPage() {
             onRequest={(input) =>
               requestFirmwareUpdate(session, device.deviceId, input)
             }
+          />
+          <DeviceMatterPanel
+            status={matterStatus}
+            homeRole={currentHome.role}
+            onCommission={async () => {
+              const result = await requestMatterCommissioning(session, device, pidProfile);
+              setMatterStatus(await getMatterStatus(session, device, pidProfile));
+              return result;
+            }}
+            onBridgeSync={async () => {
+              const result = await requestMatterBridgeSync(session, device, pidProfile);
+              setMatterStatus(await getMatterStatus(session, device, pidProfile));
+              return result;
+            }}
           />
           <section className="device-dynamic-section">
             <div className="scene-section-head">

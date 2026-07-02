@@ -95,7 +95,9 @@ export const sceneActionCommandOptions: SceneActionCommand[] = [
   "set_relay",
   "notify",
   "factory_reset",
-  "ota_force"
+  "ota_force",
+  "matter_commission",
+  "matter_bridge_sync"
 ];
 
 export const sceneStatusOptions: SceneStatus[] = ["draft", "active", "paused"];

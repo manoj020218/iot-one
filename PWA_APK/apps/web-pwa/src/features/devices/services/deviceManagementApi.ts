@@ -10,7 +10,11 @@ import {
   type DeviceFirmwarePlanResponse,
   type DeviceFirmwareRequestResult,
   type DeviceRecord,
-  type HomeAccessRole
+  type HomeAccessRole,
+  type MatterBridgeState,
+  type MatterCommissioningState,
+  type MatterDeviceStatus,
+  type MatterPlaceholderActionResult
 } from "@jenix/shared";
 
 import {
@@ -59,13 +63,27 @@ export interface RequestFirmwareUpdateInput {
 export type DevicePidProfile = CreatePidInput;
 
 const deviceEndpoint = "/api/v1/devices";
+const matterEndpoint = "/api/v1/matter/devices";
 const pidEndpoint = "/api/v1/pids";
 const demoPidProfiles = new Map<string, DevicePidProfile>([
   [foundationPidBlueprint.pid, structuredClone(foundationPidBlueprint)]
 ]);
+const demoMatterRuntime = new Map<
+  string,
+  {
+    commissioningState?: MatterCommissioningState;
+    bridgeState?: MatterBridgeState;
+    lastCommissioningAttemptAt?: string;
+    lastBridgeSyncAt?: string;
+  }
+>();
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function normalizeDeviceId(deviceId: string): string {
+  return deviceId.trim().toUpperCase();
 }
 
 function optionalProp<K extends string, V>(
@@ -109,6 +127,133 @@ function getPidIconText(pid: string): string {
     .map((part) => part[0] ?? "")
     .join("")
     .toUpperCase();
+}
+
+function canManageMatter(role: HomeAccessRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
+function getDemoMatterRuntime(deviceId: string) {
+  return demoMatterRuntime.get(normalizeDeviceId(deviceId));
+}
+
+function saveDemoMatterRuntime(
+  deviceId: string,
+  patch: {
+    commissioningState?: MatterCommissioningState;
+    bridgeState?: MatterBridgeState;
+    lastCommissioningAttemptAt?: string;
+    lastBridgeSyncAt?: string;
+  }
+) {
+  const normalizedDeviceId = normalizeDeviceId(deviceId);
+  const nextValue = {
+    ...(demoMatterRuntime.get(normalizedDeviceId) ?? {}),
+    ...patch
+  };
+
+  demoMatterRuntime.set(normalizedDeviceId, clone(nextValue));
+  return clone(nextValue);
+}
+
+function buildLocalMatterStatus(
+  device: DeviceRecord,
+  pidProfile: DevicePidProfile
+): MatterDeviceStatus {
+  const runtime = getDemoMatterRuntime(device.deviceId);
+  const mode = pidProfile.matter.mode;
+  const deviceMatterEnabled = device.matterEnabled ?? pidProfile.matter.enabled;
+  const hardwareMatterCapable = pidProfile.hardware.hasMatter;
+  const notes: string[] = [];
+  let enabled = false;
+  let readiness: MatterDeviceStatus["readiness"];
+  let commissioningState: MatterDeviceStatus["commissioningState"];
+  let bridgeState: MatterDeviceStatus["bridgeState"];
+
+  if (!pidProfile.matter.enabled || mode === "NONE") {
+    readiness = "disabled";
+    commissioningState = "disabled";
+    bridgeState = "not_required";
+    notes.push("PID Matter mapping is disabled for this product.");
+  } else if (!hardwareMatterCapable) {
+    readiness = "not_supported";
+    commissioningState = "not_supported";
+    bridgeState = "not_supported";
+    notes.push("The PID hardware profile is not marked as Matter-capable.");
+  } else if (!deviceMatterEnabled) {
+    readiness = "disabled";
+    commissioningState = "disabled";
+    bridgeState = mode === "MATTER_BRIDGE_GATEWAY" ? "disabled" : "not_required";
+    notes.push("The device-level Matter toggle is disabled.");
+  } else {
+    enabled = true;
+
+    switch (mode) {
+      case "NATIVE_MATTER":
+        readiness = "ready_to_commission";
+        commissioningState =
+          runtime?.commissioningState === "requested" ? "requested" : "ready";
+        bridgeState = "not_required";
+        notes.push("Native Matter commissioning can be staged from this device page.");
+        break;
+      case "MATTER_BRIDGE_GATEWAY":
+        readiness = "bridge_ready";
+        commissioningState =
+          runtime?.commissioningState === "requested" ? "requested" : "ready";
+        bridgeState =
+          runtime?.bridgeState === "sync_requested"
+            ? "sync_requested"
+            : "gateway_ready";
+        notes.push("This device is modeled as a Matter bridge gateway.");
+        break;
+      case "MATTER_BRIDGE_CHILD":
+        readiness = "bridge_child";
+        commissioningState = "bridge_child_only";
+        bridgeState =
+          runtime?.bridgeState === "sync_requested"
+            ? "sync_requested"
+            : "child_waiting_for_gateway";
+        notes.push("Bridge child devices must be exposed through a Matter gateway.");
+        break;
+    }
+  }
+
+  return {
+    deviceId: device.deviceId,
+    pid: pidProfile.pid,
+    enabled,
+    deviceMatterEnabled,
+    hardwareMatterCapable,
+    mode,
+    readiness,
+    commissioningState,
+    bridgeState,
+    mapping: {
+      endpoints: clone(pidProfile.matter.endpoints ?? []),
+      clusters: [...(pidProfile.matter.clusters ?? [])],
+      bridgeSupported: pidProfile.matter.bridgeSupported,
+      ...(pidProfile.matter.deviceType
+        ? { deviceType: pidProfile.matter.deviceType }
+        : {}),
+      ...(pidProfile.matter.vendorId ? { vendorId: pidProfile.matter.vendorId } : {}),
+      ...(pidProfile.matter.productId
+        ? { productId: pidProfile.matter.productId }
+        : {}),
+      ...(pidProfile.matter.discriminator
+        ? { discriminator: pidProfile.matter.discriminator }
+        : {}),
+      ...(pidProfile.matter.certificationStatus
+        ? { certificationStatus: pidProfile.matter.certificationStatus }
+        : {})
+    },
+    notes,
+    ...(runtime?.lastCommissioningAttemptAt
+      ? { lastCommissioningAttemptAt: runtime.lastCommissioningAttemptAt }
+      : {}),
+    ...(runtime?.lastBridgeSyncAt
+      ? { lastBridgeSyncAt: runtime.lastBridgeSyncAt }
+      : {})
+  };
 }
 
 function toTelemetryPreview(device: DeviceRecord) {
@@ -398,10 +543,153 @@ export async function requestFirmwareUpdate(
   }
 }
 
+export async function getMatterStatus(
+  session: AuthSession,
+  device: DeviceRecord,
+  pidProfile: DevicePidProfile
+): Promise<MatterDeviceStatus> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  try {
+    return await fetchJson<MatterDeviceStatus>(
+      `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/status`,
+      {
+        method: "GET",
+        headers: {
+          "x-user-id": session.user.userId,
+          "x-home-id": currentHome.homeId,
+          "x-home-role": homeRole
+        }
+      }
+    );
+  } catch {
+    return buildLocalMatterStatus(device, pidProfile);
+  }
+}
+
+export async function requestMatterCommissioning(
+  session: AuthSession,
+  device: DeviceRecord,
+  pidProfile: DevicePidProfile
+): Promise<MatterPlaceholderActionResult> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  if (!canManageMatter(homeRole)) {
+    throw new Error("Only owner or admin access can trigger Matter commissioning.");
+  }
+
+  try {
+    return await fetchJson<MatterPlaceholderActionResult>(
+      `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/commission`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session.user.userId,
+          "x-home-id": currentHome.homeId,
+          "x-home-role": homeRole
+        },
+        body: JSON.stringify({})
+      }
+    );
+  } catch {
+    const status = buildLocalMatterStatus(device, pidProfile);
+
+    if (
+      status.readiness !== "ready_to_commission" &&
+      status.readiness !== "bridge_ready"
+    ) {
+      throw new Error(`Matter commissioning is not available for mode ${status.mode}.`);
+    }
+
+    const requestedAt = new Date().toISOString();
+    saveDemoMatterRuntime(device.deviceId, {
+      commissioningState: "requested",
+      lastCommissioningAttemptAt: requestedAt
+    });
+
+    return {
+      deviceId: device.deviceId,
+      pid: pidProfile.pid,
+      mode: status.mode,
+      action: "commission",
+      status: "accepted",
+      placeholder: true,
+      requestedAt,
+      message:
+        status.mode === "MATTER_BRIDGE_GATEWAY"
+          ? "Matter gateway commissioning was staged as a placeholder. Live commissioner transport is not wired yet."
+          : "Matter commissioning was staged as a placeholder. Live commissioner transport is not wired yet."
+    };
+  }
+}
+
+export async function requestMatterBridgeSync(
+  session: AuthSession,
+  device: DeviceRecord,
+  pidProfile: DevicePidProfile
+): Promise<MatterPlaceholderActionResult> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  if (!canManageMatter(homeRole)) {
+    throw new Error("Only owner or admin access can trigger Matter bridge sync.");
+  }
+
+  try {
+    return await fetchJson<MatterPlaceholderActionResult>(
+      `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/bridge-sync`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session.user.userId,
+          "x-home-id": currentHome.homeId,
+          "x-home-role": homeRole
+        },
+        body: JSON.stringify({})
+      }
+    );
+  } catch {
+    const status = buildLocalMatterStatus(device, pidProfile);
+
+    if (
+      status.bridgeState !== "gateway_ready" &&
+      status.bridgeState !== "child_waiting_for_gateway" &&
+      status.bridgeState !== "sync_requested"
+    ) {
+      throw new Error(`Matter bridge sync is not available for mode ${status.mode}.`);
+    }
+
+    const requestedAt = new Date().toISOString();
+    saveDemoMatterRuntime(device.deviceId, {
+      bridgeState: "sync_requested",
+      lastBridgeSyncAt: requestedAt
+    });
+
+    return {
+      deviceId: device.deviceId,
+      pid: pidProfile.pid,
+      mode: status.mode,
+      action: "bridge_sync",
+      status: "accepted",
+      placeholder: true,
+      requestedAt,
+      message:
+        status.mode === "MATTER_BRIDGE_CHILD"
+          ? "Matter bridge-child sync was staged as a placeholder. Live gateway routing is not wired yet."
+          : "Matter bridge sync was staged as a placeholder. Live gateway coordination is not wired yet."
+    };
+  }
+}
+
 export const deviceManagementApiTesting = {
   reset() {
     resetDemoDevices();
     demoPidProfiles.clear();
+    demoMatterRuntime.clear();
     demoPidProfiles.set(
       foundationPidBlueprint.pid,
       structuredClone(foundationPidBlueprint)

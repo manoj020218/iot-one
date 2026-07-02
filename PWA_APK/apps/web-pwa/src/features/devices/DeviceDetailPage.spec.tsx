@@ -142,4 +142,47 @@ describe("DeviceDetailPage", () => {
       screen.getByRole("button", { name: "Request Firmware Update" })
     ).toBeDisabled();
   });
+
+  it("renders Matter readiness for a Matter-capable PID", async () => {
+    deviceManagementApiTesting.seedDemoDevices(ownerSession.user.userId, ownerHome.homeId, [
+      createDeviceRecord({
+        deviceId: "JNX-TG-A7F9",
+        pid: "JNX-TG-C3-902",
+        homeId: ownerHome.homeId,
+        ownerUserId: ownerSession.user.userId,
+        displayName: "Matter Tank",
+        firmwareVersion: "1.0.0",
+        matterEnabled: true
+      })
+    ]);
+    deviceManagementApiTesting.seedPidProfile({
+      ...foundationPidBlueprint,
+      pid: "JNX-TG-C3-902",
+      productName: "Matter Tank Guard",
+      matterMode: "NATIVE_MATTER",
+      hardware: {
+        ...foundationPidBlueprint.hardware,
+        hasMatter: true,
+        hasThread: true
+      },
+      matter: {
+        ...foundationPidBlueprint.matter,
+        enabled: true,
+        mode: "NATIVE_MATTER",
+        deviceType: "water-valve",
+        clusters: ["descriptor", "identify"],
+        vendorId: "0xFFF1",
+        productId: "0x0102",
+        certificationStatus: "testing"
+      }
+    });
+
+    renderDeviceRoute(ownerSession);
+
+    expect(await screen.findByText("Matter Readiness")).toBeInTheDocument();
+    expect(screen.getByText("ready to commission")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Matter Commissioning" })
+    ).toBeEnabled();
+  });
 });
