@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 
 import {
   getDevice,
+  getDeviceFirmwarePlan,
   ingestDeviceTelemetry,
   listDevices,
   patchDevice,
@@ -109,6 +110,19 @@ export function patchDeviceController(request: Request, response: Response) {
   try {
     response.status(200).json({
       data: patchDevice(request.params.deviceId ?? "", payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export function getDeviceFirmwarePlanController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(200).json({
+      data: getDeviceFirmwarePlan(request.params.deviceId ?? "", readContext(request))
     });
   } catch (error) {
     sendError(response, error);

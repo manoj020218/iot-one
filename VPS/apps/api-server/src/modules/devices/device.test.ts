@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { deviceTesting } from "./device.service";
+import { otaTesting } from "../ota/ota.service";
 import { pidTesting } from "../pid/pid.service";
 
 const developerHeaders = {
@@ -31,10 +32,33 @@ async function createPid() {
     });
 }
 
+async function createOtaRelease(input?: Partial<{
+  releaseId: string;
+  pid: string;
+  hardwareRevision: string;
+  version: string;
+  channel: "stable" | "beta";
+}>) {
+  await request(createApp())
+    .post("/api/v1/admin/ota/releases")
+    .set(developerHeaders)
+    .send({
+      releaseId: input?.releaseId ?? "TANK-HW10-STABLE-100",
+      pid: input?.pid ?? "JNX-TG-C3-501",
+      hardwareRevision: input?.hardwareRevision ?? "HW1.0",
+      version: input?.version ?? "1.0.0",
+      channel: input?.channel ?? "stable",
+      artifactUrl: "https://cdn.jenix.dev/fw/tank-guard-1.0.0.bin",
+      checksum: "abc123checksum",
+      status: "published"
+    });
+}
+
 describe("device routes", () => {
   beforeEach(() => {
     deviceTesting.reset();
     pidTesting.reset();
+    otaTesting.reset();
   });
 
   it("registers a device against an existing PID", async () => {
@@ -102,6 +126,10 @@ describe("device routes", () => {
 
   it("queues a firmware request for a writable HOME role", async () => {
     await createPid();
+    await createOtaRelease({
+      releaseId: "TANK-HW10-STABLE-110",
+      version: "1.1.0"
+    });
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f6",
       pid: "JNX-TG-C3-501",
@@ -123,11 +151,12 @@ describe("device routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe("queued");
-    expect(response.body.data.targetVersion).toBe("1.0.0");
+    expect(response.body.data.targetVersion).toBe("1.1.0");
   });
 
   it("rejects firmware requests from a viewer role", async () => {
     await createPid();
+    await createOtaRelease();
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f7",
       pid: "JNX-TG-C3-501",
@@ -149,6 +178,63 @@ describe("device routes", () => {
 
     expect(response.status).toBe(403);
     expect(response.body.error).toMatch(/firmware/i);
+  });
+
+  it("resolves the correct OTA release by PID and hardware revision", async () => {
+    await createPid();
+    await request(createApp())
+      .post("/api/v1/admin/pids")
+      .set(developerHeaders)
+      .send({
+        ...foundationPidBlueprint,
+        pid: "JNX-TG-C3-601",
+        status: "beta",
+        api: {
+          enabled: false,
+          sellable: false,
+          allowedScopes: []
+        },
+        firmware: {
+          ...foundationPidBlueprint.firmware,
+          stableVersion: "2.0.0"
+        }
+      });
+    await createOtaRelease({
+      releaseId: "TANK-HW10-STABLE-120",
+      pid: "JNX-TG-C3-501",
+      hardwareRevision: "HW1.0",
+      version: "1.2.0"
+    });
+    await createOtaRelease({
+      releaseId: "TANK-HW20-STABLE-190",
+      pid: "JNX-TG-C3-501",
+      hardwareRevision: "HW2.0",
+      version: "1.9.0"
+    });
+    await createOtaRelease({
+      releaseId: "TANK2-HW10-STABLE-200",
+      pid: "JNX-TG-C3-601",
+      hardwareRevision: "HW1.0",
+      version: "2.0.0"
+    });
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f8",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1",
+      firmwareVersion: "1.0.0",
+      hardwareRevision: "HW1.0"
+    });
+
+    const response = await request(createApp())
+      .get("/api/v1/devices/JNX-TG-A7F8/firmware-plan")
+      .set(deviceHeaders);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.stable.release.version).toBe("1.2.0");
+    expect(response.body.data.stable.release.pid).toBe("JNX-TG-C3-501");
+    expect(response.body.data.stable.release.hardwareRevision).toBe("HW1.0");
+    expect(response.body.data.recommendedChannel).toBe("stable");
   });
 
   it("ingests telemetry and triggers matching device-threshold scenes", async () => {

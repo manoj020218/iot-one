@@ -1,14 +1,15 @@
 import {
   createDeviceRecord,
   renameDeviceRecord,
-  type DeviceFirmwareChannel,
   type DeviceRecord
 } from "@jenix/shared";
 
+import { getDeviceFirmwarePlan as resolveDeviceFirmwarePlan, resolveOtaReleaseForDevice } from "../ota/ota.service";
 import { getPid } from "../pid/pid.service";
 import { evaluateScenesByTelemetry } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
 import type {
+  DeviceFirmwarePlanResult,
   DevicePatchPayload,
   DeviceFirmwareRequestPayload,
   DeviceFirmwareRequestResponse,
@@ -146,26 +147,12 @@ export function patchDevice(
   return deviceRepository.save(updated);
 }
 
-function resolveFirmwareTargetVersion(
-  device: DeviceRecord,
-  channel: DeviceFirmwareChannel,
-  requestedVersion?: string
-) {
-  const pid = getPid(device.pid);
-  const targetVersion =
-    requestedVersion?.trim() ||
-    (channel === "beta"
-      ? pid.firmware.betaVersion
-      : pid.firmware.stableVersion);
-
-  if (!targetVersion) {
-    throw new DeviceModuleError(
-      409,
-      `No ${channel} firmware release available for PID ${device.pid}`
-    );
-  }
-
-  return targetVersion;
+export function getDeviceFirmwarePlan(
+  deviceId: string,
+  context: DeviceRequestContext
+): DeviceFirmwarePlanResult {
+  const existing = ensureAccess(requireDevice(deviceId), context);
+  return resolveDeviceFirmwarePlan(existing);
 }
 
 export function requestDeviceFirmwareUpdate(
@@ -179,21 +166,29 @@ export function requestDeviceFirmwareUpdate(
 
   const existing = ensureAccess(requireDevice(deviceId), context);
   const channel = payload.channel ?? "stable";
-  const targetVersion = resolveFirmwareTargetVersion(
+  const resolution = resolveOtaReleaseForDevice(
     existing,
     channel,
     payload.targetVersion
   );
+
+  if (!resolution.release) {
+    throw new DeviceModuleError(
+      409,
+      resolution.reason ?? `No ${channel} firmware release is available`
+    );
+  }
+
   const requestedAt = new Date().toISOString();
 
   return {
     deviceId: existing.deviceId,
     pid: existing.pid,
     channel,
-    targetVersion,
+    targetVersion: resolution.release.version,
     ...(existing.firmwareVersion ? { currentVersion: existing.firmwareVersion } : {}),
     status:
-      existing.firmwareVersion === targetVersion ? "up_to_date" : "queued",
+      existing.firmwareVersion === resolution.release.version ? "up_to_date" : "queued",
     requestedAt
   };
 }
