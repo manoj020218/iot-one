@@ -46,5 +46,6 @@ cmd /c pnpm build
 - Scene persistence defaults to MongoDB when `MONGODB_URI` is set, or can be forced with `SCENE_PERSISTENCE_MODE=mongodb`.
 - Scene records, scene audit logs, and scene run history now persist in MongoDB collections `scenes`, `scene_audit_logs`, and `scene_run_history`.
 - Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
+- Scheduler leadership can be coordinated across multiple API instances with `SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock`, `SCENE_SCHEDULER_LEASE_MS`, and an optional `SCENE_SCHEDULER_INSTANCE_ID`.
 - Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and evaluates matching device-threshold scenes immediately.
-- Scheduler coordination is still single-process. Horizontal scale or external worker deployment will need a distributed scheduler or queue-backed runtime.
+- Mongo lease coordination prevents duplicate scheduler ownership across instances, but transport-side scale still benefits from a dedicated worker or queue-backed runtime when deployment complexity grows.

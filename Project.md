@@ -7,6 +7,7 @@
 - Workspace root: `D:\IOT Device\IOT_Platform\jenix One`
 - Current status: Phase 7 scene UI and runtime orchestration complete
 - Current status: Phase 7 durable MongoDB-backed scene persistence complete
+- Current status: Phase 7 distributed scheduler coordination complete
 - Current phase: Phase 7 - scene pipeline
 
 ## Working Scope
@@ -229,6 +230,7 @@ Deliverables:
 - [x] MongoDB-backed scene persistence
 - [x] MongoDB-backed scene audit log persistence
 - [x] MongoDB-backed scene run-history persistence
+- [x] Mongo lease-based scheduler coordination
 
 Validation gates:
 - [x] Condition evaluation tests
@@ -307,8 +309,8 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Replace in-process scheduling and direct ingest with MQTT or worker-backed infrastructure if deployment topology requires distributed execution.
-2. Start Phase 8 home sharing now that durable automation persistence is stable.
+1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+2. Start Phase 8 home sharing now that durable automation persistence and scheduler coordination are stable.
 3. Persist PID, device registry, and provisioning intent modules in MongoDB for platform-wide durability.
 4. Keep `PROGRESS.md` updated after each remaining Phase 7 milestone.
 
@@ -329,6 +331,7 @@ Validation gates:
 - 2026-07-02: Added explicit runtime scene evaluation endpoints and run-history support before introducing scheduler and telemetry worker infrastructure.
 - 2026-07-02: Wired schedule scenes into an in-process scheduler and device-threshold scenes into a direct telemetry ingest path so Phase 7 now executes automatically within the running API process.
 - 2026-07-02: Persisted scenes, scene audit logs, and scene run history in MongoDB behind a shared repository abstraction while preserving in-memory mode for tests.
+- 2026-07-02: Added Mongo lease-based scheduler leadership so multi-instance deployments do not run the same schedule tick concurrently.
 
 ## Risks and Controls
 

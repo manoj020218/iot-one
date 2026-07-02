@@ -31,6 +31,7 @@
 - [x] Scene background scheduler
 - [x] Device telemetry ingestion path
 - [x] MongoDB-backed scene persistence
+- [x] Distributed scheduler coordination
 - [ ] Home sharing
 - [ ] Settings pages
 - [ ] OTA by PID
@@ -76,6 +77,9 @@
 - Date: 2026-07-02
   Decision: Persist scene records, scene audit logs, and scene run history in MongoDB behind a repository abstraction, while leaving a memory mode for tests and local fallback.
   Reason: It makes Phase 7 automation durable without coupling test runs or lightweight development flows to a live database.
+- Date: 2026-07-02
+  Decision: Coordinate scheduled scene execution with a MongoDB lease so only one API instance owns a scheduler tick at a time, while keeping a local coordinator for tests and single-node fallback.
+  Reason: It removes the main multi-instance duplication risk without forcing an immediate move to a separate worker service.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -102,14 +106,14 @@
 - Issue: Provisioning intent storage is still in-memory on the API side with a frontend fallback store when the API is unavailable.
   Impact: Cloud registration intent tracking works for development and tests, but not yet with durable operational history.
   Fix plan: Persist provisioning intents and status transitions in MongoDB and attach them to device lifecycle audit history.
-- Issue: Scene execution is now durable in MongoDB, but scheduler coordination still runs inside a single API process.
-  Impact: Automations survive restarts, but multi-instance deployments can still double-run schedule windows unless runtime ownership moves to a distributed worker or lock strategy.
-  Fix plan: Move schedule execution to a queue, worker, or distributed lock-backed coordinator before horizontal scaling.
+- Issue: Scheduler leadership is now lease-coordinated across API instances, but execution still runs inside the API process instead of a dedicated worker.
+  Impact: Duplicate leadership is controlled, but heavy automation volume still competes with API traffic and would benefit from queue-backed isolation at larger scale.
+  Fix plan: Move schedule execution and high-volume telemetry-triggered automation to a worker or queue-backed runtime once deployment load justifies it.
 
 ## Next Tasks
-1. Replace the local telemetry ingress and scheduler loop with MQTT or worker-backed runtime infrastructure when deployment topology requires it.
-2. Start Phase 8 home sharing now that durable automation persistence is in place.
-3. Move PID, device registry, and provisioning intent storage to MongoDB so the rest of the platform matches the new scene durability baseline.
+1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
+2. Start Phase 8 home sharing now that durable automation persistence and scheduler coordination are in place.
+3. Move PID, device registry, and provisioning intent storage to MongoDB so the rest of the platform matches the scene durability baseline.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -126,3 +130,4 @@
 - 2026-07-02: Added Phase 7 scene runtime orchestration hooks for device-threshold evaluation, schedule evaluation, and scene run-history retrieval on the API side.
 - 2026-07-02: Wired Phase 7 runtime execution into an in-process scheduler loop and a device telemetry ingestion route so scenes can now fire automatically while the API server is running.
 - 2026-07-02: Persisted scene records, audit logs, and run history in MongoDB with a repository abstraction, bootstrap wiring, and full workspace validation.
+- 2026-07-02: Added Mongo lease-based scheduler coordination, local overlap protection, and multi-instance scheduler tests for Phase 7 runtime hardening.
