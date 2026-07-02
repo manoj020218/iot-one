@@ -127,7 +127,9 @@ function parseSceneActionCommand(
     value === "set_relay" ||
     value === "notify" ||
     value === "factory_reset" ||
-    value === "ota_force"
+    value === "ota_force" ||
+    value === "matter_commission" ||
+    value === "matter_bridge_sync"
     ? value
     : undefined;
 }

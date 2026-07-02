@@ -6,7 +6,9 @@ import type {
 
 const restrictedSceneCommands = new Set<SceneActionCommand>([
   "factory_reset",
-  "ota_force"
+  "ota_force",
+  "matter_commission",
+  "matter_bridge_sync"
 ]);
 
 export function isRestrictedSceneCommand(command: SceneActionCommand): boolean {

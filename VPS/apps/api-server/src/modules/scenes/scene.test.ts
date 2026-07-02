@@ -139,6 +139,43 @@ describe("scene routes", () => {
     expect(runResponse.body.error).toContain("Restricted scene command");
   });
 
+  it("blocks restricted Matter scene commands for non-owner roles", async () => {
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(ownerHeaders)
+      .send({
+        name: "Restricted Matter Scene",
+        status: "active",
+        triggers: [
+          {
+            type: "manual"
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-C3-A7F2",
+            command: "matter_commission"
+          }
+        ]
+      });
+
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    const runResponse = await request(createApp())
+      .post(`/api/v1/scenes/${sceneId}/run`)
+      .set({
+        "x-user-id": "user-scene-owner",
+        "x-home-id": "home-user-scene-owner",
+        "x-home-role": "member"
+      })
+      .send({});
+
+    expect(runResponse.status).toBe(403);
+    expect(runResponse.body.error).toContain("Restricted scene command");
+  });
+
   it("blocks viewer access from manually running a scene", async () => {
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")

@@ -5,6 +5,7 @@ import { evaluateSceneCondition, isRestrictedSceneCommand } from "../src/index";
 describe("scene helpers", () => {
   it("identifies restricted scene commands", () => {
     expect(isRestrictedSceneCommand("factory_reset")).toBe(true);
+    expect(isRestrictedSceneCommand("matter_commission")).toBe(true);
     expect(isRestrictedSceneCommand("refresh")).toBe(false);
   });
 

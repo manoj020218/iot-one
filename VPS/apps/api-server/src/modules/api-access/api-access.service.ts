@@ -103,7 +103,9 @@ function toSceneActionCommand(command: string): SceneActionCommand | null {
     command === "set_relay" ||
     command === "notify" ||
     command === "factory_reset" ||
-    command === "ota_force"
+    command === "ota_force" ||
+    command === "matter_commission" ||
+    command === "matter_bridge_sync"
     ? command
     : null;
 }

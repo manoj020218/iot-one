@@ -523,6 +523,10 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
     errors.push("hardware.hasMatter must be true when matter.enabled is true");
   }
 
+  if (matterMode !== matter.mode) {
+    errors.push("matterMode must match matter.mode");
+  }
+
   if (api.sellable && !api.enabled) {
     errors.push("api.sellable cannot be true when api.enabled is false");
   }

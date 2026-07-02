@@ -91,4 +91,44 @@ describe("pid routes", () => {
     expect(response.body.data.createdBy).toBeUndefined();
     expect(response.body.data.dashboard.templateId).toBe("tank-guard-default");
   });
+
+  it("rejects a PID when top-level matterMode does not match matter.mode", async () => {
+    const response = await request(createApp())
+      .post("/api/v1/admin/pids")
+      .set(developerHeaders)
+      .send({
+        ...buildPidPayload("JNX-TG-C3-105"),
+        matterMode: "NATIVE_MATTER",
+        matter: {
+          ...foundationPidBlueprint.matter,
+          enabled: false,
+          mode: "NONE"
+        }
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("matterMode must match matter.mode");
+  });
+
+  it("rejects Matter-enabled PID payloads when the hardware profile is not Matter-capable", async () => {
+    const response = await request(createApp())
+      .post("/api/v1/admin/pids")
+      .set(developerHeaders)
+      .send({
+        ...buildPidPayload("JNX-TG-C3-106"),
+        matterMode: "NATIVE_MATTER",
+        hardware: {
+          ...foundationPidBlueprint.hardware,
+          hasMatter: false
+        },
+        matter: {
+          ...foundationPidBlueprint.matter,
+          enabled: true,
+          mode: "NATIVE_MATTER"
+        }
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("hardware.hasMatter must be true");
+  });
 });

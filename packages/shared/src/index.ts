@@ -3,6 +3,7 @@ export * from "./constants/app";
 export * from "./types/auth";
 export * from "./types/device";
 export * from "./types/home";
+export * from "./types/matter";
 export * from "./types/ota";
 export * from "./types/platform";
 export * from "./types/provisioning";

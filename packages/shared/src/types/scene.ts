@@ -38,7 +38,9 @@ export type SceneActionCommand =
   | "set_relay"
   | "notify"
   | "factory_reset"
-  | "ota_force";
+  | "ota_force"
+  | "matter_commission"
+  | "matter_bridge_sync";
 
 export interface SceneAction {
   actionId: string;
