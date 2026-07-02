@@ -1,9 +1,14 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { homeTesting } from "../homes/home.service";
 
 describe("auth routes", () => {
+  beforeEach(() => {
+    homeTesting.reset();
+  });
+
   it("creates a default HOME during email signup", async () => {
     const response = await request(createApp())
       .post("/api/v1/auth/email/signup")
@@ -16,6 +21,8 @@ describe("auth routes", () => {
     expect(response.status).toBe(201);
     expect(response.body.data.user.email).toBe("asha@example.com");
     expect(response.body.data.homes[0].name).toBe("HOME");
+    expect(response.body.data.homes[0].role).toBe("owner");
+    expect(response.body.data.activeHomeId).toBe("home-user-asha-example-com");
     expect(response.body.data.tokens.accessToken).toBe("access-user-asha-example-com");
   });
 

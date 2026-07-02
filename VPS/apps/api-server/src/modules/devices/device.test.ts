@@ -76,6 +76,30 @@ describe("device routes", () => {
     expect(response.body.data.displayName).toBe("Main Tank");
   });
 
+  it("allows a shared HOME member to rename a device inside the same HOME", async () => {
+    await createPid();
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f5",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F5/rename")
+      .set({
+        "x-user-id": "user-2",
+        "x-home-id": "home-user-1",
+        "x-home-role": "member"
+      })
+      .send({
+        displayName: "Shared Tank"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.displayName).toBe("Shared Tank");
+  });
+
   it("ingests telemetry and triggers matching device-threshold scenes", async () => {
     await createPid();
     await request(createApp()).post("/api/v1/devices/register").send({

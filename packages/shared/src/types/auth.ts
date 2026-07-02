@@ -18,5 +18,6 @@ export interface TokenPair {
 export interface AuthSession {
   user: AuthenticatedUser;
   homes: HomeRecord[];
+  activeHomeId?: string;
   tokens: TokenPair;
 }

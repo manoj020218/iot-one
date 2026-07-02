@@ -1,5 +1,3 @@
-export type HomeAccessRole = "owner" | "admin" | "member" | "viewer";
-
 export type SceneStatus = "draft" | "active" | "paused";
 
 export type SceneTriggerType = "manual" | "device_threshold" | "schedule";

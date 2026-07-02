@@ -1,5 +1,6 @@
 import type {
   DeviceRecord,
+  HomeAccessRole,
   RegisterDeviceInput,
   SceneTelemetrySnapshot
 } from "@jenix/shared";
@@ -9,6 +10,7 @@ import type { SceneRuntimeBatchResponse } from "../scenes/scene.types";
 export interface DeviceRequestContext {
   userId?: string;
   homeId?: string;
+  homeRole?: HomeAccessRole;
 }
 
 export interface RenameDevicePayload {

@@ -6,6 +6,7 @@ import type {
   EmailSignupPayload,
   ProviderAuthPayload
 } from "./auth.types";
+import { syncUserHomes } from "../homes/home.service";
 
 function createUserId(email: string): string {
   return `user-${email.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
@@ -21,6 +22,12 @@ function createTokenPair(userId: string): TokenPair {
 
 function createSession(seed: AuthProviderSessionSeed): AuthSession {
   const userId = createUserId(seed.email);
+  const homes = syncUserHomes({
+    userId,
+    name: seed.name,
+    email: seed.email
+  });
+  const normalizedHomes = ensureDefaultHome(homes, userId);
 
   return {
     user: {
@@ -29,7 +36,8 @@ function createSession(seed: AuthProviderSessionSeed): AuthSession {
       name: seed.name.trim(),
       provider: seed.provider
     },
-    homes: ensureDefaultHome([], userId),
+    homes: normalizedHomes,
+    activeHomeId: normalizedHomes[0]!.homeId,
     tokens: createTokenPair(userId)
   };
 }

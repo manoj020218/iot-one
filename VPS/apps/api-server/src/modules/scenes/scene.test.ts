@@ -139,6 +139,42 @@ describe("scene routes", () => {
     expect(runResponse.body.error).toContain("Restricted scene command");
   });
 
+  it("blocks viewer access from manually running a scene", async () => {
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(ownerHeaders)
+      .send({
+        name: "Viewer Read Only Scene",
+        status: "active",
+        triggers: [
+          {
+            type: "manual"
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "notification",
+            message: "Viewer should not run this"
+          }
+        ]
+      });
+
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    const runResponse = await request(createApp())
+      .post(`/api/v1/scenes/${sceneId}/run`)
+      .set({
+        "x-user-id": "user-scene-viewer",
+        "x-home-id": "home-user-scene-owner",
+        "x-home-role": "viewer"
+      })
+      .send({});
+
+    expect(runResponse.status).toBe(403);
+    expect(runResponse.body.error).toContain("Viewer access");
+  });
+
   it("evaluates active device-threshold scenes from telemetry runtime events", async () => {
     await request(createApp())
       .post("/api/v1/scenes")

@@ -35,7 +35,11 @@ function ensureAccess(
   device: DeviceRecord,
   context: DeviceRequestContext
 ): DeviceRecord {
-  if (context.userId && device.ownerUserId !== context.userId) {
+  if (context.homeId && device.homeId !== context.homeId) {
+    throw new DeviceModuleError(403, "Device access denied");
+  }
+
+  if (!context.homeRole && context.userId && device.ownerUserId !== context.userId) {
     throw new DeviceModuleError(403, "Device access denied");
   }
 
@@ -44,11 +48,11 @@ function ensureAccess(
 
 export function listDevices(context: DeviceRequestContext): DeviceRecord[] {
   return deviceRepository.list().filter((device) => {
-    if (context.userId && device.ownerUserId !== context.userId) {
+    if (context.homeId && device.homeId !== context.homeId) {
       return false;
     }
 
-    if (context.homeId && device.homeId !== context.homeId) {
+    if (!context.homeRole && context.userId && device.ownerUserId !== context.userId) {
       return false;
     }
 
@@ -94,6 +98,10 @@ export function patchDevice(
   patch: DevicePatchPayload,
   context: DeviceRequestContext
 ): DeviceRecord {
+  if (context.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot modify devices");
+  }
+
   const existing = ensureAccess(requireDevice(deviceId), context);
   const updated: DeviceRecord = {
     ...existing,
@@ -128,6 +136,10 @@ export function renameDevice(
   payload: RenameDevicePayload,
   context: DeviceRequestContext
 ): DeviceRecord {
+  if (context.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot rename devices");
+  }
+
   const existing = ensureAccess(requireDevice(deviceId), context);
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }

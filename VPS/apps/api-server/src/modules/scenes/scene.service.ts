@@ -87,6 +87,12 @@ function requireHomeId(context: SceneRequestContext): string {
   return context.homeId;
 }
 
+function requireWriteRole(context: SceneRequestContext) {
+  if (context.homeRole === "viewer") {
+    throw new SceneModuleError(403, "Viewer access cannot modify scenes");
+  }
+}
+
 function resolveActorId(context: SceneRequestContext): string {
   return context.userId ?? runtimeSystemActorId;
 }
@@ -101,12 +107,20 @@ async function requireScene(sceneId: string): Promise<SceneRecord> {
   return scene;
 }
 
-function assertAccess(scene: SceneRecord, context: SceneRequestContext): SceneRecord {
+function assertAccess(
+  scene: SceneRecord,
+  context: SceneRequestContext,
+  access: "read" | "write" = "read"
+): SceneRecord {
   if (context.homeId && scene.homeId !== context.homeId) {
     throw new SceneModuleError(403, "Scene access denied for this HOME");
   }
 
-  if (context.userId && scene.ownerUserId !== context.userId) {
+  if (access === "write") {
+    requireWriteRole(context);
+  }
+
+  if (!context.homeRole && context.userId && scene.ownerUserId !== context.userId) {
     throw new SceneModuleError(403, "Scene access denied for this user");
   }
 
@@ -430,7 +444,7 @@ export async function listScenes(
       return false;
     }
 
-    if (context.userId && scene.ownerUserId !== context.userId) {
+    if (!context.homeRole && context.userId && scene.ownerUserId !== context.userId) {
       return false;
     }
 
@@ -459,6 +473,7 @@ export async function createScene(
 ): Promise<SceneRecord> {
   const actorId = requireActorId(context);
   const homeId = requireHomeId(context);
+  requireWriteRole(context);
   const actions = payload.actions.map(toActionRecord);
 
   assertRestrictedActionPermission(actions, context.homeRole);
@@ -492,7 +507,7 @@ export async function patchScene(
   context: SceneRequestContext
 ): Promise<SceneRecord> {
   const actorId = requireActorId(context);
-  const existing = assertAccess(await requireScene(sceneId), context);
+  const existing = assertAccess(await requireScene(sceneId), context, "write");
   const nextActions = patch.actions
     ? patch.actions.map(toActionRecord)
     : existing.actions;
@@ -523,7 +538,7 @@ export async function runSceneManually(
   context: SceneRequestContext
 ): Promise<SceneRunResponse> {
   const actorId = requireActorId(context);
-  const existing = assertAccess(await requireScene(sceneId), context);
+  const existing = assertAccess(await requireScene(sceneId), context, "write");
 
   if (existing.status === "paused") {
     throw new SceneModuleError(409, "Paused scenes cannot be run manually");
