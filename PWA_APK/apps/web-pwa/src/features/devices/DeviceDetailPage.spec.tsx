@@ -181,8 +181,12 @@ describe("DeviceDetailPage", () => {
 
     expect(await screen.findByText("Matter Readiness")).toBeInTheDocument();
     expect(screen.getByText("ready to commission")).toBeInTheDocument();
+    expect(screen.getByText("Planned")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Matter remains planned at the MQTT\/VPS layer only/i)
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Start Matter Commissioning" })
-    ).toBeEnabled();
+    ).toBeDisabled();
   });
 });

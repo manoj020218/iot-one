@@ -58,6 +58,9 @@ async function bootstrap() {
     console.log(
       `[api-server] listening on port ${config.port} in ${config.nodeEnv} mode`
     );
+    console.log(
+      `[api-server] matter runtime enabled: ${config.matterRuntimeEnabled}`
+    );
 
     if (sceneRuntimeScheduler) {
       sceneRuntimeScheduler.start();

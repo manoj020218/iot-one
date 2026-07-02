@@ -1,6 +1,6 @@
 import { foundationPidBlueprint } from "@jenix/device-schemas";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { deviceTesting } from "../devices/device.service";
@@ -17,6 +17,8 @@ const ownerHeaders = {
   "x-home-id": "home-user-matter-owner",
   "x-home-role": "owner"
 };
+
+const originalMatterRuntimeEnabled = process.env.MATTER_RUNTIME_ENABLED;
 
 async function createMatterPid(
   pid: string,
@@ -69,9 +71,19 @@ async function registerMatterDevice(pid: string, deviceId = "JNX-TG-MTR-1") {
 
 describe("matter routes", () => {
   beforeEach(() => {
+    delete process.env.MATTER_RUNTIME_ENABLED;
     pidTesting.reset();
     deviceTesting.reset();
     matterTesting.reset();
+  });
+
+  afterEach(() => {
+    if (originalMatterRuntimeEnabled === undefined) {
+      delete process.env.MATTER_RUNTIME_ENABLED;
+      return;
+    }
+
+    process.env.MATTER_RUNTIME_ENABLED = originalMatterRuntimeEnabled;
   });
 
   it("returns a Matter readiness status derived from the PID mapping", async () => {
@@ -85,10 +97,25 @@ describe("matter routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.mode).toBe("NATIVE_MATTER");
     expect(response.body.data.readiness).toBe("ready_to_commission");
+    expect(response.body.data.activationEnabled).toBe(false);
     expect(response.body.data.mapping.vendorId).toBe("0xFFF1");
   });
 
-  it("stages placeholder Matter commissioning for owner/admin access", async () => {
+  it("blocks Matter commissioning until the runtime activation flag is enabled", async () => {
+    await createMatterPid("JNX-TG-C3-302", "NATIVE_MATTER");
+    await registerMatterDevice("JNX-TG-C3-302");
+
+    const response = await request(createApp())
+      .post("/api/v1/matter/devices/JNX-TG-MTR-1/commission")
+      .set(ownerHeaders)
+      .send({});
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("MQTT/VPS layer only");
+  });
+
+  it("stages placeholder Matter commissioning for owner/admin access when activation is enabled", async () => {
+    process.env.MATTER_RUNTIME_ENABLED = "true";
     await createMatterPid("JNX-TG-C3-302", "NATIVE_MATTER");
     await registerMatterDevice("JNX-TG-C3-302");
 
@@ -110,6 +137,7 @@ describe("matter routes", () => {
   });
 
   it("blocks Matter commissioning for shared member access", async () => {
+    process.env.MATTER_RUNTIME_ENABLED = "true";
     await createMatterPid("JNX-TG-C3-303", "NATIVE_MATTER");
     await registerMatterDevice("JNX-TG-C3-303");
 
@@ -127,6 +155,7 @@ describe("matter routes", () => {
   });
 
   it("stages placeholder bridge sync for bridge-mode devices", async () => {
+    process.env.MATTER_RUNTIME_ENABLED = "true";
     await createMatterPid("JNX-TG-C3-304", "MATTER_BRIDGE_GATEWAY");
     await registerMatterDevice("JNX-TG-C3-304");
 

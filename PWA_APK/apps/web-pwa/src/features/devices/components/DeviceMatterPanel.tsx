@@ -34,11 +34,13 @@ export function DeviceMatterPanel({
   const [error, setError] = useState<string | null>(null);
   const canManage = canManageMatter(homeRole);
   const canCommission =
-    status.readiness === "ready_to_commission" || status.readiness === "bridge_ready";
+    status.activationEnabled &&
+    (status.readiness === "ready_to_commission" || status.readiness === "bridge_ready");
   const canBridgeSync =
-    status.bridgeState === "gateway_ready" ||
-    status.bridgeState === "child_waiting_for_gateway" ||
-    status.bridgeState === "sync_requested";
+    status.activationEnabled &&
+    (status.bridgeState === "gateway_ready" ||
+      status.bridgeState === "child_waiting_for_gateway" ||
+      status.bridgeState === "sync_requested");
 
   return (
     <section className="panel matter-panel">
@@ -47,8 +49,9 @@ export function DeviceMatterPanel({
           <span className="eyebrow">Matter</span>
           <h2>Matter Readiness</h2>
           <p className="hint-text">
-            Phase 11 models Matter mapping, readiness, bridge state, and operator
-            placeholders before live commissioner and bridge transport are introduced.
+            Phase 11 keeps Matter at the MQTT/VPS architecture layer with product
+            mapping and readiness only. Live activation stays off until the vendor ID,
+            CSA process, and multi-product rollout are ready.
           </p>
         </div>
       </div>
@@ -68,6 +71,10 @@ export function DeviceMatterPanel({
         <div>
           <dt>Bridge</dt>
           <dd>{formatState(status.bridgeState)}</dd>
+        </div>
+        <div>
+          <dt>Activation</dt>
+          <dd>{status.activationEnabled ? "Active" : "Planned"}</dd>
         </div>
         <div>
           <dt>Device Type</dt>
@@ -114,6 +121,9 @@ export function DeviceMatterPanel({
       ) : null}
       {status.lastBridgeSyncAt ? (
         <p className="hint-text">Last bridge sync placeholder: {status.lastBridgeSyncAt}</p>
+      ) : null}
+      {!status.activationEnabled ? (
+        <p className="provisioning-note">{status.activationMessage}</p>
       ) : null}
       {!canManage ? (
         <p className="inline-error">

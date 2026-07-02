@@ -2,6 +2,7 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   mongodbUri?: string;
+  matterRuntimeEnabled: boolean;
   scenePersistenceMode: "memory" | "mongodb";
   sceneSchedulerEnabled: boolean;
   sceneSchedulerCoordinationMode: "local" | "mongodb-lock";
@@ -122,6 +123,10 @@ export function readAppConfig(): AppConfig {
     nodeEnv: process.env.NODE_ENV ?? "development",
     port,
     ...(mongodbUri ? { mongodbUri } : {}),
+    matterRuntimeEnabled: parseBooleanEnv(
+      process.env.MATTER_RUNTIME_ENABLED,
+      false
+    ),
     scenePersistenceMode,
     sceneSchedulerEnabled: parseBooleanEnv(
       process.env.SCENE_SCHEDULER_ENABLED,

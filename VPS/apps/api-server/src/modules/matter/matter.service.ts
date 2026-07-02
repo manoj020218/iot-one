@@ -12,6 +12,16 @@ import { matterRuntimeRepository } from "./matter.model";
 import type { MatterRequestContext, MatterRuntimeRecord } from "./matter.types";
 import { MatterModuleError } from "./matter.types";
 
+function isMatterRuntimeEnabled(): boolean {
+  return process.env.MATTER_RUNTIME_ENABLED?.trim() === "true";
+}
+
+function getMatterActivationMessage(): string {
+  return isMatterRuntimeEnabled()
+    ? "Matter runtime is enabled for this deployment."
+    : "Matter remains planned at the MQTT/VPS layer only until multi-product rollout, vendor ID assignment, and CSA readiness are complete.";
+}
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
@@ -54,6 +64,8 @@ function buildStatus(
   deviceMatterEnabled: boolean,
   runtime: MatterRuntimeRecord | undefined
 ): Omit<MatterDeviceStatus, "deviceId" | "pid"> {
+  const activationEnabled = isMatterRuntimeEnabled();
+  const activationMessage = getMatterActivationMessage();
   const notes: string[] = [];
   const mode = pid.matter.mode;
   const hardwareMatterCapable = pid.hardware.hasMatter;
@@ -113,6 +125,8 @@ function buildStatus(
 
   return {
     enabled,
+    activationEnabled,
+    activationMessage,
     deviceMatterEnabled,
     hardwareMatterCapable,
     mode,
@@ -159,6 +173,10 @@ export function requestMatterCommissioning(
 
   const status = getMatterDeviceStatus(device.deviceId, context);
 
+  if (!status.activationEnabled) {
+    throw new MatterModuleError(409, status.activationMessage);
+  }
+
   if (
     status.readiness !== "ready_to_commission" &&
     status.readiness !== "bridge_ready"
@@ -200,6 +218,10 @@ export function requestMatterBridgeSync(
   requireMatterOperatorAccess(device.ownerUserId, context);
 
   const status = getMatterDeviceStatus(device.deviceId, context);
+
+  if (!status.activationEnabled) {
+    throw new MatterModuleError(409, status.activationMessage);
+  }
 
   if (
     status.bridgeState !== "gateway_ready" &&

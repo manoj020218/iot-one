@@ -47,6 +47,8 @@ export interface MatterDeviceStatus {
   deviceId: string;
   pid: string;
   enabled: boolean;
+  activationEnabled: boolean;
+  activationMessage: string;
   deviceMatterEnabled: boolean;
   hardwareMatterCapable: boolean;
   mode: MatterMode;

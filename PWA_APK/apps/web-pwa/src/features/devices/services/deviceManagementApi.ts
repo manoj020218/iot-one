@@ -160,6 +160,9 @@ function buildLocalMatterStatus(
   device: DeviceRecord,
   pidProfile: DevicePidProfile
 ): MatterDeviceStatus {
+  const activationEnabled = false;
+  const activationMessage =
+    "Matter remains planned at the MQTT/VPS layer only until multi-product rollout, vendor ID assignment, and CSA readiness are complete.";
   const runtime = getDemoMatterRuntime(device.deviceId);
   const mode = pidProfile.matter.mode;
   const deviceMatterEnabled = device.matterEnabled ?? pidProfile.matter.enabled;
@@ -222,6 +225,8 @@ function buildLocalMatterStatus(
     deviceId: device.deviceId,
     pid: pidProfile.pid,
     enabled,
+    activationEnabled,
+    activationMessage,
     deviceMatterEnabled,
     hardwareMatterCapable,
     mode,
@@ -597,6 +602,10 @@ export async function requestMatterCommissioning(
   } catch {
     const status = buildLocalMatterStatus(device, pidProfile);
 
+    if (!status.activationEnabled) {
+      throw new Error(status.activationMessage);
+    }
+
     if (
       status.readiness !== "ready_to_commission" &&
       status.readiness !== "bridge_ready"
@@ -654,6 +663,10 @@ export async function requestMatterBridgeSync(
     );
   } catch {
     const status = buildLocalMatterStatus(device, pidProfile);
+
+    if (!status.activationEnabled) {
+      throw new Error(status.activationMessage);
+    }
 
     if (
       status.bridgeState !== "gateway_ready" &&
