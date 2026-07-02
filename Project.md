@@ -12,7 +12,8 @@
 - Current status: Phase 9 settings and dynamic PID pages complete
 - Current status: Phase 10 OTA and third-party API foundations complete
 - Current status: Phase 11 Matter readiness complete
-- Current phase: Phase 11 - Matter Readiness
+- Current status: Phase 12 PID and device persistence baseline complete
+- Current phase: Phase 12 - Core Persistence Baseline
 
 ## Working Scope
 
@@ -311,16 +312,33 @@ Validation gates:
 - [x] Matter mode validation tests
 - [x] Restricted Matter command tests
 
+### Phase 12 - Core Persistence Baseline
+
+Status: Completed
+
+Deliverables:
+- [x] PID repository abstraction
+- [x] MongoDB-backed PID persistence
+- [x] MongoDB-backed PID audit log persistence
+- [x] Device repository abstraction
+- [x] MongoDB-backed device persistence
+- [x] Bootstrap wiring for PID/device persistence modes
+
+Validation gates:
+- [x] PID admin route regression tests
+- [x] Device registry route regression tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
-2. Persist PID, device registry, provisioning intent, HOME sharing, OTA release, and API access modules in MongoDB for platform-wide durability.
-3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows.
-4. Keep `PROGRESS.md` updated after each remaining milestone.
+1. Persist HOME sharing, provisioning intent, OTA release, and API access modules in MongoDB for platform-wide durability.
+2. Replace header-trusted HOME role context with server-authoritative membership checks.
+3. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
 
 ## Decision Log
 
@@ -345,6 +363,7 @@ Validation gates:
 - 2026-07-02: Added OTA release records, PID/hardware-aware firmware resolution, API package and key management, public device API scope enforcement, and Phase 10 validation coverage.
 - 2026-07-02: Added Matter readiness contracts, PID matter-mode consistency validation, placeholder commissioning and bridge routes, restricted Matter scene commands, and device-detail Matter status panels for Phase 11.
 - 2026-07-02: Locked Matter runtime behind an explicit activation flag so the MQTT/VPS-side modeling remains in place while live Matter actions stay disabled until vendor ID, CSA, and multi-product rollout readiness are complete.
+- 2026-07-02: Added repository abstractions and MongoDB-backed drivers for PID records, PID audit logs, and device records so the core product/device layer now matches the scene durability baseline.
 
 ## Risks and Controls
 
@@ -374,3 +393,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-02: Phase 7 runtime orchestration hooks completed for schedule and device-threshold evaluation, history retrieval, and full workspace validation.
 - 2026-07-02: Phase 7 automatic runtime wiring completed with scheduler bootstrap, telemetry ingest, scheduler tests, and full workspace validation.
 - 2026-07-02: Phase 11 Matter readiness completed with backend placeholders, PID validation alignment, restricted-command coverage, device-detail Matter UI, and full workspace validation.
+- 2026-07-02: Phase 12 core persistence baseline completed with PID/device MongoDB drivers, bootstrap wiring, and full workspace validation.

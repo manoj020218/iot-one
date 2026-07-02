@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 11 - Matter Readiness
+- Phase name: Phase 12 - Core Persistence Baseline
 - Started: 2026-07-02
 - Status: Completed
 
@@ -48,6 +48,9 @@
 - [x] Matter readiness status
 - [x] Matter bridge placeholder
 - [x] Matter commissioning placeholder
+- [x] PID MongoDB persistence
+- [x] PID audit log persistence
+- [x] Device MongoDB persistence
 - [x] Unit tests
 - [x] Regression tests
 
@@ -106,6 +109,9 @@
 - Date: 2026-07-02
   Decision: Keep Matter runtime disabled by default behind `MATTER_RUNTIME_ENABLED=false` until vendor ID, CSA readiness, and a broader multi-product rollout are in place.
   Reason: It preserves the MQTT/VPS-side architecture work from Phase 11 without signaling that live Matter activation is ready before the commercial and certification prerequisites exist.
+- Date: 2026-07-02
+  Decision: Start the persistence-hardening phase with PID and device registry storage first, using the same repository-plus-driver pattern already proven in scenes.
+  Reason: PID and device records sit underneath OTA, Matter, provisioning, and public API flows, so making them durable first reduces cross-module risk and keeps the later persistence passes more mechanical.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -114,15 +120,9 @@
 - Issue: Auth persistence is currently mock-backed and not yet connected to MongoDB.
   Impact: Login and signup flows validate architecture and tests, but not final production persistence.
   Fix plan: Replace the mock session generation with database-backed auth and refresh-token storage during the next auth-hardening pass.
-- Issue: PID storage and audit logs are currently in-memory inside the API server module.
-  Impact: Phase 3 behavior is validated and testable, but PID data is not yet durable across process restarts.
-  Fix plan: Replace the in-memory repository with MongoDB collections `product_pids` and `pid_audit_logs` during the persistence pass.
 - Issue: The admin PID UI falls back to a local demo store when `/api/v1/admin/pids` is unavailable.
   Impact: Frontend development remains usable without the backend, but full multi-user consistency still depends on the live API.
   Fix plan: Remove or reduce the demo fallback once the backend is consistently available in development and staging.
-- Issue: The device registry is still in-memory on the API side and uses dashboard-side demo fallback when the API is unavailable.
-  Impact: Device cards and rename flows are fully wired, but device persistence is not durable yet.
-  Fix plan: Move device records to MongoDB and reduce dashboard fallback use once the backend environment is stable.
 - Issue: Provisioning currently simulates BLE scan discovery and AP hotspot progression instead of talking to real device transport layers.
   Impact: The onboarding UX, backend contracts, and dashboard integration are validated, but hardware commissioning is still a controlled abstraction.
   Fix plan: Replace the simulated BLE and AP transport services with native Android and live firmware-facing provisioning adapters in the device integration pass.
@@ -150,11 +150,15 @@
 - Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
   Impact: Phase 11 models Matter capability, permissions, and UI entry points, but live Matter activation is intentionally disabled by default and still does not perform commissioner transport, gateway coordination, or durable Matter-state persistence.
   Fix plan: Keep the activation flag off until vendor ID and CSA readiness are complete, then replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
+- Issue: HOME sharing, provisioning intent, OTA release, and API access storage are still in-memory on the API side.
+  Impact: The platform now has durable scenes, PIDs, and devices, but collaboration, onboarding history, firmware catalog data, and issued API credentials still reset with the process.
+  Fix plan: Continue the persistence phase with MongoDB-backed HOME, provisioning, OTA, and API-access drivers using the same repository pattern.
 
 ## Next Tasks
-1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
-2. Move PID, device registry, provisioning intent, HOME sharing, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene durability baseline.
-3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
+1. Move HOME sharing, provisioning intent, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene/PID/device durability baseline.
+2. Replace header-trusted HOME role context with server-authoritative membership checks.
+3. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
+4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -176,3 +180,4 @@
 - 2026-07-02: Completed Phase 9 device management, device detail pages, firmware request panel, PID-driven dynamic page rendering, settings pages, and full workspace validation.
 - 2026-07-02: Completed Phase 10 OTA release modeling, device firmware compatibility resolution, API package and key management, public API scope enforcement, and full workspace validation.
 - 2026-07-02: Completed Phase 11 Matter readiness with shared Matter contracts, PID mode validation alignment, placeholder backend routes, restricted Matter command coverage, device-detail Matter UI, and full workspace validation.
+- 2026-07-02: Completed Phase 12 core persistence baseline with MongoDB-backed PID records, PID audit logs, device records, bootstrap wiring, and full workspace validation.
