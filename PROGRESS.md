@@ -1,9 +1,9 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 7 - Scene Pipeline
-- Started: 2026-07-01
-- Status: In progress
+- Phase name: Phase 8 - Home Management and Sharing
+- Started: 2026-07-02
+- Status: Completed
 
 ## Completed
 - [x] Project planning tracker
@@ -32,7 +32,7 @@
 - [x] Device telemetry ingestion path
 - [x] MongoDB-backed scene persistence
 - [x] Distributed scheduler coordination
-- [ ] Home sharing
+- [x] Home sharing
 - [ ] Settings pages
 - [ ] OTA by PID
 - [ ] Matter mapping
@@ -80,6 +80,9 @@
 - Date: 2026-07-02
   Decision: Coordinate scheduled scene execution with a MongoDB lease so only one API instance owns a scheduler tick at a time, while keeping a local coordinator for tests and single-node fallback.
   Reason: It removes the main multi-instance duplication risk without forcing an immediate move to a separate worker service.
+- Date: 2026-07-02
+  Decision: Model HOME access explicitly with `owner`, `admin`, `member`, and `viewer` roles, keep the PWA on the real `/api/v1/homes` contract first, and preserve a local fallback store for browser-only and API-unavailable runs.
+  Reason: It makes shared access rules visible across dashboard, provisioning, and scenes immediately without blocking Phase 8 on full auth middleware or durable HOME persistence.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -109,11 +112,17 @@
 - Issue: Scheduler leadership is now lease-coordinated across API instances, but execution still runs inside the API process instead of a dedicated worker.
   Impact: Duplicate leadership is controlled, but heavy automation volume still competes with API traffic and would benefit from queue-backed isolation at larger scale.
   Fix plan: Move schedule execution and high-volume telemetry-triggered automation to a worker or queue-backed runtime once deployment load justifies it.
+- Issue: HOME sharing state, memberships, share codes, and audit records are currently in-memory on the API side.
+  Impact: Phase 8 role management and share-code flows are functional and tested, but HOME collaboration data is not durable across process restarts.
+  Fix plan: Persist HOME records, members, share codes, and access audit history in MongoDB during the broader persistence-hardening pass.
+- Issue: Shared HOME access for scenes and devices currently trusts the session-provided `x-home-role` context instead of resolving membership on the backend from authenticated middleware.
+  Impact: UI-visible role restrictions work for the current architecture, but final production RBAC still needs server-authoritative membership checks.
+  Fix plan: Replace header-trusted HOME role context with authenticated membership resolution when the auth middleware and durable HOME repository are introduced.
 
 ## Next Tasks
 1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
-2. Start Phase 8 home sharing now that durable automation persistence and scheduler coordination are in place.
-3. Move PID, device registry, and provisioning intent storage to MongoDB so the rest of the platform matches the scene durability baseline.
+2. Start Phase 9 settings pages and dynamic PID-driven device pages on top of the new HOME role model.
+3. Move PID, device registry, provisioning intent, and HOME sharing storage to MongoDB so the rest of the platform matches the scene durability baseline.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -131,3 +140,4 @@
 - 2026-07-02: Wired Phase 7 runtime execution into an in-process scheduler loop and a device telemetry ingestion route so scenes can now fire automatically while the API server is running.
 - 2026-07-02: Persisted scene records, audit logs, and run history in MongoDB with a repository abstraction, bootstrap wiring, and full workspace validation.
 - 2026-07-02: Added Mongo lease-based scheduler coordination, local overlap protection, and multi-instance scheduler tests for Phase 7 runtime hardening.
+- 2026-07-02: Completed Phase 8 HOME sharing with members, share codes, redeem flow, role-based access, dashboard and scene integration, and full workspace validation.

@@ -8,7 +8,8 @@
 - Current status: Phase 7 scene UI and runtime orchestration complete
 - Current status: Phase 7 durable MongoDB-backed scene persistence complete
 - Current status: Phase 7 distributed scheduler coordination complete
-- Current phase: Phase 7 - scene pipeline
+- Current status: Phase 8 home management and sharing complete
+- Current phase: Phase 8 - home management and sharing
 
 ## Working Scope
 
@@ -210,7 +211,7 @@ Validation gates:
 
 ### Phase 7 - Scene Pipeline
 
-Status: In Progress
+Status: Completed
 
 Deliverables:
 - [x] Scene model
@@ -241,20 +242,20 @@ Validation gates:
 
 ### Phase 8 - Home Management and Sharing
 
-Status: Pending
+Status: Completed
 
 Deliverables:
-- [ ] Home members model
-- [ ] Share code generation
-- [ ] Share code redeem flow
-- [ ] Permission selector
-- [ ] Access revoke flow
-- [ ] Owner/admin/shared/viewer distinction in UI
+- [x] Home members model
+- [x] Share code generation
+- [x] Share code redeem flow
+- [x] Permission selector
+- [x] Access revoke flow
+- [x] Owner/admin/shared/viewer distinction in UI
 
 Validation gates:
-- [ ] Shared user permission tests
-- [ ] Expired code tests
-- [ ] Access revocation tests
+- [x] Shared user permission tests
+- [x] Expired code tests
+- [x] Access revocation tests
 
 ### Phase 9 - Settings and Dynamic PID Pages
 
@@ -309,10 +310,10 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
-2. Start Phase 8 home sharing now that durable automation persistence and scheduler coordination are stable.
-3. Persist PID, device registry, and provisioning intent modules in MongoDB for platform-wide durability.
-4. Keep `PROGRESS.md` updated after each remaining Phase 7 milestone.
+1. Start Phase 9 settings pages and dynamic PID-driven device pages on top of the new HOME role model.
+2. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+3. Persist PID, device registry, provisioning intent, and HOME sharing modules in MongoDB for platform-wide durability.
+4. Keep `PROGRESS.md` updated after each remaining milestone.
 
 ## Decision Log
 
@@ -332,6 +333,7 @@ Validation gates:
 - 2026-07-02: Wired schedule scenes into an in-process scheduler and device-threshold scenes into a direct telemetry ingest path so Phase 7 now executes automatically within the running API process.
 - 2026-07-02: Persisted scenes, scene audit logs, and scene run history in MongoDB behind a shared repository abstraction while preserving in-memory mode for tests.
 - 2026-07-02: Added Mongo lease-based scheduler leadership so multi-instance deployments do not run the same schedule tick concurrently.
+- 2026-07-02: Added HOME members, share codes, redeem flow, role-aware access, and HOME management UI on the real `/api/v1/homes` contract with local fallback support.
 
 ## Risks and Controls
 
