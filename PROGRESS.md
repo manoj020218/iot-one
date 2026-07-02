@@ -25,6 +25,9 @@
 - [x] Scene engine
 - [x] Manual scene run support
 - [x] Scene builder UI
+- [x] Scene telemetry runtime hook
+- [x] Scene schedule runtime hook
+- [x] Scene run history
 - [ ] Home sharing
 - [ ] Settings pages
 - [ ] OTA by PID
@@ -61,6 +64,9 @@
 - Date: 2026-07-02
   Decision: Keep the PWA scene builder on the real `/api/v1/scenes` contract first, but add a local scene catalog fallback and local manual-run evaluator when the backend is unavailable.
   Reason: It preserves the production automation contract while keeping authoring, testing, and route coverage usable in browser-only and CI environments.
+- Date: 2026-07-02
+  Decision: Add schedule and device-threshold runtime evaluation as explicit API hooks before introducing a long-running scheduler or telemetry-consumer worker.
+  Reason: It keeps Phase 7 testable and production-aligned while avoiding premature infrastructure coupling to MQTT, cron, or queue workers.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -90,14 +96,14 @@
 - Issue: Scene records, scene audit entries, and manual run history are currently in-memory on the API side.
   Impact: The Phase 7 execution model and permission rules are validated, but automations are not durable across restarts.
   Fix plan: Move scenes and scene audit logs into MongoDB before enabling production automation management.
-- Issue: Scene authoring is now available in the PWA, but scheduled execution and device-threshold execution are not yet wired into a background runtime.
-  Impact: Operators can build, edit, and manually test scenes today, but automatic scene firing still stops at the API contract and evaluator layer.
-  Fix plan: Extend the Phase 7 backend into scheduler hooks, device telemetry ingestion hooks, and durable run history before production automation is enabled.
+- Issue: Scene runtime evaluation now supports schedule and device-threshold hooks, but there is still no autonomous background worker invoking those hooks from real cron or telemetry infrastructure.
+  Impact: Operators can author scenes and the backend can evaluate them through explicit runtime endpoints, but full automatic execution still depends on a future scheduler and telemetry-consumer layer.
+  Fix plan: Connect these runtime hooks to scheduled jobs, MQTT or telemetry ingestion, and durable persistence before production automation is enabled.
 
 ## Next Tasks
-1. Extend the backend scene engine beyond manual runs into scheduled and device-threshold execution hooks.
+1. Connect scene runtime hooks to a real background scheduler and telemetry ingestion path.
 2. Persist scenes, audit entries, and run history in MongoDB so automation survives process restarts.
-3. Start Phase 8 home sharing once Phase 7 runtime orchestration is stable.
+3. Start Phase 8 home sharing once autonomous scene execution is stable.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -111,3 +117,4 @@
 - 2026-07-01: Ported the FloodGuard-style BLE quick-search pattern into Jenix provisioning with native plugin detection, two-pass filtering, and quick-search UI support.
 - 2026-07-01: Started Phase 7 with shared scene contracts, restricted-command rules, backend scene routes, manual run support, and tests.
 - 2026-07-02: Completed the Phase 7 PWA scene catalog and scene builder UI with trigger, condition, action, schedule, and manual-test-run flows on the `/api/v1/scenes` contract.
+- 2026-07-02: Added Phase 7 scene runtime orchestration hooks for device-threshold evaluation, schedule evaluation, and scene run-history retrieval on the API side.

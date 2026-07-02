@@ -3,7 +3,10 @@ import type { Request, Response } from "express";
 
 import {
   createScene,
+  evaluateScheduledScenes,
+  evaluateScenesByTelemetry,
   getScene,
+  listSceneRunHistory,
   listScenes,
   patchScene,
   runSceneManually
@@ -12,7 +15,9 @@ import { SceneModuleError } from "./scene.types";
 import {
   parseCreateScenePayload,
   parseManualRunPayload,
-  parseScenePatchPayload
+  parseScheduleRuntimePayload,
+  parseScenePatchPayload,
+  parseTelemetryRuntimePayload
 } from "./scene.validation";
 import type { SceneRequestContext } from "./scene.types";
 
@@ -74,6 +79,19 @@ export function getSceneController(request: Request, response: Response) {
   }
 }
 
+export function listSceneRunHistoryController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(200).json({
+      data: listSceneRunHistory(request.params.sceneId ?? "", readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
 export function createSceneController(request: Request, response: Response) {
   const payload = parseCreateScenePayload(request.body);
 
@@ -125,6 +143,50 @@ export function runSceneController(request: Request, response: Response) {
   try {
     response.status(200).json({
       data: runSceneManually(request.params.sceneId ?? "", payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export function evaluateTelemetryRuntimeController(
+  request: Request,
+  response: Response
+) {
+  const payload = parseTelemetryRuntimePayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid telemetry runtime payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: evaluateScenesByTelemetry(payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export function evaluateScheduleRuntimeController(
+  request: Request,
+  response: Response
+) {
+  const payload = parseScheduleRuntimePayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid schedule runtime payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: evaluateScheduledScenes(payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);

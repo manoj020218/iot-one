@@ -138,4 +138,149 @@ describe("scene routes", () => {
     expect(runResponse.status).toBe(403);
     expect(runResponse.body.error).toContain("Restricted scene command");
   });
+
+  it("evaluates active device-threshold scenes from telemetry runtime events", async () => {
+    await request(createApp())
+      .post("/api/v1/scenes")
+      .set(ownerHeaders)
+      .send({
+        name: "Tank Alert Runtime",
+        status: "active",
+        triggers: [
+          {
+            type: "device_threshold",
+            deviceId: "JNX-TG-C3-A7F2",
+            metricKey: "tankLevelPct",
+            comparator: "gte",
+            threshold: 80
+          }
+        ],
+        conditions: [
+          {
+            field: "tankLevelPct",
+            operator: "gte",
+            value: 80
+          }
+        ],
+        actions: [
+          {
+            type: "notification",
+            message: "Tank level crossed 80%"
+          }
+        ]
+      });
+
+    const runtimeResponse = await request(createApp())
+      .post("/api/v1/scenes/runtime/device-threshold")
+      .set(ownerHeaders)
+      .send({
+        deviceId: "JNX-TG-C3-A7F2",
+        telemetry: {
+          tankLevelPct: 82
+        },
+        occurredAt: "2026-07-02T03:30:00.000Z"
+      });
+
+    expect(runtimeResponse.status).toBe(200);
+    expect(runtimeResponse.body.data.evaluatedSceneCount).toBe(1);
+    expect(runtimeResponse.body.data.matchedRunCount).toBe(1);
+    expect(runtimeResponse.body.data.runs[0].scene.lastRunStatus).toBe("success");
+  });
+
+  it("dedupes schedule runtime evaluation for the same schedule window", async () => {
+    await request(createApp())
+      .post("/api/v1/scenes")
+      .set(ownerHeaders)
+      .send({
+        name: "Morning Sync",
+        status: "active",
+        triggers: [
+          {
+            type: "schedule"
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-C3-A7F2",
+            command: "sync"
+          }
+        ],
+        schedule: {
+          timezone: "Asia/Kolkata",
+          daysOfWeek: [4],
+          time: "09:15"
+        }
+      });
+
+    const firstRunResponse = await request(createApp())
+      .post("/api/v1/scenes/runtime/schedule")
+      .set(ownerHeaders)
+      .send({
+        occurredAt: "2026-07-02T03:45:00.000Z"
+      });
+
+    expect(firstRunResponse.status).toBe(200);
+    expect(firstRunResponse.body.data.evaluatedSceneCount).toBe(1);
+    expect(firstRunResponse.body.data.runs).toHaveLength(1);
+
+    const secondRunResponse = await request(createApp())
+      .post("/api/v1/scenes/runtime/schedule")
+      .set(ownerHeaders)
+      .send({
+        occurredAt: "2026-07-02T03:45:00.000Z"
+      });
+
+    expect(secondRunResponse.status).toBe(200);
+    expect(secondRunResponse.body.data.evaluatedSceneCount).toBe(0);
+    expect(secondRunResponse.body.data.runs).toHaveLength(0);
+  });
+
+  it("returns run history for a scene after runtime execution", async () => {
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(ownerHeaders)
+      .send({
+        name: "History Alert",
+        status: "active",
+        triggers: [
+          {
+            type: "device_threshold",
+            deviceId: "JNX-TG-C3-A7F2",
+            metricKey: "tankLevelPct",
+            comparator: "gte",
+            threshold: 70
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "notification",
+            message: "History capture alert"
+          }
+        ]
+      });
+
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    await request(createApp())
+      .post("/api/v1/scenes/runtime/device-threshold")
+      .set(ownerHeaders)
+      .send({
+        deviceId: "JNX-TG-C3-A7F2",
+        telemetry: {
+          tankLevelPct: 75
+        }
+      });
+
+    const historyResponse = await request(createApp())
+      .get(`/api/v1/scenes/${sceneId}/history`)
+      .set(ownerHeaders);
+
+    expect(historyResponse.status).toBe(200);
+    expect(historyResponse.body.data).toHaveLength(1);
+    expect(historyResponse.body.data[0].source).toBe("device_threshold");
+    expect(historyResponse.body.data[0].matchedConditions).toBe(true);
+  });
 });
