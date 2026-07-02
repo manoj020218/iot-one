@@ -54,3 +54,4 @@ cmd /c pnpm build
 - Third-party API packages are managed through `/api/v1/admin/api-packages`, HOME-scoped API keys through `/api/v1/api-keys`, and public device access through `/api/v1/public/devices/:deviceId/...` with API-key scope enforcement.
 - Matter readiness is exposed through `GET /api/v1/matter/devices/:deviceId/status`, with owner/admin placeholder actions at `POST /api/v1/matter/devices/:deviceId/commission` and `POST /api/v1/matter/devices/:deviceId/bridge-sync`.
 - Matter commissioning and bridge sync are still modeled placeholders; they validate PID/device readiness and permissions now, but live commissioner and gateway transport are not wired yet.
+- Matter runtime is disabled by default with `MATTER_RUNTIME_ENABLED=false` and should remain off until vendor ID, CSA readiness, and the broader multi-product rollout are ready.

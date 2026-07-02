@@ -103,6 +103,9 @@
 - Date: 2026-07-02
   Decision: Implement Phase 11 Matter readiness as shared contracts plus placeholder backend routes and a device-detail status panel, while deferring live commissioner and bridge transport to a later integration pass.
   Reason: It adds Matter-aware product and device modeling now, keeps permissions and tests enforceable, and avoids pretending transport exists before the device/runtime layer is ready.
+- Date: 2026-07-02
+  Decision: Keep Matter runtime disabled by default behind `MATTER_RUNTIME_ENABLED=false` until vendor ID, CSA readiness, and a broader multi-product rollout are in place.
+  Reason: It preserves the MQTT/VPS-side architecture work from Phase 11 without signaling that live Matter activation is ready before the commercial and certification prerequisites exist.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -145,8 +148,8 @@
   Impact: Operators can select the correct PID/hardware-compatible target version, but rollout execution is still a controlled placeholder.
   Fix plan: Add the actual OTA delivery worker, device acknowledgement flow, and rollout state tracking when the firmware transport layer is introduced.
 - Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
-  Impact: Phase 11 models Matter capability, permissions, and UI entry points, but it does not yet perform live commissioner transport, gateway coordination, or durable Matter-state persistence.
-  Fix plan: Replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
+  Impact: Phase 11 models Matter capability, permissions, and UI entry points, but live Matter activation is intentionally disabled by default and still does not perform commissioner transport, gateway coordination, or durable Matter-state persistence.
+  Fix plan: Keep the activation flag off until vendor ID and CSA readiness are complete, then replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
 
 ## Next Tasks
 1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.

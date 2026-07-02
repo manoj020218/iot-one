@@ -296,6 +296,10 @@ Validation gates:
 
 Status: Completed
 
+Rollout note:
+- Phase 11 Matter work is limited to MQTT/VPS-side data modeling, PID mapping, readiness state, and guarded placeholder flows.
+- Live Matter activation must stay disabled until the platform is ready with multiple products, vendor ID assignment, and CSA onboarding/certification readiness.
+
 Deliverables:
 - [x] Matter mapping model
 - [x] Matter mode in PID model
@@ -340,6 +344,7 @@ Validation gates:
 - 2026-07-02: Added device-facing PID metadata, device center pages, firmware request controls, dynamic PID page rendering, settings pages, and Phase 9 validation coverage.
 - 2026-07-02: Added OTA release records, PID/hardware-aware firmware resolution, API package and key management, public device API scope enforcement, and Phase 10 validation coverage.
 - 2026-07-02: Added Matter readiness contracts, PID matter-mode consistency validation, placeholder commissioning and bridge routes, restricted Matter scene commands, and device-detail Matter status panels for Phase 11.
+- 2026-07-02: Locked Matter runtime behind an explicit activation flag so the MQTT/VPS-side modeling remains in place while live Matter actions stay disabled until vendor ID, CSA, and multi-product rollout readiness are complete.
 
 ## Risks and Controls
 
