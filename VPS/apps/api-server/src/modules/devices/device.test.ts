@@ -55,10 +55,10 @@ async function createOtaRelease(input?: Partial<{
 }
 
 describe("device routes", () => {
-  beforeEach(() => {
-    deviceTesting.reset();
-    pidTesting.reset();
-    otaTesting.reset();
+  beforeEach(async () => {
+    await deviceTesting.reset();
+    await pidTesting.reset();
+    await otaTesting.reset();
   });
 
   it("registers a device against an existing PID", async () => {

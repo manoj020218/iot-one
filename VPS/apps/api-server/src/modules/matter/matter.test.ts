@@ -70,10 +70,10 @@ async function registerMatterDevice(pid: string, deviceId = "JNX-TG-MTR-1") {
 }
 
 describe("matter routes", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     delete process.env.MATTER_RUNTIME_ENABLED;
-    pidTesting.reset();
-    deviceTesting.reset();
+    await pidTesting.reset();
+    await deviceTesting.reset();
     matterTesting.reset();
   });
 

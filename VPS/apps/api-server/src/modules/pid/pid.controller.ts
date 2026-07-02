@@ -62,31 +62,35 @@ function requireActor(request: Request, response: Response): PidActorContext | n
   return actor;
 }
 
-export function listPidController(request: Request, response: Response) {
-  if (!requireActor(request, response)) {
-    return;
-  }
-
-  response.status(200).json({
-    data: listPids()
-  });
-}
-
-export function getPidController(request: Request, response: Response) {
+export async function listPidController(request: Request, response: Response) {
   if (!requireActor(request, response)) {
     return;
   }
 
   try {
     response.status(200).json({
-      data: getPid(request.params.pid ?? "")
+      data: await listPids()
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function createPidController(request: Request, response: Response) {
+export async function getPidController(request: Request, response: Response) {
+  if (!requireActor(request, response)) {
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: await getPid(request.params.pid ?? "")
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function createPidController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -104,14 +108,14 @@ export function createPidController(request: Request, response: Response) {
 
   try {
     response.status(201).json({
-      data: createPid(parsed.data, actor)
+      data: await createPid(parsed.data, actor)
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function updatePidController(request: Request, response: Response) {
+export async function updatePidController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -129,14 +133,14 @@ export function updatePidController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: updatePid(request.params.pid ?? "", parsed.data, actor)
+      data: await updatePid(request.params.pid ?? "", parsed.data, actor)
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function approvePidController(request: Request, response: Response) {
+export async function approvePidController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -145,14 +149,14 @@ export function approvePidController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: approvePid(request.params.pid ?? "", actor)
+      data: await approvePid(request.params.pid ?? "", actor)
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function archivePidController(request: Request, response: Response) {
+export async function archivePidController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -161,7 +165,7 @@ export function archivePidController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: archivePid(request.params.pid ?? "", actor)
+      data: await archivePid(request.params.pid ?? "", actor)
     });
   } catch (error) {
     sendError(response, error);

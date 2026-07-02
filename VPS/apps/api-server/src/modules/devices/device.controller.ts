@@ -62,23 +62,27 @@ function sendError(response: Response, error: unknown) {
   });
 }
 
-export function listDevicesController(request: Request, response: Response) {
-  response.status(200).json({
-    data: listDevices(readContext(request))
-  });
-}
-
-export function getDeviceController(request: Request, response: Response) {
+export async function listDevicesController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: getDevice(request.params.deviceId ?? "", readContext(request))
+      data: await listDevices(readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function registerDeviceController(request: Request, response: Response) {
+export async function getDeviceController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await getDevice(request.params.deviceId ?? "", readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function registerDeviceController(request: Request, response: Response) {
   const payload = parseRegisterDevicePayload(request.body);
 
   if (!payload) {
@@ -90,14 +94,14 @@ export function registerDeviceController(request: Request, response: Response) {
 
   try {
     response.status(201).json({
-      data: registerDevice(payload)
+      data: await registerDevice(payload)
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function patchDeviceController(request: Request, response: Response) {
+export async function patchDeviceController(request: Request, response: Response) {
   const payload = parseDevicePatchPayload(request.body);
 
   if (!payload) {
@@ -109,27 +113,30 @@ export function patchDeviceController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: patchDevice(request.params.deviceId ?? "", payload, readContext(request))
+      data: await patchDevice(request.params.deviceId ?? "", payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function getDeviceFirmwarePlanController(
+export async function getDeviceFirmwarePlanController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: getDeviceFirmwarePlan(request.params.deviceId ?? "", readContext(request))
+      data: await getDeviceFirmwarePlan(
+        request.params.deviceId ?? "",
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function renameDeviceController(request: Request, response: Response) {
+export async function renameDeviceController(request: Request, response: Response) {
   const payload = parseRenamePayload(request.body);
 
   if (!payload) {
@@ -141,14 +148,18 @@ export function renameDeviceController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: renameDevice(request.params.deviceId ?? "", payload, readContext(request))
+      data: await renameDevice(
+        request.params.deviceId ?? "",
+        payload,
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function requestDeviceFirmwareUpdateController(
+export async function requestDeviceFirmwareUpdateController(
   request: Request,
   response: Response
 ) {
@@ -163,7 +174,7 @@ export function requestDeviceFirmwareUpdateController(
 
   try {
     response.status(200).json({
-      data: requestDeviceFirmwareUpdate(
+      data: await requestDeviceFirmwareUpdate(
         request.params.deviceId ?? "",
         payload,
         readContext(request)

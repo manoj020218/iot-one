@@ -70,22 +70,23 @@ function requireRelease(releaseId: string): OtaReleaseRecord {
   return record;
 }
 
-function getDeviceHardwareRevision(device: DeviceRecord): string {
+async function getDeviceHardwareRevision(device: DeviceRecord): Promise<string> {
   if (device.hardwareRevision?.trim()) {
     return normalizeHardwareRevision(device.hardwareRevision);
   }
 
-  return normalizeHardwareRevision(getPid(device.pid).hardware.hardwareRevision);
+  return normalizeHardwareRevision(
+    (await getPid(device.pid)).hardware.hardwareRevision
+  );
 }
 
-function listPublishedMatchingReleases(
+async function listPublishedMatchingReleases(
   device: DeviceRecord,
   channel: OtaReleaseChannel
 ) {
-  const hardwareRevision = getDeviceHardwareRevision(device);
+  const hardwareRevision = await getDeviceHardwareRevision(device);
 
-  return otaRepository
-    .list()
+  return (await otaRepository.list())
     .filter(
       (release) =>
         release.status === "published" &&
@@ -96,12 +97,12 @@ function listPublishedMatchingReleases(
     .sort((left, right) => compareVersionParts(right.version, left.version));
 }
 
-function resolveReleaseRecord(
+async function resolveReleaseRecord(
   device: DeviceRecord,
   channel: OtaReleaseChannel,
   targetVersion?: string
-): OtaReleaseRecord | undefined {
-  const releases = listPublishedMatchingReleases(device, channel);
+): Promise<OtaReleaseRecord | undefined> {
+  const releases = await listPublishedMatchingReleases(device, channel);
 
   if (!targetVersion) {
     return releases[0];
@@ -110,27 +111,27 @@ function resolveReleaseRecord(
   return releases.find((release) => release.version === targetVersion.trim());
 }
 
-export function listOtaReleases(): OtaReleaseRecord[] {
-  return otaRepository.list().sort((left, right) =>
+export async function listOtaReleases(): Promise<OtaReleaseRecord[]> {
+  return (await otaRepository.list()).sort((left, right) =>
     left.releaseId.localeCompare(right.releaseId)
   );
 }
 
-export function getOtaRelease(releaseId: string): OtaReleaseRecord {
+export async function getOtaRelease(releaseId: string): Promise<OtaReleaseRecord> {
   return requireRelease(releaseId);
 }
 
-export function createOtaRelease(
+export async function createOtaRelease(
   input: CreateOtaReleaseInput,
   actor: OtaActorContext
-): OtaReleaseRecord {
+): Promise<OtaReleaseRecord> {
   const releaseId = normalizeReleaseId(input.releaseId);
 
-  if (otaRepository.get(releaseId)) {
+  if (await otaRepository.get(releaseId)) {
     throw new OtaModuleError(409, `OTA release already exists: ${releaseId}`);
   }
 
-  const pid = getPid(input.pid);
+  const pid = await getPid(input.pid);
   const timestamp = new Date().toISOString();
   const normalizedHardwareRevision = normalizeHardwareRevision(input.hardwareRevision);
 
@@ -163,13 +164,13 @@ export function createOtaRelease(
   return otaRepository.save(record);
 }
 
-export function resolveOtaReleaseForDevice(
+export async function resolveOtaReleaseForDevice(
   device: DeviceRecord,
   channel: OtaReleaseChannel,
   targetVersion?: string
-): OtaResolutionResult {
-  const hardwareRevision = getDeviceHardwareRevision(device);
-  const release = resolveReleaseRecord(device, channel, targetVersion);
+): Promise<OtaResolutionResult> {
+  const hardwareRevision = await getDeviceHardwareRevision(device);
+  const release = await resolveReleaseRecord(device, channel, targetVersion);
 
   if (!release) {
     return {
@@ -199,9 +200,11 @@ export function resolveOtaReleaseForDevice(
   };
 }
 
-export function getDeviceFirmwarePlan(device: DeviceRecord): DeviceFirmwarePlanResponse {
-  const stable = resolveOtaReleaseForDevice(device, "stable");
-  const beta = resolveOtaReleaseForDevice(device, "beta");
+export async function getDeviceFirmwarePlan(
+  device: DeviceRecord
+): Promise<DeviceFirmwarePlanResponse> {
+  const stable = await resolveOtaReleaseForDevice(device, "stable");
+  const beta = await resolveOtaReleaseForDevice(device, "beta");
   const recommendedChannel =
     stable.status === "update_available"
       ? "stable"
@@ -214,7 +217,7 @@ export function getDeviceFirmwarePlan(device: DeviceRecord): DeviceFirmwarePlanR
   return {
     deviceId: device.deviceId,
     pid: device.pid,
-    hardwareRevision: getDeviceHardwareRevision(device),
+    hardwareRevision: await getDeviceHardwareRevision(device),
     ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {}),
     recommendedChannel,
     stable,
@@ -224,11 +227,11 @@ export function getDeviceFirmwarePlan(device: DeviceRecord): DeviceFirmwarePlanR
 
 export const otaTesting = {
   reset() {
-    otaRepository.reset();
+    return otaRepository.reset();
   },
-  snapshot(): OtaModuleState {
+  async snapshot(): Promise<OtaModuleState> {
     return {
-      releases: listOtaReleases()
+      releases: await listOtaReleases()
     };
   }
 };

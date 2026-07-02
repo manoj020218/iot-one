@@ -1,7 +1,11 @@
 import type { CreatePidInput, ProductPidRecord } from "@jenix/device-schemas";
 import { createAuditStamp } from "@jenix/shared";
 
-import { pidRepository } from "./pid.model";
+import {
+  pidAuditRepository,
+  pidRepository,
+  snapshotPidPersistenceState
+} from "./pid.model";
 import type {
   PidActorContext,
   PidAuditAction,
@@ -63,7 +67,7 @@ function writeAuditLog(
   actor: PidActorContext,
   summary: string,
   occurredAt: string
-) {
+): Promise<void> {
   const stamp = createAuditStamp({
     actorId: actor.actorId,
     action,
@@ -78,11 +82,11 @@ function writeAuditLog(
     summary
   };
 
-  pidRepository.appendAuditLog(audit);
+  return pidAuditRepository.append(audit);
 }
 
-function requirePid(pid: string): ProductPidRecord {
-  const record = pidRepository.get(normalizePid(pid));
+async function requirePid(pid: string): Promise<ProductPidRecord> {
+  const record = await pidRepository.get(normalizePid(pid));
 
   if (!record) {
     throw new PidModuleError(404, `PID not found: ${normalizePid(pid)}`);
@@ -91,25 +95,25 @@ function requirePid(pid: string): ProductPidRecord {
   return record;
 }
 
-export function listPids(): ProductPidRecord[] {
+export function listPids(): Promise<ProductPidRecord[]> {
   return pidRepository.list();
 }
 
-export function getPid(pid: string): ProductPidRecord {
+export function getPid(pid: string): Promise<ProductPidRecord> {
   return requirePid(pid);
 }
 
-export function getPublicPid(pid: string): CreatePidInput {
-  return toCreatePidInput(requirePid(pid));
+export async function getPublicPid(pid: string): Promise<CreatePidInput> {
+  return toCreatePidInput(await requirePid(pid));
 }
 
-export function createPid(
+export async function createPid(
   input: CreatePidInput,
   actor: PidActorContext
-): ProductPidRecord {
+): Promise<ProductPidRecord> {
   const normalizedPid = normalizePid(input.pid);
 
-  if (pidRepository.get(normalizedPid)) {
+  if (await pidRepository.get(normalizedPid)) {
     throw new PidModuleError(409, `PID already exists: ${normalizedPid}`);
   }
 
@@ -129,8 +133,8 @@ export function createPid(
     updatedAt: timestamp
   };
 
-  pidRepository.save(record);
-  writeAuditLog(
+  await pidRepository.save(record);
+  await writeAuditLog(
     normalizedPid,
     "pid.created",
     actor,
@@ -141,12 +145,12 @@ export function createPid(
   return record;
 }
 
-export function updatePid(
+export async function updatePid(
   pid: string,
   patch: PidPatchPayload,
   actor: PidActorContext
-): ProductPidRecord {
-  const existing = requirePid(pid);
+): Promise<ProductPidRecord> {
+  const existing = await requirePid(pid);
 
   if (existing.approvedAt || existing.status === "production") {
     throw new PidModuleError(
@@ -176,17 +180,17 @@ export function updatePid(
     updatedAt: timestamp
   };
 
-  pidRepository.save(updated);
-  writeAuditLog(existing.pid, "pid.updated", actor, "PID updated", timestamp);
+  await pidRepository.save(updated);
+  await writeAuditLog(existing.pid, "pid.updated", actor, "PID updated", timestamp);
 
   return updated;
 }
 
-export function approvePid(
+export async function approvePid(
   pid: string,
   actor: PidActorContext
-): ProductPidRecord {
-  const existing = requirePid(pid);
+): Promise<ProductPidRecord> {
+  const existing = await requirePid(pid);
 
   if (existing.approvedAt || existing.status === "production") {
     throw new PidModuleError(409, `PID is already approved: ${existing.pid}`);
@@ -208,17 +212,17 @@ export function approvePid(
     updatedAt: timestamp
   };
 
-  pidRepository.save(approved);
-  writeAuditLog(existing.pid, "pid.approved", actor, "PID approved", timestamp);
+  await pidRepository.save(approved);
+  await writeAuditLog(existing.pid, "pid.approved", actor, "PID approved", timestamp);
 
   return approved;
 }
 
-export function archivePid(
+export async function archivePid(
   pid: string,
   actor: PidActorContext
-): ProductPidRecord {
-  const existing = requirePid(pid);
+): Promise<ProductPidRecord> {
+  const existing = await requirePid(pid);
 
   if (existing.status === "discontinued") {
     throw new PidModuleError(409, `PID is already archived: ${existing.pid}`);
@@ -231,17 +235,19 @@ export function archivePid(
     updatedAt: timestamp
   };
 
-  pidRepository.save(archived);
-  writeAuditLog(existing.pid, "pid.archived", actor, "PID archived", timestamp);
+  await pidRepository.save(archived);
+  await writeAuditLog(existing.pid, "pid.archived", actor, "PID archived", timestamp);
 
   return archived;
 }
 
 export const pidTesting = {
   reset() {
-    pidRepository.reset();
+    return Promise.all([pidRepository.reset(), pidAuditRepository.reset()]).then(
+      () => undefined
+    );
   },
   snapshot() {
-    return pidRepository.snapshot();
+    return snapshotPidPersistenceState();
   }
 };

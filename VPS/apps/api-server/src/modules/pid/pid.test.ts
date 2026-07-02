@@ -23,8 +23,8 @@ function buildPidPayload(pid: string, status: "draft" | "beta" = "draft") {
 }
 
 describe("pid routes", () => {
-  beforeEach(() => {
-    pidTesting.reset();
+  beforeEach(async () => {
+    await pidTesting.reset();
   });
 
   it("creates a PID record through the admin route", async () => {

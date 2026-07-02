@@ -3,6 +3,8 @@ export interface AppConfig {
   port: number;
   mongodbUri?: string;
   matterRuntimeEnabled: boolean;
+  pidPersistenceMode: "memory" | "mongodb";
+  devicePersistenceMode: "memory" | "mongodb";
   scenePersistenceMode: "memory" | "mongodb";
   sceneSchedulerEnabled: boolean;
   sceneSchedulerCoordinationMode: "local" | "mongodb-lock";
@@ -48,9 +50,10 @@ function parsePositiveIntegerEnv(
   return parsed;
 }
 
-function parseScenePersistenceMode(
+function parsePersistenceMode(
   rawValue: string | undefined,
-  hasMongoUri: boolean
+  hasMongoUri: boolean,
+  key: string
 ): "memory" | "mongodb" {
   if (rawValue === undefined) {
     return hasMongoUri ? "mongodb" : "memory";
@@ -60,7 +63,7 @@ function parseScenePersistenceMode(
     return rawValue;
   }
 
-  throw new Error(`Invalid SCENE_PERSISTENCE_MODE value: ${rawValue}`);
+  throw new Error(`Invalid ${key} value: ${rawValue}`);
 }
 
 function parseSceneSchedulerCoordinationMode(
@@ -89,9 +92,20 @@ export function readAppConfig(): AppConfig {
     30_000,
     "SCENE_SCHEDULER_INTERVAL_MS"
   );
-  const scenePersistenceMode = parseScenePersistenceMode(
+  const pidPersistenceMode = parsePersistenceMode(
+    process.env.PID_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "PID_PERSISTENCE_MODE"
+  );
+  const devicePersistenceMode = parsePersistenceMode(
+    process.env.DEVICE_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "DEVICE_PERSISTENCE_MODE"
+  );
+  const scenePersistenceMode = parsePersistenceMode(
     process.env.SCENE_PERSISTENCE_MODE,
-    Boolean(mongodbUri)
+    Boolean(mongodbUri),
+    "SCENE_PERSISTENCE_MODE"
   );
   const sceneSchedulerCoordinationMode = parseSceneSchedulerCoordinationMode(
     process.env.SCENE_SCHEDULER_COORDINATION_MODE,
@@ -113,6 +127,14 @@ export function readAppConfig(): AppConfig {
     throw new Error("SCENE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
+  if (pidPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("PID_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (devicePersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
   if (sceneSchedulerCoordinationMode === "mongodb-lock" && !mongodbUri) {
     throw new Error(
       "SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock requires MONGODB_URI"
@@ -127,6 +149,8 @@ export function readAppConfig(): AppConfig {
       process.env.MATTER_RUNTIME_ENABLED,
       false
     ),
+    pidPersistenceMode,
+    devicePersistenceMode,
     scenePersistenceMode,
     sceneSchedulerEnabled: parseBooleanEnv(
       process.env.SCENE_SCHEDULER_ENABLED,

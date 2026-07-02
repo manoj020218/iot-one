@@ -16,10 +16,10 @@ function sendError(response: Response, error: unknown) {
   });
 }
 
-export function getPublicPidController(request: Request, response: Response) {
+export async function getPublicPidController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: getPublicPid(request.params.pid ?? "")
+      data: await getPublicPid(request.params.pid ?? "")
     });
   } catch (error) {
     sendError(response, error);

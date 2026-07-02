@@ -151,27 +151,28 @@ function getMatterStateRecord(deviceId: string): MatterRuntimeRecord | undefined
 export function getMatterDeviceStatus(
   deviceId: string,
   context: MatterRequestContext
-): MatterDeviceStatus {
-  const device = getDevice(deviceId, context);
-  const pid = getPid(device.pid);
-  const runtime = getMatterStateRecord(device.deviceId);
-  const deviceMatterEnabled = device.matterEnabled ?? pid.matter.enabled;
+): Promise<MatterDeviceStatus> {
+  return getDevice(deviceId, context).then(async (device) => {
+    const pid = await getPid(device.pid);
+    const runtime = getMatterStateRecord(device.deviceId);
+    const deviceMatterEnabled = device.matterEnabled ?? pid.matter.enabled;
 
-  return {
-    deviceId: device.deviceId,
-    pid: pid.pid,
-    ...buildStatus(pid, deviceMatterEnabled, runtime)
-  };
+    return {
+      deviceId: device.deviceId,
+      pid: pid.pid,
+      ...buildStatus(pid, deviceMatterEnabled, runtime)
+    };
+  });
 }
 
-export function requestMatterCommissioning(
+export async function requestMatterCommissioning(
   deviceId: string,
   context: MatterRequestContext
-): MatterPlaceholderActionResult {
-  const device = getDevice(deviceId, context);
+): Promise<MatterPlaceholderActionResult> {
+  const device = await getDevice(deviceId, context);
   requireMatterOperatorAccess(device.ownerUserId, context);
 
-  const status = getMatterDeviceStatus(device.deviceId, context);
+  const status = await getMatterDeviceStatus(device.deviceId, context);
 
   if (!status.activationEnabled) {
     throw new MatterModuleError(409, status.activationMessage);
@@ -210,14 +211,14 @@ export function requestMatterCommissioning(
   };
 }
 
-export function requestMatterBridgeSync(
+export async function requestMatterBridgeSync(
   deviceId: string,
   context: MatterRequestContext
-): MatterPlaceholderActionResult {
-  const device = getDevice(deviceId, context);
+): Promise<MatterPlaceholderActionResult> {
+  const device = await getDevice(deviceId, context);
   requireMatterOperatorAccess(device.ownerUserId, context);
 
-  const status = getMatterDeviceStatus(device.deviceId, context);
+  const status = await getMatterDeviceStatus(device.deviceId, context);
 
   if (!status.activationEnabled) {
     throw new MatterModuleError(409, status.activationMessage);

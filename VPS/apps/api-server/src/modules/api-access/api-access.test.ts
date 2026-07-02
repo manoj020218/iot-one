@@ -71,10 +71,10 @@ async function createApiKey(packageId: string, scopes?: string[]) {
 }
 
 describe("api access routes", () => {
-  beforeEach(() => {
-    apiAccessTesting.reset();
-    deviceTesting.reset();
-    pidTesting.reset();
+  beforeEach(async () => {
+    await apiAccessTesting.reset();
+    await deviceTesting.reset();
+    await pidTesting.reset();
   });
 
   it("returns public device state when the API key has the required scope", async () => {

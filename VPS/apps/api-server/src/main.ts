@@ -5,6 +5,10 @@ import type { Db } from "mongodb";
 import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
+import { useDeviceRepository } from "./modules/devices/device.model";
+import { createMongoDeviceRepository } from "./modules/devices/device.mongo-store";
+import { usePidPersistenceStore } from "./modules/pid/pid.model";
+import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
 import { createMongoScenePersistenceStore } from "./modules/scenes/scene.mongo-store";
 import {
@@ -19,10 +23,30 @@ async function bootstrap() {
   let database: Db | null = null;
 
   if (
+    config.pidPersistenceMode === "mongodb" ||
+    config.devicePersistenceMode === "mongodb" ||
     config.scenePersistenceMode === "mongodb" ||
     config.sceneSchedulerCoordinationMode === "mongodb-lock"
   ) {
     database = await getMongoDb(config.mongodbUri!);
+  }
+
+  if (config.pidPersistenceMode === "mongodb") {
+    usePidPersistenceStore(
+      await createMongoPidPersistenceStore(database!)
+    );
+    console.log("[api-server] pid persistence driver: mongodb");
+  } else {
+    console.log("[api-server] pid persistence driver: memory");
+  }
+
+  if (config.devicePersistenceMode === "mongodb") {
+    useDeviceRepository(
+      await createMongoDeviceRepository(database!)
+    );
+    console.log("[api-server] device persistence driver: mongodb");
+  } else {
+    console.log("[api-server] device persistence driver: memory");
   }
 
   if (config.scenePersistenceMode === "mongodb") {

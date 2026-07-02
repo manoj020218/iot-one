@@ -50,39 +50,48 @@ function sendError(response: Response, error: unknown) {
   });
 }
 
-export function getMatterDeviceStatusController(
+export async function getMatterDeviceStatusController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: getMatterDeviceStatus(request.params.deviceId ?? "", readContext(request))
+      data: await getMatterDeviceStatus(
+        request.params.deviceId ?? "",
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function requestMatterCommissioningController(
+export async function requestMatterCommissioningController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: requestMatterCommissioning(request.params.deviceId ?? "", readContext(request))
+      data: await requestMatterCommissioning(
+        request.params.deviceId ?? "",
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function requestMatterBridgeSyncController(
+export async function requestMatterBridgeSyncController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: requestMatterBridgeSync(request.params.deviceId ?? "", readContext(request))
+      data: await requestMatterBridgeSync(
+        request.params.deviceId ?? "",
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);

@@ -110,8 +110,8 @@ function toSceneActionCommand(command: string): SceneActionCommand | null {
     : null;
 }
 
-function assertPidApiScopes(pid: string, scopes: string[]) {
-  const pidRecord = getPid(pid);
+async function assertPidApiScopes(pid: string, scopes: string[]) {
+  const pidRecord = await getPid(pid);
 
   if (!pidRecord.api.enabled) {
     throw new ApiAccessModuleError(409, `PID API access is disabled for ${pidRecord.pid}`);
@@ -138,11 +138,11 @@ function translateDeviceError(error: unknown): never {
   throw error;
 }
 
-function authorizePublicDeviceScope(
+async function authorizePublicDeviceScope(
   apiSecret: string,
   deviceId: string,
   requiredScope: string
-): PublicApiAuthorizedContext & { deviceState: PublicDeviceState } {
+): Promise<PublicApiAuthorizedContext & { deviceState: PublicDeviceState }> {
   const normalizedSecret = apiSecret.trim();
 
   if (!normalizedSecret) {
@@ -168,7 +168,10 @@ function authorizePublicDeviceScope(
   const normalizedRequiredScope = normalizeScope(requiredScope);
   const packageScopes = new Set(packageRecord.scopes.map(normalizeScope));
   const keyScopes = new Set(keyRecord.scopes.map(normalizeScope));
-  const pidRecord = assertPidApiScopes(packageRecord.pid, packageRecord.scopes);
+  const pidRecord = await assertPidApiScopes(
+    packageRecord.pid,
+    packageRecord.scopes
+  );
 
   if (!packageScopes.has(normalizedRequiredScope) || !keyScopes.has(normalizedRequiredScope)) {
     throw new ApiAccessModuleError(
@@ -187,7 +190,7 @@ function authorizePublicDeviceScope(
   }
 
   try {
-    const device = getDevice(deviceId, {});
+    const device = await getDevice(deviceId, {});
 
     if (device.homeId !== keyRecord.homeId) {
       throw new ApiAccessModuleError(403, "API key cannot access devices outside its HOME");
@@ -230,17 +233,20 @@ export function getApiPackage(packageId: string): ApiPackageRecord {
   return requirePackage(packageId);
 }
 
-export function createApiPackage(
+export async function createApiPackage(
   input: CreateApiPackageInput,
   actor: ApiPackageActorContext
-): ApiPackageRecord {
+): Promise<ApiPackageRecord> {
   const packageId = normalizePackageId(input.packageId);
 
   if (apiAccessRepository.getPackage(packageId)) {
     throw new ApiAccessModuleError(409, `API package already exists: ${packageId}`);
   }
 
-  const pidRecord = assertPidApiScopes(input.pid, uniqueScopes(input.scopes));
+  const pidRecord = await assertPidApiScopes(
+    input.pid,
+    uniqueScopes(input.scopes)
+  );
   const timestamp = new Date().toISOString();
   const record: ApiPackageRecord = {
     packageId,
@@ -273,10 +279,10 @@ export function listApiKeys(context: ApiKeyRequestContext): ApiKeyRecord[] {
     .sort((left, right) => left.keyId.localeCompare(right.keyId));
 }
 
-export function createApiKey(
+export async function createApiKey(
   input: CreateApiKeyInput,
   context: ApiKeyRequestContext
-): ApiKeyCreateResult {
+): Promise<ApiKeyCreateResult> {
   const { homeId, userId } = requireHomeManager(context);
   const packageRecord = requirePackage(input.packageId);
 
@@ -284,7 +290,9 @@ export function createApiKey(
     throw new ApiAccessModuleError(409, "API package must be active before keys can be issued");
   }
 
-  const devices = listDevices({ homeId }).filter((device) => device.pid === packageRecord.pid);
+  const devices = (await listDevices({ homeId })).filter(
+    (device) => device.pid === packageRecord.pid
+  );
 
   if (!devices.length) {
     throw new ApiAccessModuleError(
@@ -304,7 +312,7 @@ export function createApiKey(
     );
   }
 
-  assertPidApiScopes(packageRecord.pid, scopes);
+  await assertPidApiScopes(packageRecord.pid, scopes);
 
   const timestamp = new Date().toISOString();
   const keyId = `key-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -361,11 +369,15 @@ export function revokeApiKey(
   return apiAccessRepository.saveKey(updated);
 }
 
-export function getPublicDeviceState(
+export async function getPublicDeviceState(
   deviceId: string,
   apiSecret: string
-): PublicApiStateResponse {
-  const authorized = authorizePublicDeviceScope(apiSecret, deviceId, "devices:read");
+): Promise<PublicApiStateResponse> {
+  const authorized = await authorizePublicDeviceScope(
+    apiSecret,
+    deviceId,
+    "devices:read"
+  );
 
   return {
     ...authorized.deviceState,
@@ -373,16 +385,20 @@ export function getPublicDeviceState(
   };
 }
 
-export function executePublicDeviceCommand(
+export async function executePublicDeviceCommand(
   deviceId: string,
   apiSecret: string,
   payload: PublicCommandPayload
-): PublicApiCommandResponse {
+): Promise<PublicApiCommandResponse> {
   const sceneCommand = toSceneActionCommand(payload.command);
   const requiredScope = sceneCommand && isRestrictedSceneCommand(sceneCommand)
     ? "devices:admin"
     : "devices:write";
-  const authorized = authorizePublicDeviceScope(apiSecret, deviceId, requiredScope);
+  const authorized = await authorizePublicDeviceScope(
+    apiSecret,
+    deviceId,
+    requiredScope
+  );
 
   const result: PublicDeviceCommandResult = {
     deviceId,

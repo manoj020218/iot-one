@@ -59,31 +59,35 @@ function requireActor(request: Request, response: Response): OtaActorContext | n
   return actor;
 }
 
-export function listOtaReleasesController(request: Request, response: Response) {
-  if (!requireActor(request, response)) {
-    return;
-  }
-
-  response.status(200).json({
-    data: listOtaReleases()
-  });
-}
-
-export function getOtaReleaseController(request: Request, response: Response) {
+export async function listOtaReleasesController(request: Request, response: Response) {
   if (!requireActor(request, response)) {
     return;
   }
 
   try {
     response.status(200).json({
-      data: getOtaRelease(request.params.releaseId ?? "")
+      data: await listOtaReleases()
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function createOtaReleaseController(request: Request, response: Response) {
+export async function getOtaReleaseController(request: Request, response: Response) {
+  if (!requireActor(request, response)) {
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: await getOtaRelease(request.params.releaseId ?? "")
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function createOtaReleaseController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -101,7 +105,7 @@ export function createOtaReleaseController(request: Request, response: Response)
 
   try {
     response.status(201).json({
-      data: createOtaRelease(payload, actor)
+      data: await createOtaRelease(payload, actor)
     });
   } catch (error) {
     sendError(response, error);

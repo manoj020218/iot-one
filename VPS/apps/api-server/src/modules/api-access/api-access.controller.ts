@@ -119,7 +119,7 @@ export function getApiPackageController(request: Request, response: Response) {
   }
 }
 
-export function createApiPackageController(request: Request, response: Response) {
+export async function createApiPackageController(request: Request, response: Response) {
   const actor = requireActor(request, response);
 
   if (!actor) {
@@ -137,7 +137,7 @@ export function createApiPackageController(request: Request, response: Response)
 
   try {
     response.status(201).json({
-      data: createApiPackage(payload, actor)
+      data: await createApiPackage(payload, actor)
     });
   } catch (error) {
     sendError(response, error);
@@ -154,7 +154,7 @@ export function listApiKeysController(request: Request, response: Response) {
   }
 }
 
-export function createApiKeyController(request: Request, response: Response) {
+export async function createApiKeyController(request: Request, response: Response) {
   const payload = parseApiKeyPayload(request.body);
 
   if (!payload) {
@@ -166,7 +166,7 @@ export function createApiKeyController(request: Request, response: Response) {
 
   try {
     response.status(201).json({
-      data: createApiKey(payload, readApiKeyContext(request))
+      data: await createApiKey(payload, readApiKeyContext(request))
     });
   } catch (error) {
     sendError(response, error);
@@ -183,10 +183,10 @@ export function revokeApiKeyController(request: Request, response: Response) {
   }
 }
 
-export function getPublicDeviceStateController(request: Request, response: Response) {
+export async function getPublicDeviceStateController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: getPublicDeviceState(
+      data: await getPublicDeviceState(
         request.params.deviceId ?? "",
         readHeaderValue(request.header("x-api-key")) ?? ""
       )
@@ -196,7 +196,7 @@ export function getPublicDeviceStateController(request: Request, response: Respo
   }
 }
 
-export function executePublicDeviceCommandController(
+export async function executePublicDeviceCommandController(
   request: Request,
   response: Response
 ) {
@@ -211,7 +211,7 @@ export function executePublicDeviceCommandController(
 
   try {
     response.status(200).json({
-      data: executePublicDeviceCommand(
+      data: await executePublicDeviceCommand(
         request.params.deviceId ?? "",
         readHeaderValue(request.header("x-api-key")) ?? "",
         payload

@@ -25,8 +25,8 @@ function normalizeDeviceId(deviceId: string): string {
   return deviceId.trim().toUpperCase();
 }
 
-function requireDevice(deviceId: string): DeviceRecord {
-  const record = deviceRepository.get(normalizeDeviceId(deviceId));
+async function requireDevice(deviceId: string): Promise<DeviceRecord> {
+  const record = await deviceRepository.get(normalizeDeviceId(deviceId));
 
   if (!record) {
     throw new DeviceModuleError(404, `Device not found: ${normalizeDeviceId(deviceId)}`);
@@ -50,8 +50,10 @@ function ensureAccess(
   return device;
 }
 
-export function listDevices(context: DeviceRequestContext): DeviceRecord[] {
-  return deviceRepository.list().filter((device) => {
+export async function listDevices(
+  context: DeviceRequestContext
+): Promise<DeviceRecord[]> {
+  return (await deviceRepository.list()).filter((device) => {
     if (context.homeId && device.homeId !== context.homeId) {
       return false;
     }
@@ -67,22 +69,22 @@ export function listDevices(context: DeviceRequestContext): DeviceRecord[] {
 export function getDevice(
   deviceId: string,
   context: DeviceRequestContext
-): DeviceRecord {
-  return ensureAccess(requireDevice(deviceId), context);
+): Promise<DeviceRecord> {
+  return requireDevice(deviceId).then((device) => ensureAccess(device, context));
 }
 
-export function registerDevice(
+export async function registerDevice(
   payload: ParsedRegisterDevicePayload
-): DeviceRecord {
+): Promise<DeviceRecord> {
   const normalizedDeviceId = normalizeDeviceId(payload.deviceId);
 
-  if (deviceRepository.get(normalizedDeviceId)) {
+  if (await deviceRepository.get(normalizedDeviceId)) {
     throw new DeviceModuleError(409, `Device already exists: ${normalizedDeviceId}`);
   }
 
   let pidRecord;
   try {
-    pidRecord = getPid(payload.pid);
+    pidRecord = await getPid(payload.pid);
   } catch {
     throw new DeviceModuleError(404, `PID not found: ${payload.pid.trim().toUpperCase()}`);
   }
@@ -97,16 +99,16 @@ export function registerDevice(
   return deviceRepository.save(record);
 }
 
-export function patchDevice(
+export async function patchDevice(
   deviceId: string,
   patch: DevicePatchPayload,
   context: DeviceRequestContext
-): DeviceRecord {
+): Promise<DeviceRecord> {
   if (context.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot modify devices");
   }
 
-  const existing = ensureAccess(requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), context);
   const updated: DeviceRecord = {
     ...existing,
     updatedAt: new Date().toISOString()
@@ -147,26 +149,26 @@ export function patchDevice(
   return deviceRepository.save(updated);
 }
 
-export function getDeviceFirmwarePlan(
+export async function getDeviceFirmwarePlan(
   deviceId: string,
   context: DeviceRequestContext
-): DeviceFirmwarePlanResult {
-  const existing = ensureAccess(requireDevice(deviceId), context);
+): Promise<DeviceFirmwarePlanResult> {
+  const existing = ensureAccess(await requireDevice(deviceId), context);
   return resolveDeviceFirmwarePlan(existing);
 }
 
-export function requestDeviceFirmwareUpdate(
+export async function requestDeviceFirmwareUpdate(
   deviceId: string,
   payload: DeviceFirmwareRequestPayload,
   context: DeviceRequestContext
-): DeviceFirmwareRequestResponse {
+): Promise<DeviceFirmwareRequestResponse> {
   if (context.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot request firmware updates");
   }
 
-  const existing = ensureAccess(requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), context);
   const channel = payload.channel ?? "stable";
-  const resolution = resolveOtaReleaseForDevice(
+  const resolution = await resolveOtaReleaseForDevice(
     existing,
     channel,
     payload.targetVersion
@@ -193,16 +195,16 @@ export function requestDeviceFirmwareUpdate(
   };
 }
 
-export function renameDevice(
+export async function renameDevice(
   deviceId: string,
   payload: RenameDevicePayload,
   context: DeviceRequestContext
-): DeviceRecord {
+): Promise<DeviceRecord> {
   if (context.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot rename devices");
   }
 
-  const existing = ensureAccess(requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), context);
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }
 
@@ -210,7 +212,7 @@ export async function ingestDeviceTelemetry(
   deviceId: string,
   payload: DeviceTelemetryIngestPayload
 ): Promise<DeviceTelemetryIngestResponse> {
-  const existing = requireDevice(deviceId);
+  const existing = await requireDevice(deviceId);
   const occurredAt = payload.occurredAt ?? new Date().toISOString();
   const updatedDevice: DeviceRecord = {
     ...existing,
@@ -220,7 +222,7 @@ export async function ingestDeviceTelemetry(
     ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
-  const savedDevice = deviceRepository.save(updatedDevice);
+  const savedDevice = await deviceRepository.save(updatedDevice);
   const sceneRuntime = await evaluateScenesByTelemetry(
     {
       deviceId: savedDevice.deviceId,
@@ -240,6 +242,6 @@ export async function ingestDeviceTelemetry(
 
 export const deviceTesting = {
   reset() {
-    deviceRepository.reset();
+    return deviceRepository.reset();
   }
 };
