@@ -1,26 +1,56 @@
+import { hostname } from "node:os";
+
+import type { Db } from "mongodb";
+
 import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
 import { createMongoScenePersistenceStore } from "./modules/scenes/scene.mongo-store";
+import {
+  createLeaseBasedSceneSchedulerCoordinator,
+  createLocalSceneSchedulerCoordinator
+} from "./modules/scenes/scene.scheduler.coordinator";
+import { createMongoSceneSchedulerLeaseStore } from "./modules/scenes/scene.scheduler.mongo-store";
 import { createSceneRuntimeScheduler } from "./modules/scenes/scene.scheduler";
 
 async function bootstrap() {
   const config = readAppConfig();
+  let database: Db | null = null;
+
+  if (
+    config.scenePersistenceMode === "mongodb" ||
+    config.sceneSchedulerCoordinationMode === "mongodb-lock"
+  ) {
+    database = await getMongoDb(config.mongodbUri!);
+  }
 
   if (config.scenePersistenceMode === "mongodb") {
-    const database = await getMongoDb(config.mongodbUri!);
-    useScenePersistenceStore(await createMongoScenePersistenceStore(database));
+    useScenePersistenceStore(
+      await createMongoScenePersistenceStore(database!)
+    );
     console.log("[api-server] scene persistence driver: mongodb");
   } else {
     console.log("[api-server] scene persistence driver: memory");
   }
 
+  const schedulerCoordinator =
+    config.sceneSchedulerCoordinationMode === "mongodb-lock"
+      ? createLeaseBasedSceneSchedulerCoordinator({
+          ownerId:
+            config.sceneSchedulerInstanceId ??
+            `${hostname()}:${process.pid.toString()}`,
+          leaseMs: config.sceneSchedulerLeaseMs,
+          leaseStore: await createMongoSceneSchedulerLeaseStore(database!)
+        })
+      : createLocalSceneSchedulerCoordinator();
+
   const app = createApp();
   const sceneRuntimeScheduler = config.sceneSchedulerEnabled
     ? createSceneRuntimeScheduler({
         intervalMs: config.sceneSchedulerIntervalMs,
-        logger: (message) => console.log(message)
+        logger: (message) => console.log(message),
+        coordinator: schedulerCoordinator
       })
     : null;
 
@@ -33,6 +63,9 @@ async function bootstrap() {
       sceneRuntimeScheduler.start();
       console.log(
         `[api-server] scene scheduler enabled with ${config.sceneSchedulerIntervalMs}ms interval`
+      );
+      console.log(
+        `[api-server] scene scheduler coordination mode: ${config.sceneSchedulerCoordinationMode}`
       );
     }
   });

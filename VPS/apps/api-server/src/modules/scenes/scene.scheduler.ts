@@ -2,18 +2,24 @@ import {
   evaluateScheduledScenes,
   listActiveSceneHomeIds
 } from "./scene.service";
+import {
+  createLocalSceneSchedulerCoordinator,
+  type SceneSchedulerCoordinator
+} from "./scene.scheduler.coordinator";
 
 export interface SceneRuntimeSchedulerOptions {
   intervalMs: number;
   now?: () => Date;
   logger?: (message: string) => void;
   getHomeIds?: () => Promise<string[]>;
+  coordinator?: SceneSchedulerCoordinator;
 }
 
 export interface SceneRuntimeSchedulerTickResult {
   evaluatedHomeCount: number;
   matchedRunCount: number;
   runCount: number;
+  skippedReason?: "coordination_lock" | "local_overlap";
 }
 
 export class SceneRuntimeScheduler {
@@ -21,21 +27,25 @@ export class SceneRuntimeScheduler {
   private readonly now: () => Date;
   private readonly logger: ((message: string) => void) | undefined;
   private readonly getHomeIds: () => Promise<string[]>;
+  private readonly coordinator: SceneSchedulerCoordinator;
   private timer: NodeJS.Timeout | null = null;
+  private tickInProgress = false;
 
   constructor(options: SceneRuntimeSchedulerOptions) {
     this.intervalMs = options.intervalMs;
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger;
     this.getHomeIds = options.getHomeIds ?? listActiveSceneHomeIds;
+    this.coordinator =
+      options.coordinator ?? createLocalSceneSchedulerCoordinator();
   }
 
   isRunning(): boolean {
     return this.timer !== null;
   }
 
-  async runOnce(
-    occurredAt = this.now().toISOString()
+  private async evaluateTick(
+    occurredAt: string
   ): Promise<SceneRuntimeSchedulerTickResult> {
     const homeIds = await this.getHomeIds();
     const result: SceneRuntimeSchedulerTickResult = {
@@ -66,14 +76,63 @@ export class SceneRuntimeScheduler {
     return result;
   }
 
+  async runOnce(
+    occurredAt = this.now().toISOString()
+  ): Promise<SceneRuntimeSchedulerTickResult> {
+    if (this.tickInProgress) {
+      this.logger?.("[scene-scheduler] skipped tick because the previous tick is still running");
+      return {
+        evaluatedHomeCount: 0,
+        matchedRunCount: 0,
+        runCount: 0,
+        skippedReason: "local_overlap"
+      };
+    }
+
+    this.tickInProgress = true;
+
+    try {
+      const coordinated = await this.coordinator.runIfLeader(() =>
+        this.evaluateTick(occurredAt)
+      );
+
+      if (!coordinated.executed) {
+        this.logger?.(
+          "[scene-scheduler] skipped tick because another scheduler instance holds the lease"
+        );
+        return {
+          evaluatedHomeCount: 0,
+          matchedRunCount: 0,
+          runCount: 0,
+          skippedReason: "coordination_lock"
+        };
+      }
+
+      return coordinated.value ?? {
+        evaluatedHomeCount: 0,
+        matchedRunCount: 0,
+        runCount: 0
+      };
+    } finally {
+      this.tickInProgress = false;
+    }
+  }
+
+  private triggerTick() {
+    void this.runOnce().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger?.(`[scene-scheduler] tick failed: ${message}`);
+    });
+  }
+
   start() {
     if (this.timer) {
       return;
     }
 
-    void this.runOnce();
+    this.triggerTick();
     this.timer = setInterval(() => {
-      void this.runOnce();
+      this.triggerTick();
     }, this.intervalMs);
   }
 

@@ -10,6 +10,18 @@ const ownerContext = {
   homeRole: "owner" as const
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return {
+    promise,
+    resolve
+  };
+}
+
 describe("scene runtime scheduler", () => {
   beforeEach(async () => {
     await sceneTesting.reset();
@@ -58,5 +70,32 @@ describe("scene runtime scheduler", () => {
     expect(secondRun.evaluatedHomeCount).toBe(1);
     expect(secondRun.runCount).toBe(0);
     expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
+  });
+
+  it("skips overlapping ticks in the same process", async () => {
+    const gate = createDeferred<void>();
+    const release = createDeferred<void>();
+    const scheduler = createSceneRuntimeScheduler({
+      intervalMs: 30_000,
+      logger: () => undefined,
+      getHomeIds: async () => {
+        gate.resolve();
+        await release.promise;
+        return [];
+      }
+    });
+
+    const firstRun = scheduler.runOnce("2026-07-02T03:45:00.000Z");
+
+    await gate.promise;
+
+    const secondRun = await scheduler.runOnce("2026-07-02T03:45:00.000Z");
+
+    expect(secondRun.skippedReason).toBe("local_overlap");
+    expect(secondRun.runCount).toBe(0);
+
+    release.resolve();
+
+    await firstRun;
   });
 });
