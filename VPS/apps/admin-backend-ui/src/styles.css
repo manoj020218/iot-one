@@ -1,0 +1,148 @@
+:root {
+  color: #0f172a;
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.15), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.admin-nav,
+.card-actions,
+.toggle-grid,
+.form-actions,
+.toolbar-card,
+.card-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-nav {
+  margin-bottom: 20px;
+}
+
+.admin-card,
+.form-card,
+.toolbar-card,
+.validation-card,
+.access-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  padding: 20px;
+}
+
+.toolbar-card,
+.card-head {
+  justify-content: space-between;
+}
+
+.list-grid,
+.detail-grid,
+.editor-stack,
+.form-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.list-grid,
+.detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.editor-stack {
+  margin-top: 8px;
+}
+
+.form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field input,
+.field textarea,
+.field select {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.field textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
+.checkbox-field {
+  align-items: center;
+}
+
+.checkbox-field input {
+  min-height: 18px;
+}
+
+.toggle-grid {
+  margin-top: 16px;
+}
+
+.toggle-grid label {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.primary-button,
+.secondary-button,
+.primary-link {
+  appearance: none;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  min-height: 44px;
+  padding: 10px 16px;
+}
+
+.primary-button,
+.primary-link {
+  background: #0f766e;
+  color: #f8fafc;
+}
+
+.secondary-button {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.validation-card {
+  border-color: #fca5a5;
+}
+
+.access-card {
+  margin: 48px auto;
+  max-width: 620px;
+}

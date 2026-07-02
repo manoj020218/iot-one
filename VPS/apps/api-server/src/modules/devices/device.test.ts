@@ -1,0 +1,78 @@
+import { foundationPidBlueprint } from "@jenix/device-schemas";
+import request from "supertest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { createApp } from "../../app";
+import { deviceTesting } from "./device.service";
+import { pidTesting } from "../pid/pid.service";
+
+const developerHeaders = {
+  "x-role": "JENIX_DEVELOPER",
+  "x-actor-id": "device-tests"
+};
+
+const deviceHeaders = {
+  "x-user-id": "user-1",
+  "x-home-id": "home-user-1"
+};
+
+async function createPid() {
+  await request(createApp())
+    .post("/api/v1/admin/pids")
+    .set(developerHeaders)
+    .send({
+      ...foundationPidBlueprint,
+      pid: "JNX-TG-C3-501",
+      status: "beta",
+      firmware: {
+        ...foundationPidBlueprint.firmware,
+        stableVersion: "1.0.0"
+      }
+    });
+}
+
+describe("device routes", () => {
+  beforeEach(() => {
+    deviceTesting.reset();
+    pidTesting.reset();
+  });
+
+  it("registers a device against an existing PID", async () => {
+    await createPid();
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/register")
+      .send({
+        deviceId: "jnx-tg-a7f2",
+        pid: "JNX-TG-C3-501",
+        homeId: "home-user-1",
+        ownerUserId: "user-1",
+        firmwareVersion: "1.0.0"
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.pid).toBe("JNX-TG-C3-501");
+    expect(response.body.data.deviceId).toBe("JNX-TG-A7F2");
+    expect(response.body.data.displayName).toBe("Smart Tank Guard");
+  });
+
+  it("renames a registered device for its owner", async () => {
+    await createPid();
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f3",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F3/rename")
+      .set(deviceHeaders)
+      .send({
+        displayName: "Main Tank"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.displayName).toBe("Main Tank");
+  });
+});

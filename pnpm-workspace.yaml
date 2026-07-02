@@ -1,0 +1,4 @@
+packages:
+  - "VPS/apps/*"
+  - "PWA_APK/apps/*"
+  - "packages/*"

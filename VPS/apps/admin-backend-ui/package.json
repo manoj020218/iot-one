@@ -1,0 +1,22 @@
+{
+  "name": "@jenix/admin-backend-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jenix/device-schemas": "workspace:*",
+    "@jenix/shared": "workspace:*",
+    "@jenix/ui": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --environment jsdom",
+    "test:unit": "vitest run --environment jsdom",
+    "lint": "eslint src vite.config.ts --ext .ts,.tsx"
+  }
+}

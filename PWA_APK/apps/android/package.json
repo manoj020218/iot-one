@@ -1,0 +1,16 @@
+{
+  "name": "@jenix/android",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jenix/shared": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "lint": "eslint src capacitor.config.ts tests --ext .ts"
+  }
+}
