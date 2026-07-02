@@ -100,6 +100,57 @@ describe("device routes", () => {
     expect(response.body.data.displayName).toBe("Shared Tank");
   });
 
+  it("queues a firmware request for a writable HOME role", async () => {
+    await createPid();
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f6",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1",
+      firmwareVersion: "0.9.0"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F6/firmware/request")
+      .set({
+        "x-user-id": "user-2",
+        "x-home-id": "home-user-1",
+        "x-home-role": "member"
+      })
+      .send({
+        channel: "stable"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("queued");
+    expect(response.body.data.targetVersion).toBe("1.0.0");
+  });
+
+  it("rejects firmware requests from a viewer role", async () => {
+    await createPid();
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f7",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1",
+      firmwareVersion: "0.9.0"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F7/firmware/request")
+      .set({
+        "x-user-id": "user-3",
+        "x-home-id": "home-user-1",
+        "x-home-role": "viewer"
+      })
+      .send({
+        channel: "stable"
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatch(/firmware/i);
+  });
+
   it("ingests telemetry and triggers matching device-threshold scenes", async () => {
     await createPid();
     await request(createApp()).post("/api/v1/devices/register").send({

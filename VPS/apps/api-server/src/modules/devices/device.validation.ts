@@ -1,4 +1,5 @@
 import type {
+  DeviceFirmwareRequestPayload,
   DevicePatchPayload,
   DeviceTelemetryIngestPayload,
   ParsedRegisterDevicePayload,
@@ -37,6 +38,12 @@ function parseConnectivityStatus(
   return value === "online" || value === "offline" || value === "unknown"
     ? value
     : undefined;
+}
+
+function parseFirmwareChannel(
+  value: unknown
+): DeviceFirmwareRequestPayload["channel"] | undefined {
+  return value === "stable" || value === "beta" ? value : undefined;
 }
 
 function parseLocalStatus(
@@ -153,6 +160,20 @@ export function parseDevicePatchPayload(body: unknown): DevicePatchPayload | nul
     patch.displayName = displayName;
   }
 
+  const firmwareVersion = readTrimmedString(body, "firmwareVersion");
+  if (firmwareVersion) {
+    patch.firmwareVersion = firmwareVersion;
+  }
+
+  const hardwareRevision = readTrimmedString(body, "hardwareRevision");
+  if (hardwareRevision) {
+    patch.hardwareRevision = hardwareRevision;
+  }
+
+  if (typeof body.matterEnabled === "boolean") {
+    patch.matterEnabled = body.matterEnabled;
+  }
+
   const mqttStatus = parseConnectivityStatus(body.mqttStatus);
   if (mqttStatus) {
     patch.mqttStatus = mqttStatus;
@@ -173,6 +194,28 @@ export function parseDevicePatchPayload(body: unknown): DevicePatchPayload | nul
   }
 
   return Object.keys(patch).length ? patch : null;
+}
+
+export function parseDeviceFirmwareRequestPayload(
+  body: unknown
+): DeviceFirmwareRequestPayload | null {
+  if (!isRecord(body)) {
+    return {};
+  }
+
+  const payload: DeviceFirmwareRequestPayload = {};
+  const channel = parseFirmwareChannel(body.channel);
+  const targetVersion = readTrimmedString(body, "targetVersion");
+
+  if (channel) {
+    payload.channel = channel;
+  }
+
+  if (targetVersion) {
+    payload.targetVersion = targetVersion;
+  }
+
+  return payload;
 }
 
 export function parseDeviceTelemetryPayload(

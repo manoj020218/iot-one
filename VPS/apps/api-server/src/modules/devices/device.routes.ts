@@ -5,6 +5,7 @@ import {
   ingestDeviceTelemetryController,
   listDevicesController,
   patchDeviceController,
+  requestDeviceFirmwareUpdateController,
   registerDeviceController,
   renameDeviceController
 } from "./device.controller";
@@ -15,5 +16,6 @@ deviceRouter.get("/", listDevicesController);
 deviceRouter.post("/register", registerDeviceController);
 deviceRouter.get("/:deviceId", getDeviceController);
 deviceRouter.patch("/:deviceId", patchDeviceController);
+deviceRouter.post("/:deviceId/firmware/request", requestDeviceFirmwareUpdateController);
 deviceRouter.post("/:deviceId/telemetry", ingestDeviceTelemetryController);
 deviceRouter.post("/:deviceId/rename", renameDeviceController);

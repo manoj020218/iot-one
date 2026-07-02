@@ -6,12 +6,14 @@ import {
   ingestDeviceTelemetry,
   listDevices,
   patchDevice,
+  requestDeviceFirmwareUpdate,
   registerDevice,
   renameDevice
 } from "./device.service";
 import { DeviceModuleError } from "./device.types";
 import {
   parseDevicePatchPayload,
+  parseDeviceFirmwareRequestPayload,
   parseDeviceTelemetryPayload,
   parseRegisterDevicePayload,
   parseRenamePayload
@@ -126,6 +128,32 @@ export function renameDeviceController(request: Request, response: Response) {
   try {
     response.status(200).json({
       data: renameDevice(request.params.deviceId ?? "", payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export function requestDeviceFirmwareUpdateController(
+  request: Request,
+  response: Response
+) {
+  const payload = parseDeviceFirmwareRequestPayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid firmware request payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: requestDeviceFirmwareUpdate(
+        request.params.deviceId ?? "",
+        payload,
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);

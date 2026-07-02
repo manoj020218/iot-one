@@ -99,6 +99,10 @@ export function getPid(pid: string): ProductPidRecord {
   return requirePid(pid);
 }
 
+export function getPublicPid(pid: string): CreatePidInput {
+  return toCreatePidInput(requirePid(pid));
+}
+
 export function createPid(
   input: CreatePidInput,
   actor: PidActorContext

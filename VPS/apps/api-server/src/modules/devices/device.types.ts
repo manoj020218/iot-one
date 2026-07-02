@@ -1,4 +1,6 @@
 import type {
+  DeviceFirmwareRequestInput,
+  DeviceFirmwareRequestResult,
   DeviceRecord,
   HomeAccessRole,
   RegisterDeviceInput,
@@ -19,11 +21,16 @@ export interface RenameDevicePayload {
 
 export interface DevicePatchPayload {
   displayName?: string;
+  firmwareVersion?: string;
+  hardwareRevision?: string;
+  matterEnabled?: boolean;
   mqttStatus?: DeviceRecord["mqttStatus"];
   cloudStatus?: DeviceRecord["cloudStatus"];
   localStatus?: DeviceRecord["localStatus"];
   lastSeenAt?: string;
 }
+
+export type DeviceFirmwareRequestPayload = DeviceFirmwareRequestInput;
 
 export interface DeviceTelemetryIngestPayload {
   telemetry: SceneTelemetrySnapshot;
@@ -37,6 +44,8 @@ export interface DeviceTelemetryIngestResponse {
   device: DeviceRecord;
   sceneRuntime: SceneRuntimeBatchResponse;
 }
+
+export type DeviceFirmwareRequestResponse = DeviceFirmwareRequestResult;
 
 export class DeviceModuleError extends Error {
   constructor(

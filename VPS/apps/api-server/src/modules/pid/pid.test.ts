@@ -77,4 +77,18 @@ describe("pid routes", () => {
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/immutable/i);
   });
+
+  it("returns public PID metadata without developer headers", async () => {
+    await request(createApp())
+      .post("/api/v1/admin/pids")
+      .set(developerHeaders)
+      .send(buildPidPayload("JNX-TG-C3-104", "beta"));
+
+    const response = await request(createApp()).get("/api/v1/pids/JNX-TG-C3-104");
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.pid).toBe("JNX-TG-C3-104");
+    expect(response.body.data.createdBy).toBeUndefined();
+    expect(response.body.data.dashboard.templateId).toBe("tank-guard-default");
+  });
 });

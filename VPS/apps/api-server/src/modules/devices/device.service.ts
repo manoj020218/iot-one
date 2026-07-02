@@ -1,6 +1,7 @@
 import {
   createDeviceRecord,
   renameDeviceRecord,
+  type DeviceFirmwareChannel,
   type DeviceRecord
 } from "@jenix/shared";
 
@@ -9,6 +10,8 @@ import { evaluateScenesByTelemetry } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
 import type {
   DevicePatchPayload,
+  DeviceFirmwareRequestPayload,
+  DeviceFirmwareRequestResponse,
   DeviceRequestContext,
   DeviceTelemetryIngestPayload,
   DeviceTelemetryIngestResponse,
@@ -112,6 +115,18 @@ export function patchDevice(
     updated.displayName = patch.displayName;
   }
 
+  if (patch.firmwareVersion !== undefined) {
+    updated.firmwareVersion = patch.firmwareVersion;
+  }
+
+  if (patch.hardwareRevision !== undefined) {
+    updated.hardwareRevision = patch.hardwareRevision;
+  }
+
+  if (patch.matterEnabled !== undefined) {
+    updated.matterEnabled = patch.matterEnabled;
+  }
+
   if (patch.mqttStatus !== undefined) {
     updated.mqttStatus = patch.mqttStatus;
   }
@@ -129,6 +144,58 @@ export function patchDevice(
   }
 
   return deviceRepository.save(updated);
+}
+
+function resolveFirmwareTargetVersion(
+  device: DeviceRecord,
+  channel: DeviceFirmwareChannel,
+  requestedVersion?: string
+) {
+  const pid = getPid(device.pid);
+  const targetVersion =
+    requestedVersion?.trim() ||
+    (channel === "beta"
+      ? pid.firmware.betaVersion
+      : pid.firmware.stableVersion);
+
+  if (!targetVersion) {
+    throw new DeviceModuleError(
+      409,
+      `No ${channel} firmware release available for PID ${device.pid}`
+    );
+  }
+
+  return targetVersion;
+}
+
+export function requestDeviceFirmwareUpdate(
+  deviceId: string,
+  payload: DeviceFirmwareRequestPayload,
+  context: DeviceRequestContext
+): DeviceFirmwareRequestResponse {
+  if (context.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot request firmware updates");
+  }
+
+  const existing = ensureAccess(requireDevice(deviceId), context);
+  const channel = payload.channel ?? "stable";
+  const targetVersion = resolveFirmwareTargetVersion(
+    existing,
+    channel,
+    payload.targetVersion
+  );
+  const requestedAt = new Date().toISOString();
+
+  return {
+    deviceId: existing.deviceId,
+    pid: existing.pid,
+    channel,
+    targetVersion,
+    ...(existing.firmwareVersion ? { currentVersion: existing.firmwareVersion } : {}),
+    status:
+      existing.firmwareVersion === targetVersion ? "up_to_date" : "queued",
+    requestedAt
+  };
 }
 
 export function renameDevice(

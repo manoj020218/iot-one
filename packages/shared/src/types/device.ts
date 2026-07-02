@@ -2,6 +2,10 @@ export type DeviceConnectivityStatus = "online" | "offline" | "unknown";
 
 export type DeviceLocalStatus = "available" | "unavailable" | "unknown";
 
+export type DeviceFirmwareChannel = "stable" | "beta";
+
+export type DeviceFirmwareRequestStatus = "queued" | "up_to_date";
+
 export interface DeviceRecord {
   deviceId: string;
   pid: string;
@@ -28,4 +32,19 @@ export interface RegisterDeviceInput {
   firmwareVersion?: string;
   hardwareRevision?: string;
   matterEnabled?: boolean;
+}
+
+export interface DeviceFirmwareRequestInput {
+  channel?: DeviceFirmwareChannel;
+  targetVersion?: string;
+}
+
+export interface DeviceFirmwareRequestResult {
+  deviceId: string;
+  pid: string;
+  channel: DeviceFirmwareChannel;
+  targetVersion: string;
+  currentVersion?: string;
+  status: DeviceFirmwareRequestStatus;
+  requestedAt: string;
 }
