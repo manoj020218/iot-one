@@ -43,5 +43,8 @@ cmd /c pnpm build
 ## Runtime Notes
 
 - The API server now starts an in-process scene scheduler by default.
+- Scene persistence defaults to MongoDB when `MONGODB_URI` is set, or can be forced with `SCENE_PERSISTENCE_MODE=mongodb`.
+- Scene records, scene audit logs, and scene run history now persist in MongoDB collections `scenes`, `scene_audit_logs`, and `scene_run_history`.
 - Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
 - Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and evaluates matching device-threshold scenes immediately.
+- Scheduler coordination is still single-process. Horizontal scale or external worker deployment will need a distributed scheduler or queue-backed runtime.

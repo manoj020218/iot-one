@@ -5,8 +5,8 @@
 - Initialized: 2026-07-01
 - Source brief: `D:\IOT Device\IOT_Platform\codex.md`
 - Workspace root: `D:\IOT Device\IOT_Platform\jenix One`
-- Current status: Phase 7 scene UI complete, Phase 7 runtime orchestration in progress
-- Current status: Phase 7 runtime automation wired, persistence still pending
+- Current status: Phase 7 scene UI and runtime orchestration complete
+- Current status: Phase 7 durable MongoDB-backed scene persistence complete
 - Current phase: Phase 7 - scene pipeline
 
 ## Working Scope
@@ -226,6 +226,9 @@ Deliverables:
 - [x] Scene run-history endpoint
 - [x] Background scheduler bootstrap
 - [x] Device telemetry ingest route
+- [x] MongoDB-backed scene persistence
+- [x] MongoDB-backed scene audit log persistence
+- [x] MongoDB-backed scene run-history persistence
 
 Validation gates:
 - [x] Condition evaluation tests
@@ -304,9 +307,9 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Persist scenes, audit entries, and run history in MongoDB.
-2. Replace in-process scheduling and direct ingest with MQTT or worker-backed infrastructure if deployment topology requires distributed execution.
-3. Start Phase 8 home sharing once durable automation persistence is stable.
+1. Replace in-process scheduling and direct ingest with MQTT or worker-backed infrastructure if deployment topology requires distributed execution.
+2. Start Phase 8 home sharing now that durable automation persistence is stable.
+3. Persist PID, device registry, and provisioning intent modules in MongoDB for platform-wide durability.
 4. Keep `PROGRESS.md` updated after each remaining Phase 7 milestone.
 
 ## Decision Log
@@ -325,6 +328,7 @@ Validation gates:
 - 2026-07-02: Delivered the Phase 7 scene catalog and builder UI against the real scene API contract, with a local fallback store and manual-run evaluator to keep authoring usable without a live backend.
 - 2026-07-02: Added explicit runtime scene evaluation endpoints and run-history support before introducing scheduler and telemetry worker infrastructure.
 - 2026-07-02: Wired schedule scenes into an in-process scheduler and device-threshold scenes into a direct telemetry ingest path so Phase 7 now executes automatically within the running API process.
+- 2026-07-02: Persisted scenes, scene audit logs, and scene run history in MongoDB behind a shared repository abstraction while preserving in-memory mode for tests.
 
 ## Risks and Controls
 

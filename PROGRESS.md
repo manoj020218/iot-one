@@ -30,6 +30,7 @@
 - [x] Scene run history
 - [x] Scene background scheduler
 - [x] Device telemetry ingestion path
+- [x] MongoDB-backed scene persistence
 - [ ] Home sharing
 - [ ] Settings pages
 - [ ] OTA by PID
@@ -72,6 +73,9 @@
 - Date: 2026-07-02
   Decision: Use an in-process scheduler loop and a direct device telemetry ingest route as the first production-grade runtime wiring for scenes.
   Reason: It turns Phase 7 into a functioning automation backbone immediately, while still leaving room to replace the transport and scheduling sources with MQTT workers or external jobs later.
+- Date: 2026-07-02
+  Decision: Persist scene records, scene audit logs, and scene run history in MongoDB behind a repository abstraction, while leaving a memory mode for tests and local fallback.
+  Reason: It makes Phase 7 automation durable without coupling test runs or lightweight development flows to a live database.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -98,17 +102,14 @@
 - Issue: Provisioning intent storage is still in-memory on the API side with a frontend fallback store when the API is unavailable.
   Impact: Cloud registration intent tracking works for development and tests, but not yet with durable operational history.
   Fix plan: Persist provisioning intents and status transitions in MongoDB and attach them to device lifecycle audit history.
-- Issue: Scene records, scene audit entries, and manual run history are currently in-memory on the API side.
-  Impact: The Phase 7 execution model and permission rules are validated, but automations are not durable across restarts.
-  Fix plan: Move scenes and scene audit logs into MongoDB before enabling production automation management.
-- Issue: Scene execution is now wired to an in-process scheduler and a direct telemetry ingest route, but both still rely on in-memory scene storage and local process uptime.
-  Impact: Automations can execute automatically while the API server is running, but scene state and run history do not yet survive process restarts or horizontal scaling.
-  Fix plan: Move scenes, run history, and scheduler coordination into MongoDB-backed persistence and distributed-safe runtime infrastructure before production scaling.
+- Issue: Scene execution is now durable in MongoDB, but scheduler coordination still runs inside a single API process.
+  Impact: Automations survive restarts, but multi-instance deployments can still double-run schedule windows unless runtime ownership moves to a distributed worker or lock strategy.
+  Fix plan: Move schedule execution to a queue, worker, or distributed lock-backed coordinator before horizontal scaling.
 
 ## Next Tasks
-1. Persist scenes, audit entries, and run history in MongoDB so automation survives process restarts.
-2. Replace the local telemetry ingress and scheduler loop with MQTT or worker-backed runtime infrastructure when deployment topology requires it.
-3. Start Phase 8 home sharing once durable automation persistence is in place.
+1. Replace the local telemetry ingress and scheduler loop with MQTT or worker-backed runtime infrastructure when deployment topology requires it.
+2. Start Phase 8 home sharing now that durable automation persistence is in place.
+3. Move PID, device registry, and provisioning intent storage to MongoDB so the rest of the platform matches the new scene durability baseline.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -124,3 +125,4 @@
 - 2026-07-02: Completed the Phase 7 PWA scene catalog and scene builder UI with trigger, condition, action, schedule, and manual-test-run flows on the `/api/v1/scenes` contract.
 - 2026-07-02: Added Phase 7 scene runtime orchestration hooks for device-threshold evaluation, schedule evaluation, and scene run-history retrieval on the API side.
 - 2026-07-02: Wired Phase 7 runtime execution into an in-process scheduler loop and a device telemetry ingestion route so scenes can now fire automatically while the API server is running.
+- 2026-07-02: Persisted scene records, audit logs, and run history in MongoDB with a repository abstraction, bootstrap wiring, and full workspace validation.
