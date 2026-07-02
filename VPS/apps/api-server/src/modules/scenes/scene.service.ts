@@ -22,13 +22,13 @@ import type {
   ScheduleRuntimePayload,
   SceneActionInput,
   SceneAuditEntry,
-  SceneRunHistoryEntry,
-  SceneRuntimeBatchResponse,
-  SceneRuntimeSource,
   SceneConditionInput,
   ScenePatchPayload,
   SceneRequestContext,
+  SceneRunHistoryEntry,
   SceneRunResponse,
+  SceneRuntimeBatchResponse,
+  SceneRuntimeSource,
   SceneTriggerInput,
   TelemetryRuntimePayload
 } from "./scene.types";
@@ -91,8 +91,8 @@ function resolveActorId(context: SceneRequestContext): string {
   return context.userId ?? runtimeSystemActorId;
 }
 
-function requireScene(sceneId: string): SceneRecord {
-  const scene = sceneRepository.get(sceneId);
+async function requireScene(sceneId: string): Promise<SceneRecord> {
+  const scene = await sceneRepository.get(sceneId);
 
   if (!scene) {
     throw new SceneModuleError(404, `Scene not found: ${sceneId}`);
@@ -168,7 +168,7 @@ function toActionRecord(input: SceneActionInput): SceneAction {
   };
 }
 
-function writeAudit(
+async function writeAudit(
   sceneId: string,
   actorId: string,
   action: string,
@@ -187,11 +187,11 @@ function writeAudit(
     ...optionalProp("metadata", metadata)
   };
 
-  sceneAuditRepository.append(entry);
+  await sceneAuditRepository.append(entry);
 }
 
-function appendRunHistory(entry: SceneRunHistoryEntry) {
-  sceneRunHistoryRepository.append(entry);
+async function appendRunHistory(entry: SceneRunHistoryEntry): Promise<boolean> {
+  return sceneRunHistoryRepository.append(entry);
 }
 
 function evaluateConditions(
@@ -248,7 +248,7 @@ function createHistoryEntry(
   };
 }
 
-function executeSceneRuntime(
+async function executeSceneRuntime(
   scene: SceneRecord,
   input: {
     source: SceneRuntimeSource;
@@ -258,34 +258,47 @@ function executeSceneRuntime(
     telemetry?: SceneTelemetrySnapshot | undefined;
     dedupeKey?: string | undefined;
   }
-): SceneRunResponse {
+): Promise<SceneRunResponse | null> {
   assertRestrictedActionPermission(scene.actions, input.homeRole);
 
   const matchedConditions = evaluateConditions(scene, input.telemetry);
+  const executedActions = matchedConditions
+    ? scene.actions.map((action: SceneAction) => action.actionId)
+    : [];
+  const historyEntry = createHistoryEntry(
+    scene,
+    input.source,
+    input.triggeredAt,
+    matchedConditions,
+    executedActions,
+    input.telemetry,
+    input.dedupeKey
+  );
+
+  if (input.source === "schedule") {
+    const inserted = await appendRunHistory(historyEntry);
+
+    if (!inserted) {
+      return null;
+    }
+  }
+
   const updatedScene: SceneRecord = {
     ...scene,
     updatedAt: input.triggeredAt,
     lastRunAt: input.triggeredAt,
     lastRunStatus: matchedConditions ? "success" : "skipped"
   };
-  const savedScene = sceneRepository.save(updatedScene);
-  const executedActions = matchedConditions
-    ? savedScene.actions.map((action: SceneAction) => action.actionId)
-    : [];
+  const savedScene = await sceneRepository.save(updatedScene);
 
-  appendRunHistory(
-    createHistoryEntry(
-      savedScene,
-      input.source,
-      input.triggeredAt,
-      matchedConditions,
-      executedActions,
-      input.telemetry,
-      input.dedupeKey
-    )
-  );
+  if (input.source !== "schedule") {
+    await appendRunHistory({
+      ...historyEntry,
+      sceneStatus: savedScene.status
+    });
+  }
 
-  writeAudit(
+  await writeAudit(
     savedScene.sceneId,
     input.actorId,
     createAuditAction(input.source, matchedConditions),
@@ -382,23 +395,16 @@ function sceneHasMatchingThresholdTrigger(
   });
 }
 
-function hasRunForScheduleWindow(sceneId: string, dedupeKey: string): boolean {
-  return sceneRunHistoryRepository
-    .list(sceneId)
-    .some((entry) => entry.source === "schedule" && entry.dedupeKey === dedupeKey);
+async function listActiveScenesForHome(homeId: string): Promise<SceneRecord[]> {
+  return (await sceneRepository.list()).filter(
+    (scene) => scene.homeId === homeId && scene.status === "active"
+  );
 }
 
-function listActiveScenesForHome(homeId: string): SceneRecord[] {
-  return sceneRepository
-    .list()
-    .filter((scene) => scene.homeId === homeId && scene.status === "active");
-}
-
-export function listActiveSceneHomeIds(): string[] {
+export async function listActiveSceneHomeIds(): Promise<string[]> {
   return Array.from(
     new Set(
-      sceneRepository
-        .list()
+      (await sceneRepository.list())
         .filter(
           (scene) =>
             scene.status === "active" && hasScheduleTrigger(scene) && Boolean(scene.schedule)
@@ -416,8 +422,10 @@ function toBatchResponse(runs: SceneRunResponse[]): SceneRuntimeBatchResponse {
   };
 }
 
-export function listScenes(context: SceneRequestContext): SceneRecord[] {
-  return sceneRepository.list().filter((scene) => {
+export async function listScenes(
+  context: SceneRequestContext
+): Promise<SceneRecord[]> {
+  return (await sceneRepository.list()).filter((scene) => {
     if (context.homeId && scene.homeId !== context.homeId) {
       return false;
     }
@@ -430,25 +438,25 @@ export function listScenes(context: SceneRequestContext): SceneRecord[] {
   });
 }
 
-export function getScene(
+export async function getScene(
   sceneId: string,
   context: SceneRequestContext
-): SceneRecord {
-  return assertAccess(requireScene(sceneId), context);
+): Promise<SceneRecord> {
+  return assertAccess(await requireScene(sceneId), context);
 }
 
-export function listSceneRunHistory(
+export async function listSceneRunHistory(
   sceneId: string,
   context: SceneRequestContext
-): SceneRunHistoryEntry[] {
-  const scene = assertAccess(requireScene(sceneId), context);
+): Promise<SceneRunHistoryEntry[]> {
+  const scene = assertAccess(await requireScene(sceneId), context);
   return sceneRunHistoryRepository.list(scene.sceneId);
 }
 
-export function createScene(
+export async function createScene(
   payload: CreateScenePayload,
   context: SceneRequestContext
-): SceneRecord {
+): Promise<SceneRecord> {
   const actorId = requireActorId(context);
   const homeId = requireHomeId(context);
   const actions = payload.actions.map(toActionRecord);
@@ -471,20 +479,20 @@ export function createScene(
     ...optionalProp("schedule", payload.schedule)
   };
 
-  const saved = sceneRepository.save(record);
-  writeAudit(saved.sceneId, actorId, "scene.created", {
+  const saved = await sceneRepository.save(record);
+  await writeAudit(saved.sceneId, actorId, "scene.created", {
     status: saved.status
   });
   return saved;
 }
 
-export function patchScene(
+export async function patchScene(
   sceneId: string,
   patch: ScenePatchPayload,
   context: SceneRequestContext
-): SceneRecord {
+): Promise<SceneRecord> {
   const actorId = requireActorId(context);
-  const existing = assertAccess(requireScene(sceneId), context);
+  const existing = assertAccess(await requireScene(sceneId), context);
   const nextActions = patch.actions
     ? patch.actions.map(toActionRecord)
     : existing.actions;
@@ -504,42 +512,50 @@ export function patchScene(
     ...(patch.schedule ? { schedule: patch.schedule } : {})
   };
 
-  const saved = sceneRepository.save(updated);
-  writeAudit(saved.sceneId, actorId, "scene.updated");
+  const saved = await sceneRepository.save(updated);
+  await writeAudit(saved.sceneId, actorId, "scene.updated");
   return saved;
 }
 
-export function runSceneManually(
+export async function runSceneManually(
   sceneId: string,
   payload: ManualRunPayload,
   context: SceneRequestContext
-): SceneRunResponse {
+): Promise<SceneRunResponse> {
   const actorId = requireActorId(context);
-  const existing = assertAccess(requireScene(sceneId), context);
+  const existing = assertAccess(await requireScene(sceneId), context);
 
   if (existing.status === "paused") {
     throw new SceneModuleError(409, "Paused scenes cannot be run manually");
   }
 
-  return executeSceneRuntime(existing, {
+  const result = await executeSceneRuntime(existing, {
     source: "manual",
     actorId,
     triggeredAt: new Date().toISOString(),
     homeRole: context.homeRole,
     telemetry: payload.telemetry
   });
+
+  if (!result) {
+    throw new SceneModuleError(500, "Manual scene run did not produce a result");
+  }
+
+  return result;
 }
 
-export function evaluateScenesByTelemetry(
+export async function evaluateScenesByTelemetry(
   payload: TelemetryRuntimePayload,
   context: SceneRequestContext
-): SceneRuntimeBatchResponse {
+): Promise<SceneRuntimeBatchResponse> {
   const actorId = resolveActorId(context);
   const homeId = requireHomeId(context);
   const triggeredAt = payload.occurredAt ?? new Date().toISOString();
-  const runs = listActiveScenesForHome(homeId)
-    .filter((scene) => sceneHasMatchingThresholdTrigger(scene, payload))
-    .map((scene) =>
+  const candidateScenes = (await listActiveScenesForHome(homeId)).filter((scene) =>
+    sceneHasMatchingThresholdTrigger(scene, payload)
+  );
+  const runtimeResults = await Promise.all(
+    candidateScenes.map((scene) =>
       executeSceneRuntime(scene, {
         source: "device_threshold",
         actorId,
@@ -547,19 +563,24 @@ export function evaluateScenesByTelemetry(
         homeRole: context.homeRole,
         telemetry: payload.telemetry
       })
-    );
+    )
+  );
 
-  return toBatchResponse(runs);
+  return toBatchResponse(
+    runtimeResults.filter(
+      (result): result is SceneRunResponse => result !== null
+    )
+  );
 }
 
-export function evaluateScheduledScenes(
+export async function evaluateScheduledScenes(
   payload: ScheduleRuntimePayload,
   context: SceneRequestContext
-): SceneRuntimeBatchResponse {
+): Promise<SceneRuntimeBatchResponse> {
   const actorId = resolveActorId(context);
   const homeId = requireHomeId(context);
   const triggeredAt = payload.occurredAt ?? new Date().toISOString();
-  const scheduleRuns = listActiveScenesForHome(homeId)
+  const scheduleCandidates = (await listActiveScenesForHome(homeId))
     .map((scene) => ({
       scene,
       dedupeKey:
@@ -573,11 +594,10 @@ export function evaluateScheduledScenes(
       ): candidate is {
         scene: SceneRecord;
         dedupeKey: string;
-      } =>
-        candidate.dedupeKey !== undefined &&
-        !hasRunForScheduleWindow(candidate.scene.sceneId, candidate.dedupeKey)
-    )
-    .map(({ scene, dedupeKey }) =>
+      } => candidate.dedupeKey !== undefined
+    );
+  const runtimeResults = await Promise.all(
+    scheduleCandidates.map(({ scene, dedupeKey }) =>
       executeSceneRuntime(scene, {
         source: "schedule",
         actorId,
@@ -585,16 +605,21 @@ export function evaluateScheduledScenes(
         homeRole: context.homeRole,
         dedupeKey
       })
-    );
+    )
+  );
 
-  return toBatchResponse(scheduleRuns);
+  return toBatchResponse(
+    runtimeResults.filter(
+      (result): result is SceneRunResponse => result !== null
+    )
+  );
 }
 
 export const sceneTesting = {
-  reset() {
-    sceneRepository.reset();
-    sceneAuditRepository.reset();
-    sceneRunHistoryRepository.reset();
+  async reset() {
+    await sceneRepository.reset();
+    await sceneAuditRepository.reset();
+    await sceneRunHistoryRepository.reset();
   },
   listAudit(sceneId: string) {
     return sceneAuditRepository.list(sceneId);

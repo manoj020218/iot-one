@@ -6,7 +6,8 @@
   "dependencies": {
     "@jenix/device-schemas": "workspace:*",
     "@jenix/shared": "workspace:*",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "mongodb": "^6.8.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

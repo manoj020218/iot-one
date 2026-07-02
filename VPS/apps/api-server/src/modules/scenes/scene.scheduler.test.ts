@@ -11,12 +11,12 @@ const ownerContext = {
 };
 
 describe("scene runtime scheduler", () => {
-  beforeEach(() => {
-    sceneTesting.reset();
+  beforeEach(async () => {
+    await sceneTesting.reset();
   });
 
-  it("evaluates scheduled scenes for active homes and dedupes the same window", () => {
-    const scene = createScene(
+  it("evaluates scheduled scenes for active homes and dedupes the same window", async () => {
+    const scene = await createScene(
       {
         name: "Morning Tank Sync",
         status: "active",
@@ -48,15 +48,15 @@ describe("scene runtime scheduler", () => {
       logger: () => undefined
     });
 
-    const firstRun = scheduler.runOnce();
+    const firstRun = await scheduler.runOnce();
     expect(firstRun.evaluatedHomeCount).toBe(1);
     expect(firstRun.runCount).toBe(1);
     expect(firstRun.matchedRunCount).toBe(1);
-    expect(sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
+    expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
 
-    const secondRun = scheduler.runOnce();
+    const secondRun = await scheduler.runOnce();
     expect(secondRun.evaluatedHomeCount).toBe(1);
     expect(secondRun.runCount).toBe(0);
-    expect(sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
+    expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
   });
 });

@@ -11,8 +11,8 @@ const ownerHeaders = {
 };
 
 describe("scene routes", () => {
-  beforeEach(() => {
-    sceneTesting.reset();
+  beforeEach(async () => {
+    await sceneTesting.reset();
   });
 
   it("creates and lists scenes for the current HOME", async () => {

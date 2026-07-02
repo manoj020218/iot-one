@@ -63,36 +63,40 @@ function sendError(response: Response, error: unknown) {
   });
 }
 
-export function listScenesController(request: Request, response: Response) {
-  response.status(200).json({
-    data: listScenes(readContext(request))
-  });
-}
-
-export function getSceneController(request: Request, response: Response) {
+export async function listScenesController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: getScene(request.params.sceneId ?? "", readContext(request))
+      data: await listScenes(readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function listSceneRunHistoryController(
+export async function getSceneController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await getScene(request.params.sceneId ?? "", readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function listSceneRunHistoryController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: listSceneRunHistory(request.params.sceneId ?? "", readContext(request))
+      data: await listSceneRunHistory(request.params.sceneId ?? "", readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function createSceneController(request: Request, response: Response) {
+export async function createSceneController(request: Request, response: Response) {
   const payload = parseCreateScenePayload(request.body);
 
   if (!payload) {
@@ -104,14 +108,14 @@ export function createSceneController(request: Request, response: Response) {
 
   try {
     response.status(201).json({
-      data: createScene(payload, readContext(request))
+      data: await createScene(payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function patchSceneController(request: Request, response: Response) {
+export async function patchSceneController(request: Request, response: Response) {
   const payload = parseScenePatchPayload(request.body);
 
   if (!payload) {
@@ -123,14 +127,14 @@ export function patchSceneController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: patchScene(request.params.sceneId ?? "", payload, readContext(request))
+      data: await patchScene(request.params.sceneId ?? "", payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function runSceneController(request: Request, response: Response) {
+export async function runSceneController(request: Request, response: Response) {
   const payload = parseManualRunPayload(request.body);
 
   if (!payload) {
@@ -142,14 +146,18 @@ export function runSceneController(request: Request, response: Response) {
 
   try {
     response.status(200).json({
-      data: runSceneManually(request.params.sceneId ?? "", payload, readContext(request))
+      data: await runSceneManually(
+        request.params.sceneId ?? "",
+        payload,
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function evaluateTelemetryRuntimeController(
+export async function evaluateTelemetryRuntimeController(
   request: Request,
   response: Response
 ) {
@@ -164,14 +172,14 @@ export function evaluateTelemetryRuntimeController(
 
   try {
     response.status(200).json({
-      data: evaluateScenesByTelemetry(payload, readContext(request))
+      data: await evaluateScenesByTelemetry(payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function evaluateScheduleRuntimeController(
+export async function evaluateScheduleRuntimeController(
   request: Request,
   response: Response
 ) {
@@ -186,7 +194,7 @@ export function evaluateScheduleRuntimeController(
 
   try {
     response.status(200).json({
-      data: evaluateScheduledScenes(payload, readContext(request))
+      data: await evaluateScheduledScenes(payload, readContext(request))
     });
   } catch (error) {
     sendError(response, error);

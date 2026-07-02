@@ -132,10 +132,10 @@ export function renameDevice(
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }
 
-export function ingestDeviceTelemetry(
+export async function ingestDeviceTelemetry(
   deviceId: string,
   payload: DeviceTelemetryIngestPayload
-): DeviceTelemetryIngestResponse {
+): Promise<DeviceTelemetryIngestResponse> {
   const existing = requireDevice(deviceId);
   const occurredAt = payload.occurredAt ?? new Date().toISOString();
   const updatedDevice: DeviceRecord = {
@@ -147,7 +147,7 @@ export function ingestDeviceTelemetry(
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
   const savedDevice = deviceRepository.save(updatedDevice);
-  const sceneRuntime = evaluateScenesByTelemetry(
+  const sceneRuntime = await evaluateScenesByTelemetry(
     {
       deviceId: savedDevice.deviceId,
       telemetry: payload.telemetry,

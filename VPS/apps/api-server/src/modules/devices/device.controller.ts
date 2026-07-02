@@ -120,7 +120,7 @@ export function renameDeviceController(request: Request, response: Response) {
   }
 }
 
-export function ingestDeviceTelemetryController(
+export async function ingestDeviceTelemetryController(
   request: Request,
   response: Response
 ) {
@@ -135,7 +135,7 @@ export function ingestDeviceTelemetryController(
 
   try {
     response.status(200).json({
-      data: ingestDeviceTelemetry(request.params.deviceId ?? "", payload)
+      data: await ingestDeviceTelemetry(request.params.deviceId ?? "", payload)
     });
   } catch (error) {
     sendError(response, error);

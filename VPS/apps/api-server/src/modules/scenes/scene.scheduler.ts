@@ -7,7 +7,7 @@ export interface SceneRuntimeSchedulerOptions {
   intervalMs: number;
   now?: () => Date;
   logger?: (message: string) => void;
-  getHomeIds?: () => string[];
+  getHomeIds?: () => Promise<string[]>;
 }
 
 export interface SceneRuntimeSchedulerTickResult {
@@ -20,7 +20,7 @@ export class SceneRuntimeScheduler {
   private readonly intervalMs: number;
   private readonly now: () => Date;
   private readonly logger: ((message: string) => void) | undefined;
-  private readonly getHomeIds: () => string[];
+  private readonly getHomeIds: () => Promise<string[]>;
   private timer: NodeJS.Timeout | null = null;
 
   constructor(options: SceneRuntimeSchedulerOptions) {
@@ -34,29 +34,28 @@ export class SceneRuntimeScheduler {
     return this.timer !== null;
   }
 
-  runOnce(occurredAt = this.now().toISOString()): SceneRuntimeSchedulerTickResult {
-    const homeIds = this.getHomeIds();
-    const result = homeIds.reduce<SceneRuntimeSchedulerTickResult>(
-      (summary, homeId) => {
-        const batch = evaluateScheduledScenes(
-          { occurredAt },
-          {
-            homeId
-          }
-        );
+  async runOnce(
+    occurredAt = this.now().toISOString()
+  ): Promise<SceneRuntimeSchedulerTickResult> {
+    const homeIds = await this.getHomeIds();
+    const result: SceneRuntimeSchedulerTickResult = {
+      evaluatedHomeCount: 0,
+      matchedRunCount: 0,
+      runCount: 0
+    };
 
-        return {
-          evaluatedHomeCount: summary.evaluatedHomeCount + 1,
-          matchedRunCount: summary.matchedRunCount + batch.matchedRunCount,
-          runCount: summary.runCount + batch.runs.length
-        };
-      },
-      {
-        evaluatedHomeCount: 0,
-        matchedRunCount: 0,
-        runCount: 0
-      }
-    );
+    for (const homeId of homeIds) {
+      const batch = await evaluateScheduledScenes(
+        { occurredAt },
+        {
+          homeId
+        }
+      );
+
+      result.evaluatedHomeCount += 1;
+      result.matchedRunCount += batch.matchedRunCount;
+      result.runCount += batch.runs.length;
+    }
 
     if (result.runCount > 0) {
       this.logger?.(
@@ -72,9 +71,9 @@ export class SceneRuntimeScheduler {
       return;
     }
 
-    this.runOnce();
+    void this.runOnce();
     this.timer = setInterval(() => {
-      this.runOnce();
+      void this.runOnce();
     }, this.intervalMs);
   }
 
