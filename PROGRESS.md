@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 8 - Home Management and Sharing
+- Phase name: Phase 9 - Settings and Dynamic PID Pages
 - Started: 2026-07-02
 - Status: Completed
 
@@ -33,7 +33,13 @@
 - [x] MongoDB-backed scene persistence
 - [x] Distributed scheduler coordination
 - [x] Home sharing
-- [ ] Settings pages
+- [x] Settings pages
+- [x] Device management page
+- [x] Device detail page
+- [x] Firmware update panel
+- [x] Dynamic PID page renderer
+- [x] User profile page
+- [x] App update page
 - [ ] OTA by PID
 - [ ] Matter mapping
 - [ ] Third-party API by PID
@@ -83,6 +89,9 @@
 - Date: 2026-07-02
   Decision: Model HOME access explicitly with `owner`, `admin`, `member`, and `viewer` roles, keep the PWA on the real `/api/v1/homes` contract first, and preserve a local fallback store for browser-only and API-unavailable runs.
   Reason: It makes shared access rules visible across dashboard, provisioning, and scenes immediately without blocking Phase 8 on full auth middleware or durable HOME persistence.
+- Date: 2026-07-02
+  Decision: Expose device-facing PID metadata at `/api/v1/pids/:pid`, add a lightweight firmware-request action on `/api/v1/devices/:deviceId/firmware/request`, and keep the PWA device center on those real contracts first with local fallback data when the API is unavailable.
+  Reason: It enables Phase 9 device detail rendering and permission-aware firmware controls without prematurely coupling the UI to the full OTA release model planned for Phase 10.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -118,10 +127,13 @@
 - Issue: Shared HOME access for scenes and devices currently trusts the session-provided `x-home-role` context instead of resolving membership on the backend from authenticated middleware.
   Impact: UI-visible role restrictions work for the current architecture, but final production RBAC still needs server-authoritative membership checks.
   Fix plan: Replace header-trusted HOME role context with authenticated membership resolution when the auth middleware and durable HOME repository are introduced.
+- Issue: Firmware update requests now expose a real route and permission checks, but they do not yet resolve OTA compatibility or execute device delivery.
+  Impact: Operators can see release intent and queue requests, but full PID/hardware-aware rollout logic is still deferred.
+  Fix plan: Replace the Phase 9 placeholder request flow with the Phase 10 OTA release model, compatibility resolution, and delivery pipeline.
 
 ## Next Tasks
-1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
-2. Start Phase 9 settings pages and dynamic PID-driven device pages on top of the new HOME role model.
+1. Start Phase 10 OTA by PID and third-party API packaging on top of the new device detail and firmware-request surfaces.
+2. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
 3. Move PID, device registry, provisioning intent, and HOME sharing storage to MongoDB so the rest of the platform matches the scene durability baseline.
 
 ## Log
@@ -141,3 +153,4 @@
 - 2026-07-02: Persisted scene records, audit logs, and run history in MongoDB with a repository abstraction, bootstrap wiring, and full workspace validation.
 - 2026-07-02: Added Mongo lease-based scheduler coordination, local overlap protection, and multi-instance scheduler tests for Phase 7 runtime hardening.
 - 2026-07-02: Completed Phase 8 HOME sharing with members, share codes, redeem flow, role-based access, dashboard and scene integration, and full workspace validation.
+- 2026-07-02: Completed Phase 9 device management, device detail pages, firmware request panel, PID-driven dynamic page rendering, settings pages, and full workspace validation.

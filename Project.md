@@ -9,7 +9,8 @@
 - Current status: Phase 7 durable MongoDB-backed scene persistence complete
 - Current status: Phase 7 distributed scheduler coordination complete
 - Current status: Phase 8 home management and sharing complete
-- Current phase: Phase 8 - home management and sharing
+- Current status: Phase 9 settings and dynamic PID pages complete
+- Current phase: Phase 9 - settings and dynamic PID pages
 
 ## Working Scope
 
@@ -259,19 +260,19 @@ Validation gates:
 
 ### Phase 9 - Settings and Dynamic PID Pages
 
-Status: Pending
+Status: Completed
 
 Deliverables:
-- [ ] Device management page
-- [ ] Device detail page
-- [ ] Firmware update panel
-- [ ] Dynamic PID page renderer
-- [ ] User profile page
-- [ ] App update page
+- [x] Device management page
+- [x] Device detail page
+- [x] Firmware update panel
+- [x] Dynamic PID page renderer
+- [x] User profile page
+- [x] App update page
 
 Validation gates:
-- [ ] Missing PID page fallback tests
-- [ ] Firmware action permission tests
+- [x] Missing PID page fallback tests
+- [x] Firmware action permission tests
 
 ### Phase 10 - OTA and Third-Party API
 
@@ -310,7 +311,7 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Start Phase 9 settings pages and dynamic PID-driven device pages on top of the new HOME role model.
+1. Start Phase 10 OTA by PID and third-party API packaging using the new device detail and firmware-request contracts from Phase 9.
 2. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
 3. Persist PID, device registry, provisioning intent, and HOME sharing modules in MongoDB for platform-wide durability.
 4. Keep `PROGRESS.md` updated after each remaining milestone.
@@ -334,6 +335,7 @@ Validation gates:
 - 2026-07-02: Persisted scenes, scene audit logs, and scene run history in MongoDB behind a shared repository abstraction while preserving in-memory mode for tests.
 - 2026-07-02: Added Mongo lease-based scheduler leadership so multi-instance deployments do not run the same schedule tick concurrently.
 - 2026-07-02: Added HOME members, share codes, redeem flow, role-aware access, and HOME management UI on the real `/api/v1/homes` contract with local fallback support.
+- 2026-07-02: Added device-facing PID metadata, device center pages, firmware request controls, dynamic PID page rendering, settings pages, and Phase 9 validation coverage.
 
 ## Risks and Controls
 
