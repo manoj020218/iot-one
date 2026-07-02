@@ -50,6 +50,16 @@ export interface ManualRunPayload {
   telemetry?: SceneTelemetrySnapshot;
 }
 
+export interface TelemetryRuntimePayload {
+  deviceId: string;
+  telemetry: SceneTelemetrySnapshot;
+  occurredAt?: string;
+}
+
+export interface ScheduleRuntimePayload {
+  occurredAt?: string;
+}
+
 export class SceneModuleError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -62,6 +72,24 @@ export class SceneModuleError extends Error {
 
 export interface SceneRunResponse extends SceneRunResult {
   scene: SceneRecord;
+}
+
+export type SceneRuntimeSource = "manual" | "device_threshold" | "schedule";
+
+export interface SceneRunHistoryEntry extends SceneRunResult {
+  runId: string;
+  sceneId: string;
+  source: SceneRuntimeSource;
+  triggeredAt: string;
+  sceneStatus: SceneStatus;
+  telemetry?: SceneTelemetrySnapshot;
+  dedupeKey?: string;
+}
+
+export interface SceneRuntimeBatchResponse {
+  evaluatedSceneCount: number;
+  matchedRunCount: number;
+  runs: SceneRunResponse[];
 }
 
 export interface SceneAuditEntry {

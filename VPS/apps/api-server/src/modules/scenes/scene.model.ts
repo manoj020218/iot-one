@@ -1,6 +1,6 @@
 import type { SceneRecord } from "@jenix/shared";
 
-import type { SceneAuditEntry } from "./scene.types";
+import type { SceneAuditEntry, SceneRunHistoryEntry } from "./scene.types";
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -8,6 +8,7 @@ function clone<T>(value: T): T {
 
 const sceneStore = new Map<string, SceneRecord>();
 const sceneAuditStore = new Map<string, SceneAuditEntry[]>();
+const sceneRunHistoryStore = new Map<string, SceneRunHistoryEntry[]>();
 
 export const sceneRepository = {
   get(sceneId: string): SceneRecord | undefined {
@@ -36,5 +37,18 @@ export const sceneAuditRepository = {
   },
   reset() {
     sceneAuditStore.clear();
+  }
+};
+
+export const sceneRunHistoryRepository = {
+  list(sceneId: string): SceneRunHistoryEntry[] {
+    return clone(sceneRunHistoryStore.get(sceneId) ?? []);
+  },
+  append(entry: SceneRunHistoryEntry) {
+    const nextEntries = [...sceneRunHistoryRepository.list(entry.sceneId), clone(entry)];
+    sceneRunHistoryStore.set(entry.sceneId, nextEntries);
+  },
+  reset() {
+    sceneRunHistoryStore.clear();
   }
 };

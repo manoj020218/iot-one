@@ -11,10 +11,12 @@ import type {
 import type {
   CreateScenePayload,
   ManualRunPayload,
+  ScheduleRuntimePayload,
   SceneActionInput,
   SceneConditionInput,
   ScenePatchPayload,
-  SceneTriggerInput
+  SceneTriggerInput,
+  TelemetryRuntimePayload
 } from "./scene.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -85,6 +87,36 @@ function parsePrimitiveValue(value: unknown): ScenePrimitiveValue | undefined {
   }
 
   return undefined;
+}
+
+function parseIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  const timestamp = value.trim();
+  return Number.isNaN(Date.parse(timestamp)) ? undefined : timestamp;
+}
+
+function parseTelemetrySnapshot(
+  value: unknown
+): Record<string, ScenePrimitiveValue> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return Object.entries(value).reduce<Record<string, ScenePrimitiveValue>>(
+    (snapshot, [key, entryValue]) => {
+      const primitiveValue = parsePrimitiveValue(entryValue);
+
+      if (primitiveValue !== undefined) {
+        snapshot[key] = primitiveValue;
+      }
+
+      return snapshot;
+    },
+    {}
+  );
 }
 
 function parseSceneActionCommand(
@@ -323,20 +355,43 @@ export function parseManualRunPayload(body: unknown): ManualRunPayload | null {
     return null;
   }
 
-  const telemetry = isRecord(body.telemetry)
-    ? Object.entries(body.telemetry).reduce<Record<string, ScenePrimitiveValue>>(
-        (snapshot, [key, value]) => {
-          const primitiveValue = parsePrimitiveValue(value);
-
-          if (primitiveValue !== undefined) {
-            snapshot[key] = primitiveValue;
-          }
-
-          return snapshot;
-        },
-        {}
-      )
-    : undefined;
+  const telemetry = parseTelemetrySnapshot(body.telemetry);
 
   return telemetry ? { telemetry } : {};
+}
+
+export function parseTelemetryRuntimePayload(
+  body: unknown
+): TelemetryRuntimePayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const deviceId = readTrimmedString(body, "deviceId");
+  const telemetry = parseTelemetrySnapshot(body.telemetry);
+
+  if (!deviceId || !telemetry) {
+    return null;
+  }
+
+  return {
+    deviceId,
+    telemetry,
+    ...optionalProp("occurredAt", parseIsoTimestamp(body.occurredAt))
+  };
+}
+
+export function parseScheduleRuntimePayload(
+  body: unknown
+): ScheduleRuntimePayload | null {
+  if (body === undefined || body === null) {
+    return {};
+  }
+
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const occurredAt = parseIsoTimestamp(body.occurredAt);
+  return occurredAt ? { occurredAt } : {};
 }
