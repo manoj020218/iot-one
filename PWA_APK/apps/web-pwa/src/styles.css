@@ -187,6 +187,8 @@ textarea {
 .device-card-head,
 .rename-form,
 .card-actions,
+.home-card-head,
+.home-member-actions,
 .summary-grid,
 .scene-card-head,
 .scene-card-meta,
@@ -268,6 +270,51 @@ textarea {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.home-card-grid,
+.home-share-list,
+.home-member-list {
+  display: grid;
+  gap: 14px;
+}
+
+.home-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.home-card-button,
+.home-share-card,
+.home-member-card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.home-card-button {
+  cursor: pointer;
+  text-align: left;
+}
+
+.home-card-button[data-active="true"] {
+  border-color: rgba(15, 118, 110, 0.45);
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.12);
+}
+
+.home-card-head,
+.home-member-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.home-share-card,
+.home-member-card,
+.home-member-copy {
+  display: grid;
+  gap: 8px;
 }
 
 .scene-section {

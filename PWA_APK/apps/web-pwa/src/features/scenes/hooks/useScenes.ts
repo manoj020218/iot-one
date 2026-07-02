@@ -25,7 +25,7 @@ export function useScenes(session: AuthSession) {
 
   useEffect(() => {
     void reload();
-  }, [session.user.userId]);
+  }, [session.user.userId, session.activeHomeId]);
 
   return {
     scenes,

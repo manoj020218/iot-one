@@ -2,6 +2,7 @@ import { foundationPidBlueprint } from "@jenix/device-schemas";
 import {
   createDeviceRecord,
   ensureDefaultHome,
+  getCurrentHome as getSelectedHome,
   type AuthSession,
   type DeviceRecord,
   type HomeRecord
@@ -85,7 +86,11 @@ export function getHomes(session: AuthSession): HomeRecord[] {
 }
 
 export function getCurrentHome(session: AuthSession): HomeRecord {
-  return getHomes(session)[0]!;
+  return getSelectedHome(
+    getHomes(session),
+    session.user.userId,
+    session.activeHomeId
+  );
 }
 
 export async function getDashboardDevices(

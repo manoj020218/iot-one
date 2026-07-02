@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthPage } from "../features/auth/AuthPage";
 import { useAuth } from "../features/auth/hooks/useAuth";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { HomeManagementPage } from "../features/homes/HomeManagementPage";
 import { ProvisioningHomePage } from "../features/provisioning/ProvisioningHomePage";
 import { ApProvisioningPage } from "../features/provisioning/ap/ApProvisioningPage";
 import { BleProvisioningPage } from "../features/provisioning/ble/BleProvisioningPage";
@@ -21,6 +22,14 @@ export function AppRouter() {
         element={
           <RequireAuth>
             <DashboardPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/homes"
+        element={
+          <RequireAuth>
+            <HomeManagementPage />
           </RequireAuth>
         }
       />

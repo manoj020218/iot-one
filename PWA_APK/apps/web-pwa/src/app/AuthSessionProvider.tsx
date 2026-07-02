@@ -1,4 +1,4 @@
-import type { AuthSession, AuthProvider } from "@jenix/shared";
+import type { AuthSession, AuthProvider, HomeRecord } from "@jenix/shared";
 import { createContext, useState, type PropsWithChildren } from "react";
 
 import {
@@ -16,6 +16,8 @@ export interface AuthContextValue {
     password: string;
   }) => Promise<void>;
   loginWithProvider: (provider: AuthProvider) => Promise<void>;
+  replaceHomes: (homes: HomeRecord[], activeHomeId?: string) => void;
+  setActiveHome: (homeId: string) => void;
   logout: () => void;
 }
 
@@ -30,6 +32,39 @@ export function AuthSessionProvider({
   initialSession = null
 }: AuthSessionProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(initialSession);
+
+  function getNextActiveHomeId(
+    homes: HomeRecord[],
+    currentActiveHomeId?: string,
+    requestedActiveHomeId?: string
+  ) {
+    const candidateHomeId = requestedActiveHomeId ?? currentActiveHomeId;
+
+    if (candidateHomeId && homes.some((home) => home.homeId === candidateHomeId)) {
+      return candidateHomeId;
+    }
+
+    return homes[0]?.homeId;
+  }
+
+  function applyHomesToSession(
+    current: AuthSession,
+    homes: HomeRecord[],
+    requestedActiveHomeId?: string
+  ): AuthSession {
+    const nextActiveHomeId = getNextActiveHomeId(
+      homes,
+      current.activeHomeId,
+      requestedActiveHomeId
+    );
+
+    return {
+      ...current,
+      homes,
+      ...(nextActiveHomeId ? { activeHomeId: nextActiveHomeId } : {})
+    };
+  }
+
   const value: AuthContextValue = {
     session,
     async loginWithEmail(payload) {
@@ -40,6 +75,27 @@ export function AuthSessionProvider({
     },
     async loginWithProvider(provider) {
       setSession(await loginWithProviderRequest(provider));
+    },
+    replaceHomes(homes, activeHomeId) {
+      setSession((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyHomesToSession(current, homes, activeHomeId);
+      });
+    },
+    setActiveHome(homeId) {
+      setSession((current) => {
+        if (!current || !current.homes.some((home) => home.homeId === homeId)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          activeHomeId: homeId
+        };
+      });
     },
     logout() {
       setSession(null);

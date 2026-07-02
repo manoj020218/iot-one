@@ -1,6 +1,7 @@
 import {
   ensureDefaultHome,
   evaluateSceneCondition,
+  getCurrentHome as getSelectedHome,
   isRestrictedSceneCommand,
   type AuthSession,
   type HomeAccessRole,
@@ -68,12 +69,15 @@ function optionalProp<K extends string, V>(
 }
 
 function getCurrentHome(session: AuthSession) {
-  return ensureDefaultHome(session.homes, session.user.userId)[0]!;
+  return getSelectedHome(
+    ensureDefaultHome(session.homes, session.user.userId),
+    session.user.userId,
+    session.activeHomeId
+  );
 }
 
 function getHomeRole(session: AuthSession): HomeAccessRole {
-  const currentHome = getCurrentHome(session);
-  return currentHome.ownerUserId === session.user.userId ? "owner" : "member";
+  return getCurrentHome(session).role;
 }
 
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {

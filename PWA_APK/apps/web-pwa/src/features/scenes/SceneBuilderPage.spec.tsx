@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -55,7 +55,11 @@ describe("SceneBuilderPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Create Scene" }));
 
-    expect(await screen.findByRole("button", { name: "Save Changes" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Save Changes" })
+      ).toBeInTheDocument();
+    });
     expect(await screen.findByDisplayValue("High Tank Alert")).toBeInTheDocument();
   });
 });

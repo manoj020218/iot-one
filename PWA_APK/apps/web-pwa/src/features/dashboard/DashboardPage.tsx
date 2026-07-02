@@ -38,6 +38,13 @@ export function DashboardPage() {
         <button
           className="text-button"
           type="button"
+          onClick={() => navigate("/homes")}
+        >
+          Homes
+        </button>
+        <button
+          className="text-button"
+          type="button"
           onClick={() => navigate("/scenes")}
         >
           Scenes

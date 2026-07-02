@@ -24,6 +24,7 @@ function createSession(
 ): Promise<AuthSession> {
   const normalizedEmail = email.trim().toLowerCase();
   const userId = createUserId(normalizedEmail);
+  const homes = ensureDefaultHome([], userId);
 
   return Promise.resolve({
     user: {
@@ -32,7 +33,8 @@ function createSession(
       name: name.trim(),
       provider
     },
-    homes: ensureDefaultHome([], userId),
+    homes,
+    activeHomeId: homes[0]!.homeId,
     tokens: createTokenPair(userId)
   });
 }

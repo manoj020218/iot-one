@@ -2,6 +2,7 @@ import { foundationPidBlueprint } from "@jenix/device-schemas";
 import {
   createDeviceRecord,
   ensureDefaultHome,
+  getCurrentHome as getSelectedHome,
   type AuthSession,
   type DeviceRecord,
   type ProvisioningIntent,
@@ -57,7 +58,11 @@ function createLocalProvisioningId(): string {
 }
 
 function getCurrentHome(session: AuthSession) {
-  return ensureDefaultHome(session.homes, session.user.userId)[0]!;
+  return getSelectedHome(
+    ensureDefaultHome(session.homes, session.user.userId),
+    session.user.userId,
+    session.activeHomeId
+  );
 }
 
 function getInitialStatus(method: ProvisioningMethod): ProvisioningStatus {

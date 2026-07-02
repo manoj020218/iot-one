@@ -38,7 +38,7 @@ export function useDashboardDevices(session: AuthSession) {
 
   useEffect(() => {
     void load();
-  }, [session.user.userId]);
+  }, [session.user.userId, session.activeHomeId]);
 
   return {
     devices,
