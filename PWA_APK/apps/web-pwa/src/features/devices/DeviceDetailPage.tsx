@@ -12,8 +12,10 @@ import { DeviceFirmwarePanel } from "./components/DeviceFirmwarePanel";
 import { PidDynamicPageRenderer } from "./components/PidDynamicPageRenderer";
 import {
   getDevicePidProfile,
+  getResolvedFirmwarePlan,
   getManagedDevice,
   requestFirmwareUpdate,
+  type DeviceFirmwarePlan,
   type DevicePidProfile
 } from "./services/deviceManagementApi";
 
@@ -23,6 +25,7 @@ export function DeviceDetailPage() {
   const navigate = useNavigate();
   const [device, setDevice] = useState<DeviceRecord | null>(null);
   const [pidProfile, setPidProfile] = useState<DevicePidProfile | null>(null);
+  const [firmwarePlan, setFirmwarePlan] = useState<DeviceFirmwarePlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,10 +53,12 @@ export function DeviceDetailPage() {
     void getManagedDevice(session, deviceId)
       .then(async (record) => {
         const profile = await getDevicePidProfile(record.pid);
+        const plan = await getResolvedFirmwarePlan(session, record, profile);
 
         if (active) {
           setDevice(record);
           setPidProfile(profile);
+          setFirmwarePlan(plan);
         }
       })
       .catch((requestError: unknown) => {
@@ -80,7 +85,7 @@ export function DeviceDetailPage() {
     <AppShell
       eyebrow="Device Detail"
       title={device?.displayName ?? deviceId ?? "Device"}
-      description="Phase 9 binds device detail pages to PID metadata, firmware visibility, and safe fallback rendering for unsupported dynamic pages."
+      description="Phase 10 extends device detail pages with OTA resolution on top of PID metadata, while preserving safe fallback rendering for unsupported dynamic pages."
       aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}
     >
       <section className="tabs-strip">
@@ -108,7 +113,7 @@ export function DeviceDetailPage() {
       </section>
       {loading ? <section className="panel">Loading device detail...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
-      {!loading && device && pidProfile ? (
+      {!loading && device && pidProfile && firmwarePlan ? (
         <>
           <section className="panel device-detail-hero">
             <div className="device-card-head">
@@ -161,9 +166,7 @@ export function DeviceDetailPage() {
             </dl>
           </section>
           <DeviceFirmwarePanel
-            device={device}
-            pidProfile={pidProfile}
-            homeRole={currentHome.role}
+            plan={firmwarePlan}
             onRequest={(input) =>
               requestFirmwareUpdate(session, device.deviceId, input)
             }

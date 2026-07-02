@@ -7,6 +7,7 @@ import {
   getCurrentHome as getSelectedHome,
   type AuthSession,
   type DeviceFirmwareChannel,
+  type DeviceFirmwarePlanResponse,
   type DeviceFirmwareRequestResult,
   type DeviceRecord,
   type HomeAccessRole
@@ -42,6 +43,10 @@ export interface DeviceFirmwarePlan {
   betaVersion?: string;
   recommendedChannel: DeviceFirmwareChannel;
   availableTargetVersion?: string;
+  stableStatus?: DeviceFirmwarePlanResponse["stable"]["status"];
+  betaStatus?: DeviceFirmwarePlanResponse["beta"]["status"];
+  stableReason?: string;
+  betaReason?: string;
   canRequest: boolean;
   blockedReason?: string;
 }
@@ -209,6 +214,49 @@ export function buildFirmwarePlan(
   };
 }
 
+export function buildFirmwarePlanFromResponse(
+  response: DeviceFirmwarePlanResponse,
+  homeRole: HomeAccessRole
+): DeviceFirmwarePlan {
+  const stableVersion = response.stable.release?.version;
+  const betaVersion = response.beta.release?.version;
+  const preferredTargetVersion =
+    response.recommendedChannel === "stable" ? stableVersion : betaVersion;
+
+  if (homeRole === "viewer") {
+    return {
+      recommendedChannel: response.recommendedChannel,
+      canRequest: false,
+      blockedReason: "Viewer access cannot request firmware updates.",
+      ...optionalProp("currentVersion", response.currentVersion),
+      ...optionalProp("stableVersion", stableVersion),
+      ...optionalProp("betaVersion", betaVersion),
+      ...optionalProp("availableTargetVersion", preferredTargetVersion),
+      ...optionalProp("stableStatus", response.stable.status),
+      ...optionalProp("betaStatus", response.beta.status),
+      ...optionalProp("stableReason", response.stable.reason),
+      ...optionalProp("betaReason", response.beta.reason)
+    };
+  }
+
+  return {
+    recommendedChannel: response.recommendedChannel,
+    canRequest:
+      response.stable.status === "update_available" ||
+      response.beta.status === "update_available" ||
+      response.stable.status === "up_to_date" ||
+      response.beta.status === "up_to_date",
+    ...optionalProp("currentVersion", response.currentVersion),
+    ...optionalProp("stableVersion", stableVersion),
+    ...optionalProp("betaVersion", betaVersion),
+    ...optionalProp("availableTargetVersion", preferredTargetVersion),
+    ...optionalProp("stableStatus", response.stable.status),
+    ...optionalProp("betaStatus", response.beta.status),
+    ...optionalProp("stableReason", response.stable.reason),
+    ...optionalProp("betaReason", response.beta.reason)
+  };
+}
+
 export async function listManagedDevices(
   session: AuthSession
 ): Promise<ManagedDeviceSummary[]> {
@@ -271,6 +319,33 @@ export async function getDevicePidProfile(pid: string): Promise<DevicePidProfile
     }
 
     return clone(profile);
+  }
+}
+
+export async function getResolvedFirmwarePlan(
+  session: AuthSession,
+  device: DeviceRecord,
+  pidProfile: DevicePidProfile
+): Promise<DeviceFirmwarePlan> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  try {
+    const response = await fetchJson<DeviceFirmwarePlanResponse>(
+      `${deviceEndpoint}/${encodeURIComponent(device.deviceId)}/firmware-plan`,
+      {
+        method: "GET",
+        headers: {
+          "x-user-id": session.user.userId,
+          "x-home-id": currentHome.homeId,
+          "x-home-role": homeRole
+        }
+      }
+    );
+
+    return buildFirmwarePlanFromResponse(response, homeRole);
+  } catch {
+    return buildFirmwarePlan(device, pidProfile, homeRole);
   }
 }
 

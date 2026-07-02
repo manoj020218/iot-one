@@ -1,17 +1,12 @@
 import { useEffect, useState } from "react";
 
-import type { DeviceRecord, HomeAccessRole } from "@jenix/shared";
-
 import {
-  buildFirmwarePlan,
-  type DevicePidProfile,
+  type DeviceFirmwarePlan,
   type RequestFirmwareUpdateInput
 } from "../services/deviceManagementApi";
 
 export interface DeviceFirmwarePanelProps {
-  device: DeviceRecord;
-  pidProfile: DevicePidProfile;
-  homeRole: HomeAccessRole;
+  plan: DeviceFirmwarePlan;
   onRequest: (
     input: RequestFirmwareUpdateInput
   ) => Promise<{
@@ -22,12 +17,9 @@ export interface DeviceFirmwarePanelProps {
 }
 
 export function DeviceFirmwarePanel({
-  device,
-  pidProfile,
-  homeRole,
+  plan,
   onRequest
 }: DeviceFirmwarePanelProps) {
-  const plan = buildFirmwarePlan(device, pidProfile, homeRole);
   const [channel, setChannel] = useState<"stable" | "beta">(plan.recommendedChannel);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -47,8 +39,8 @@ export function DeviceFirmwarePanel({
           <span className="eyebrow">Firmware</span>
           <h2>Firmware Update Panel</h2>
           <p className="hint-text">
-            Phase 9 exposes PID-scoped release visibility and request controls.
-            OTA compatibility resolution remains in Phase 10.
+            Phase 10 resolves published OTA releases by PID and hardware revision
+            before a firmware request is queued.
           </p>
         </div>
       </div>
@@ -59,11 +51,11 @@ export function DeviceFirmwarePanel({
         </div>
         <div>
           <dt>Stable</dt>
-          <dd>{plan.stableVersion ?? "Not published"}</dd>
+          <dd>{plan.stableVersion ?? plan.stableReason ?? "Not published"}</dd>
         </div>
         <div>
           <dt>Beta</dt>
-          <dd>{plan.betaVersion ?? "Not published"}</dd>
+          <dd>{plan.betaVersion ?? plan.betaReason ?? "Not published"}</dd>
         </div>
         <div>
           <dt>Recommended</dt>
