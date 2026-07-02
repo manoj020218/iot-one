@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import {
   getDevice,
+  ingestDeviceTelemetry,
   listDevices,
   patchDevice,
   registerDevice,
@@ -10,6 +11,7 @@ import {
 import { DeviceModuleError } from "./device.types";
 import {
   parseDevicePatchPayload,
+  parseDeviceTelemetryPayload,
   parseRegisterDevicePayload,
   parseRenamePayload
 } from "./device.validation";
@@ -112,6 +114,28 @@ export function renameDeviceController(request: Request, response: Response) {
   try {
     response.status(200).json({
       data: renameDevice(request.params.deviceId ?? "", payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export function ingestDeviceTelemetryController(
+  request: Request,
+  response: Response
+) {
+  const payload = parseDeviceTelemetryPayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid telemetry payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: ingestDeviceTelemetry(request.params.deviceId ?? "", payload)
     });
   } catch (error) {
     sendError(response, error);

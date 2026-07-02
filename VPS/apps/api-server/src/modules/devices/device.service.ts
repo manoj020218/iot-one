@@ -5,10 +5,13 @@ import {
 } from "@jenix/shared";
 
 import { getPid } from "../pid/pid.service";
+import { evaluateScenesByTelemetry } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
 import type {
   DevicePatchPayload,
   DeviceRequestContext,
+  DeviceTelemetryIngestPayload,
+  DeviceTelemetryIngestResponse,
   ParsedRegisterDevicePayload,
   RenameDevicePayload
 } from "./device.types";
@@ -127,6 +130,38 @@ export function renameDevice(
 ): DeviceRecord {
   const existing = ensureAccess(requireDevice(deviceId), context);
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
+}
+
+export function ingestDeviceTelemetry(
+  deviceId: string,
+  payload: DeviceTelemetryIngestPayload
+): DeviceTelemetryIngestResponse {
+  const existing = requireDevice(deviceId);
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+  const updatedDevice: DeviceRecord = {
+    ...existing,
+    updatedAt: occurredAt,
+    lastSeenAt: occurredAt,
+    ...(payload.mqttStatus ? { mqttStatus: payload.mqttStatus } : {}),
+    ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
+    ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
+  };
+  const savedDevice = deviceRepository.save(updatedDevice);
+  const sceneRuntime = evaluateScenesByTelemetry(
+    {
+      deviceId: savedDevice.deviceId,
+      telemetry: payload.telemetry,
+      occurredAt
+    },
+    {
+      homeId: savedDevice.homeId
+    }
+  );
+
+  return {
+    device: savedDevice,
+    sceneRuntime
+  };
 }
 
 export const deviceTesting = {

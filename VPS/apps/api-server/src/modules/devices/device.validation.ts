@@ -1,8 +1,10 @@
-import type { ParsedRegisterDevicePayload } from "./device.types";
 import type {
   DevicePatchPayload,
+  DeviceTelemetryIngestPayload,
+  ParsedRegisterDevicePayload,
   RenameDevicePayload
 } from "./device.types";
+import type { ScenePrimitiveValue } from "@jenix/shared";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -27,6 +29,66 @@ function optionalProp<K extends string, V>(
   return {
     [key]: value
   } as Record<K, V>;
+}
+
+function parseConnectivityStatus(
+  value: unknown
+): DevicePatchPayload["mqttStatus"] | undefined {
+  return value === "online" || value === "offline" || value === "unknown"
+    ? value
+    : undefined;
+}
+
+function parseLocalStatus(
+  value: unknown
+): DevicePatchPayload["localStatus"] | undefined {
+  return value === "available" ||
+    value === "unavailable" ||
+    value === "unknown"
+    ? value
+    : undefined;
+}
+
+function parseIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  const occurredAt = value.trim();
+  return Number.isNaN(Date.parse(occurredAt)) ? undefined : occurredAt;
+}
+
+function parsePrimitiveValue(value: unknown): ScenePrimitiveValue | undefined {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function parseTelemetrySnapshot(
+  value: unknown
+): Record<string, ScenePrimitiveValue> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return Object.entries(value).reduce<Record<string, ScenePrimitiveValue>>(
+    (snapshot, [key, entryValue]) => {
+      const primitiveValue = parsePrimitiveValue(entryValue);
+
+      if (primitiveValue !== undefined) {
+        snapshot[key] = primitiveValue;
+      }
+
+      return snapshot;
+    },
+    {}
+  );
 }
 
 export function parseRegisterDevicePayload(
@@ -91,28 +153,19 @@ export function parseDevicePatchPayload(body: unknown): DevicePatchPayload | nul
     patch.displayName = displayName;
   }
 
-  if (
-    body.mqttStatus === "online" ||
-    body.mqttStatus === "offline" ||
-    body.mqttStatus === "unknown"
-  ) {
-    patch.mqttStatus = body.mqttStatus;
+  const mqttStatus = parseConnectivityStatus(body.mqttStatus);
+  if (mqttStatus) {
+    patch.mqttStatus = mqttStatus;
   }
 
-  if (
-    body.cloudStatus === "online" ||
-    body.cloudStatus === "offline" ||
-    body.cloudStatus === "unknown"
-  ) {
-    patch.cloudStatus = body.cloudStatus;
+  const cloudStatus = parseConnectivityStatus(body.cloudStatus);
+  if (cloudStatus) {
+    patch.cloudStatus = cloudStatus;
   }
 
-  if (
-    body.localStatus === "available" ||
-    body.localStatus === "unavailable" ||
-    body.localStatus === "unknown"
-  ) {
-    patch.localStatus = body.localStatus;
+  const localStatus = parseLocalStatus(body.localStatus);
+  if (localStatus) {
+    patch.localStatus = localStatus;
   }
 
   if (typeof body.lastSeenAt === "string" && body.lastSeenAt.trim()) {
@@ -120,4 +173,26 @@ export function parseDevicePatchPayload(body: unknown): DevicePatchPayload | nul
   }
 
   return Object.keys(patch).length ? patch : null;
+}
+
+export function parseDeviceTelemetryPayload(
+  body: unknown
+): DeviceTelemetryIngestPayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const telemetry = parseTelemetrySnapshot(body.telemetry);
+
+  if (!telemetry) {
+    return null;
+  }
+
+  return {
+    telemetry,
+    ...optionalProp("occurredAt", parseIsoTimestamp(body.occurredAt)),
+    ...optionalProp("mqttStatus", parseConnectivityStatus(body.mqttStatus)),
+    ...optionalProp("cloudStatus", parseConnectivityStatus(body.cloudStatus)),
+    ...optionalProp("localStatus", parseLocalStatus(body.localStatus))
+  };
 }

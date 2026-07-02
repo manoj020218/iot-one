@@ -75,4 +75,65 @@ describe("device routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.displayName).toBe("Main Tank");
   });
+
+  it("ingests telemetry and triggers matching device-threshold scenes", async () => {
+    await createPid();
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f4",
+      pid: "JNX-TG-C3-501",
+      homeId: "home-user-1",
+      ownerUserId: "user-1"
+    });
+    await request(createApp())
+      .post("/api/v1/scenes")
+      .set({
+        "x-user-id": "user-1",
+        "x-home-id": "home-user-1",
+        "x-home-role": "owner"
+      })
+      .send({
+        name: "Tank Level Alert",
+        status: "active",
+        triggers: [
+          {
+            type: "device_threshold",
+            deviceId: "JNX-TG-A7F4",
+            metricKey: "tankLevelPct",
+            comparator: "gte",
+            threshold: 80
+          }
+        ],
+        conditions: [
+          {
+            field: "tankLevelPct",
+            operator: "gte",
+            value: 80
+          }
+        ],
+        actions: [
+          {
+            type: "notification",
+            message: "Tank level is high"
+          }
+        ]
+      });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F4/telemetry")
+      .send({
+        telemetry: {
+          tankLevelPct: 81
+        },
+        mqttStatus: "online",
+        cloudStatus: "online",
+        localStatus: "available",
+        occurredAt: "2026-07-02T06:00:00.000Z"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.device.lastSeenAt).toBe("2026-07-02T06:00:00.000Z");
+    expect(response.body.data.device.mqttStatus).toBe("online");
+    expect(response.body.data.sceneRuntime.matchedRunCount).toBe(1);
+    expect(response.body.data.sceneRuntime.runs[0].scene.lastRunStatus).toBe("success");
+  });
 });

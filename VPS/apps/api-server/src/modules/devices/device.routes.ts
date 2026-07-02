@@ -2,6 +2,7 @@ import { Router, type Router as ExpressRouter } from "express";
 
 import {
   getDeviceController,
+  ingestDeviceTelemetryController,
   listDevicesController,
   patchDeviceController,
   registerDeviceController,
@@ -14,4 +15,5 @@ deviceRouter.get("/", listDevicesController);
 deviceRouter.post("/register", registerDeviceController);
 deviceRouter.get("/:deviceId", getDeviceController);
 deviceRouter.patch("/:deviceId", patchDeviceController);
+deviceRouter.post("/:deviceId/telemetry", ingestDeviceTelemetryController);
 deviceRouter.post("/:deviceId/rename", renameDeviceController);
