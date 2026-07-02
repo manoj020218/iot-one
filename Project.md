@@ -11,7 +11,8 @@
 - Current status: Phase 8 home management and sharing complete
 - Current status: Phase 9 settings and dynamic PID pages complete
 - Current status: Phase 10 OTA and third-party API foundations complete
-- Current phase: Phase 10 - OTA and third-party API
+- Current status: Phase 11 Matter readiness complete
+- Current phase: Phase 11 - Matter Readiness
 
 ## Working Scope
 
@@ -293,18 +294,18 @@ Validation gates:
 
 ### Phase 11 - Matter Readiness
 
-Status: Pending
+Status: Completed
 
 Deliverables:
-- [ ] Matter mapping model
-- [ ] Matter mode in PID model
-- [ ] Matter status on device detail page
-- [ ] Matter bridge placeholder
-- [ ] Matter commissioning placeholder
+- [x] Matter mapping model
+- [x] Matter mode in PID model
+- [x] Matter status on device detail page
+- [x] Matter bridge placeholder
+- [x] Matter commissioning placeholder
 
 Validation gates:
-- [ ] Matter mode validation tests
-- [ ] Restricted Matter command tests
+- [x] Matter mode validation tests
+- [x] Restricted Matter command tests
 
 ## Current Open Questions
 
@@ -312,9 +313,9 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Start Phase 11 Matter readiness on top of the Phase 10 OTA and third-party API foundations.
-2. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
-3. Persist PID, device registry, provisioning intent, HOME sharing, OTA release, and API access modules in MongoDB for platform-wide durability.
+1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+2. Persist PID, device registry, provisioning intent, HOME sharing, OTA release, and API access modules in MongoDB for platform-wide durability.
+3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows.
 4. Keep `PROGRESS.md` updated after each remaining milestone.
 
 ## Decision Log
@@ -338,6 +339,7 @@ Validation gates:
 - 2026-07-02: Added HOME members, share codes, redeem flow, role-aware access, and HOME management UI on the real `/api/v1/homes` contract with local fallback support.
 - 2026-07-02: Added device-facing PID metadata, device center pages, firmware request controls, dynamic PID page rendering, settings pages, and Phase 9 validation coverage.
 - 2026-07-02: Added OTA release records, PID/hardware-aware firmware resolution, API package and key management, public device API scope enforcement, and Phase 10 validation coverage.
+- 2026-07-02: Added Matter readiness contracts, PID matter-mode consistency validation, placeholder commissioning and bridge routes, restricted Matter scene commands, and device-detail Matter status panels for Phase 11.
 
 ## Risks and Controls
 
@@ -366,3 +368,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-02: Phase 7 scene catalog and builder UI completed with route integration, page tests, and full workspace validation.
 - 2026-07-02: Phase 7 runtime orchestration hooks completed for schedule and device-threshold evaluation, history retrieval, and full workspace validation.
 - 2026-07-02: Phase 7 automatic runtime wiring completed with scheduler bootstrap, telemetry ingest, scheduler tests, and full workspace validation.
+- 2026-07-02: Phase 11 Matter readiness completed with backend placeholders, PID validation alignment, restricted-command coverage, device-detail Matter UI, and full workspace validation.

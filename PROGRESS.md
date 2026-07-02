@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 10 - OTA and Third-Party API
+- Phase name: Phase 11 - Matter Readiness
 - Started: 2026-07-02
 - Status: Completed
 
@@ -44,9 +44,12 @@
 - [x] API package model
 - [x] Third-party API key management
 - [x] Public API scope enforcement
-- [ ] Matter mapping
+- [x] Matter mapping
+- [x] Matter readiness status
+- [x] Matter bridge placeholder
+- [x] Matter commissioning placeholder
 - [x] Unit tests
-- [ ] Regression tests
+- [x] Regression tests
 
 ## Decisions
 - Date: 2026-07-01
@@ -97,6 +100,9 @@
 - Date: 2026-07-02
   Decision: Model Phase 10 as a real OTA release catalog plus a separate third-party API access layer, then make the device firmware panel consume `/api/v1/devices/:deviceId/firmware-plan` so release compatibility comes from published OTA records instead of only PID firmware hints.
   Reason: It keeps OTA compatibility, API packaging, and public-scope enforcement aligned around PID and hardware revision while reusing the Phase 9 device detail surface.
+- Date: 2026-07-02
+  Decision: Implement Phase 11 Matter readiness as shared contracts plus placeholder backend routes and a device-detail status panel, while deferring live commissioner and bridge transport to a later integration pass.
+  Reason: It adds Matter-aware product and device modeling now, keeps permissions and tests enforceable, and avoids pretending transport exists before the device/runtime layer is ready.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -138,11 +144,14 @@
 - Issue: Firmware requests now resolve against published OTA releases, but they still stop at queued intent instead of delivering binaries to real devices.
   Impact: Operators can select the correct PID/hardware-compatible target version, but rollout execution is still a controlled placeholder.
   Fix plan: Add the actual OTA delivery worker, device acknowledgement flow, and rollout state tracking when the firmware transport layer is introduced.
+- Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
+  Impact: Phase 11 models Matter capability, permissions, and UI entry points, but it does not yet perform live commissioner transport, gateway coordination, or durable Matter-state persistence.
+  Fix plan: Replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
 
 ## Next Tasks
-1. Start Phase 11 Matter readiness on top of the PID-first OTA and public API foundations.
-2. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
-3. Move PID, device registry, provisioning intent, HOME sharing, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene durability baseline.
+1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
+2. Move PID, device registry, provisioning intent, HOME sharing, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene durability baseline.
+3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -163,3 +172,4 @@
 - 2026-07-02: Completed Phase 8 HOME sharing with members, share codes, redeem flow, role-based access, dashboard and scene integration, and full workspace validation.
 - 2026-07-02: Completed Phase 9 device management, device detail pages, firmware request panel, PID-driven dynamic page rendering, settings pages, and full workspace validation.
 - 2026-07-02: Completed Phase 10 OTA release modeling, device firmware compatibility resolution, API package and key management, public API scope enforcement, and full workspace validation.
+- 2026-07-02: Completed Phase 11 Matter readiness with shared Matter contracts, PID mode validation alignment, placeholder backend routes, restricted Matter command coverage, device-detail Matter UI, and full workspace validation.
