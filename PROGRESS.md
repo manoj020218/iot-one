@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 9 - Settings and Dynamic PID Pages
+- Phase name: Phase 10 - OTA and Third-Party API
 - Started: 2026-07-02
 - Status: Completed
 
@@ -40,9 +40,11 @@
 - [x] Dynamic PID page renderer
 - [x] User profile page
 - [x] App update page
-- [ ] OTA by PID
+- [x] OTA by PID
+- [x] API package model
+- [x] Third-party API key management
+- [x] Public API scope enforcement
 - [ ] Matter mapping
-- [ ] Third-party API by PID
 - [x] Unit tests
 - [ ] Regression tests
 
@@ -92,6 +94,9 @@
 - Date: 2026-07-02
   Decision: Expose device-facing PID metadata at `/api/v1/pids/:pid`, add a lightweight firmware-request action on `/api/v1/devices/:deviceId/firmware/request`, and keep the PWA device center on those real contracts first with local fallback data when the API is unavailable.
   Reason: It enables Phase 9 device detail rendering and permission-aware firmware controls without prematurely coupling the UI to the full OTA release model planned for Phase 10.
+- Date: 2026-07-02
+  Decision: Model Phase 10 as a real OTA release catalog plus a separate third-party API access layer, then make the device firmware panel consume `/api/v1/devices/:deviceId/firmware-plan` so release compatibility comes from published OTA records instead of only PID firmware hints.
+  Reason: It keeps OTA compatibility, API packaging, and public-scope enforcement aligned around PID and hardware revision while reusing the Phase 9 device detail surface.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -127,14 +132,17 @@
 - Issue: Shared HOME access for scenes and devices currently trusts the session-provided `x-home-role` context instead of resolving membership on the backend from authenticated middleware.
   Impact: UI-visible role restrictions work for the current architecture, but final production RBAC still needs server-authoritative membership checks.
   Fix plan: Replace header-trusted HOME role context with authenticated membership resolution when the auth middleware and durable HOME repository are introduced.
-- Issue: Firmware update requests now expose a real route and permission checks, but they do not yet resolve OTA compatibility or execute device delivery.
-  Impact: Operators can see release intent and queue requests, but full PID/hardware-aware rollout logic is still deferred.
-  Fix plan: Replace the Phase 9 placeholder request flow with the Phase 10 OTA release model, compatibility resolution, and delivery pipeline.
+- Issue: OTA releases, API packages, and third-party API keys are still in-memory on the API side.
+  Impact: Phase 10 compatibility and scope enforcement are functional and tested, but release/package/key data is not durable across process restarts.
+  Fix plan: Persist OTA releases, API packages, and issued API keys in MongoDB during the broader persistence-hardening pass.
+- Issue: Firmware requests now resolve against published OTA releases, but they still stop at queued intent instead of delivering binaries to real devices.
+  Impact: Operators can select the correct PID/hardware-compatible target version, but rollout execution is still a controlled placeholder.
+  Fix plan: Add the actual OTA delivery worker, device acknowledgement flow, and rollout state tracking when the firmware transport layer is introduced.
 
 ## Next Tasks
-1. Start Phase 10 OTA by PID and third-party API packaging on top of the new device detail and firmware-request surfaces.
+1. Start Phase 11 Matter readiness on top of the PID-first OTA and public API foundations.
 2. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
-3. Move PID, device registry, provisioning intent, and HOME sharing storage to MongoDB so the rest of the platform matches the scene durability baseline.
+3. Move PID, device registry, provisioning intent, HOME sharing, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene durability baseline.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -154,3 +162,4 @@
 - 2026-07-02: Added Mongo lease-based scheduler coordination, local overlap protection, and multi-instance scheduler tests for Phase 7 runtime hardening.
 - 2026-07-02: Completed Phase 8 HOME sharing with members, share codes, redeem flow, role-based access, dashboard and scene integration, and full workspace validation.
 - 2026-07-02: Completed Phase 9 device management, device detail pages, firmware request panel, PID-driven dynamic page rendering, settings pages, and full workspace validation.
+- 2026-07-02: Completed Phase 10 OTA release modeling, device firmware compatibility resolution, API package and key management, public API scope enforcement, and full workspace validation.

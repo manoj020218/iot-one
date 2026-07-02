@@ -49,3 +49,6 @@ cmd /c pnpm build
 - Scheduler leadership can be coordinated across multiple API instances with `SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock`, `SCENE_SCHEDULER_LEASE_MS`, and an optional `SCENE_SCHEDULER_INSTANCE_ID`.
 - Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and evaluates matching device-threshold scenes immediately.
 - Mongo lease coordination prevents duplicate scheduler ownership across instances, but transport-side scale still benefits from a dedicated worker or queue-backed runtime when deployment complexity grows.
+- Device firmware planning is available through `GET /api/v1/devices/:deviceId/firmware-plan`, and firmware requests now resolve against published OTA releases by PID and hardware revision before returning a queued intent.
+- OTA releases are managed through developer routes under `/api/v1/admin/ota/releases`.
+- Third-party API packages are managed through `/api/v1/admin/api-packages`, HOME-scoped API keys through `/api/v1/api-keys`, and public device access through `/api/v1/public/devices/:deviceId/...` with API-key scope enforcement.
