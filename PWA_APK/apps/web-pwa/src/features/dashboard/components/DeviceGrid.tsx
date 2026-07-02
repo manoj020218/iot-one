@@ -5,9 +5,14 @@ import { EmptyHomeState } from "./EmptyHomeState";
 export interface DeviceGridProps {
   devices: DashboardDevice[];
   onRename: (deviceId: string, displayName: string) => Promise<void>;
+  onOpenDetails?: (deviceId: string) => void;
 }
 
-export function DeviceGrid({ devices, onRename }: DeviceGridProps) {
+export function DeviceGrid({
+  devices,
+  onRename,
+  onOpenDetails
+}: DeviceGridProps) {
   if (!devices.length) {
     return <EmptyHomeState />;
   }
@@ -19,6 +24,7 @@ export function DeviceGrid({ devices, onRename }: DeviceGridProps) {
           key={device.deviceId}
           device={device}
           onRename={onRename}
+          {...(onOpenDetails ? { onOpenDetails } : {})}
         />
       ))}
     </section>

@@ -187,6 +187,7 @@ textarea {
 .device-card-head,
 .rename-form,
 .card-actions,
+.button-row,
 .home-card-head,
 .home-member-actions,
 .summary-grid,
@@ -459,6 +460,25 @@ textarea {
 .top-bar-meta .add-device-button {
   font-size: 1rem;
   min-width: 0;
+}
+
+.button-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.firmware-panel,
+.device-detail-hero,
+.device-dynamic-section {
+  margin-top: 20px;
 }
 
 @media (min-width: 768px) {

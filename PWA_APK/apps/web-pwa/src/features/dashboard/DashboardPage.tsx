@@ -38,6 +38,13 @@ export function DashboardPage() {
         <button
           className="text-button"
           type="button"
+          onClick={() => navigate("/devices")}
+        >
+          Devices
+        </button>
+        <button
+          className="text-button"
+          type="button"
           onClick={() => navigate("/homes")}
         >
           Homes
@@ -49,13 +56,26 @@ export function DashboardPage() {
         >
           Scenes
         </button>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => navigate("/settings")}
+        >
+          Settings
+        </button>
         <button className="text-button" type="button" onClick={logout}>
           Logout
         </button>
       </section>
       {loading ? <section className="panel">Loading devices...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
-      {!loading ? <DeviceGrid devices={devices} onRename={rename} /> : null}
+      {!loading ? (
+        <DeviceGrid
+          devices={devices}
+          onRename={rename}
+          onOpenDetails={(deviceId) => navigate(`/devices/${deviceId}`)}
+        />
+      ) : null}
     </AppShell>
   );
 }

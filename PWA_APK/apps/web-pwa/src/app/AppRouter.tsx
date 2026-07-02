@@ -3,12 +3,17 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthPage } from "../features/auth/AuthPage";
 import { useAuth } from "../features/auth/hooks/useAuth";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { DeviceDetailPage } from "../features/devices/DeviceDetailPage";
+import { DeviceManagementPage } from "../features/devices/DeviceManagementPage";
 import { HomeManagementPage } from "../features/homes/HomeManagementPage";
 import { ProvisioningHomePage } from "../features/provisioning/ProvisioningHomePage";
 import { ApProvisioningPage } from "../features/provisioning/ap/ApProvisioningPage";
 import { BleProvisioningPage } from "../features/provisioning/ble/BleProvisioningPage";
 import { SceneBuilderPage } from "../features/scenes/SceneBuilderPage";
 import { SceneListPage } from "../features/scenes/SceneListPage";
+import { AppUpdatePage } from "../features/settings/AppUpdatePage";
+import { SettingsHomePage } from "../features/settings/SettingsHomePage";
+import { UserProfilePage } from "../features/settings/UserProfilePage";
 import { RequireAuth } from "./RequireAuth";
 
 export function AppRouter() {
@@ -30,6 +35,22 @@ export function AppRouter() {
         element={
           <RequireAuth>
             <HomeManagementPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/devices"
+        element={
+          <RequireAuth>
+            <DeviceManagementPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/devices/:deviceId"
+        element={
+          <RequireAuth>
+            <DeviceDetailPage />
           </RequireAuth>
         }
       />
@@ -78,6 +99,30 @@ export function AppRouter() {
         element={
           <RequireAuth>
             <SceneBuilderPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <SettingsHomePage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings/profile"
+        element={
+          <RequireAuth>
+            <UserProfilePage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings/app"
+        element={
+          <RequireAuth>
+            <AppUpdatePage />
           </RequireAuth>
         }
       />

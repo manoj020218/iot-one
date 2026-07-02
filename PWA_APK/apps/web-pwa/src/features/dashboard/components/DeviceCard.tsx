@@ -5,9 +5,14 @@ import type { DashboardDevice } from "../services/dashboardApi";
 export interface DeviceCardProps {
   device: DashboardDevice;
   onRename: (deviceId: string, displayName: string) => Promise<void>;
+  onOpenDetails?: (deviceId: string) => void;
 }
 
-export function DeviceCard({ device, onRename }: DeviceCardProps) {
+export function DeviceCard({
+  device,
+  onRename,
+  onOpenDetails
+}: DeviceCardProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(device.displayName);
 
@@ -54,13 +59,24 @@ export function DeviceCard({ device, onRename }: DeviceCardProps) {
           <p>{device.telemetryPreview}</p>
           <div className="card-actions">
             <span>{device.online ? "Online" : "Offline"}</span>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => setEditing(true)}
-            >
-              Rename
-            </button>
+            <div className="button-row">
+              {onOpenDetails ? (
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => onOpenDetails(device.deviceId)}
+                >
+                  Details
+                </button>
+              ) : null}
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setEditing(true)}
+              >
+                Rename
+              </button>
+            </div>
           </div>
         </>
       )}
