@@ -394,6 +394,20 @@ function listActiveScenesForHome(homeId: string): SceneRecord[] {
     .filter((scene) => scene.homeId === homeId && scene.status === "active");
 }
 
+export function listActiveSceneHomeIds(): string[] {
+  return Array.from(
+    new Set(
+      sceneRepository
+        .list()
+        .filter(
+          (scene) =>
+            scene.status === "active" && hasScheduleTrigger(scene) && Boolean(scene.schedule)
+        )
+        .map((scene) => scene.homeId)
+    )
+  );
+}
+
 function toBatchResponse(runs: SceneRunResponse[]): SceneRuntimeBatchResponse {
   return {
     evaluatedSceneCount: runs.length,

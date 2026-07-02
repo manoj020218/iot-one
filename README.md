@@ -39,3 +39,9 @@ cmd /c pnpm typecheck
 cmd /c pnpm test
 cmd /c pnpm build
 ```
+
+## Runtime Notes
+
+- The API server now starts an in-process scene scheduler by default.
+- Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
+- Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and evaluates matching device-threshold scenes immediately.

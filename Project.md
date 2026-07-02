@@ -6,6 +6,7 @@
 - Source brief: `D:\IOT Device\IOT_Platform\codex.md`
 - Workspace root: `D:\IOT Device\IOT_Platform\jenix One`
 - Current status: Phase 7 scene UI complete, Phase 7 runtime orchestration in progress
+- Current status: Phase 7 runtime automation wired, persistence still pending
 - Current phase: Phase 7 - scene pipeline
 
 ## Working Scope
@@ -223,12 +224,15 @@ Deliverables:
 - [x] Device-threshold runtime hook
 - [x] Schedule runtime hook
 - [x] Scene run-history endpoint
+- [x] Background scheduler bootstrap
+- [x] Device telemetry ingest route
 
 Validation gates:
 - [x] Condition evaluation tests
 - [x] Restricted command permission tests
 - [x] Scene action builder tests
 - [x] Scene runtime route tests
+- [x] Scene scheduler tests
 
 ### Phase 8 - Home Management and Sharing
 
@@ -300,9 +304,9 @@ Validation gates:
 
 ## Immediate Next Actions
 
-1. Connect the new runtime hooks to a real scheduler and telemetry ingestion worker.
-2. Persist scenes, audit entries, and run history in MongoDB.
-3. Start Phase 8 home sharing once autonomous scene execution is stable.
+1. Persist scenes, audit entries, and run history in MongoDB.
+2. Replace in-process scheduling and direct ingest with MQTT or worker-backed infrastructure if deployment topology requires distributed execution.
+3. Start Phase 8 home sharing once durable automation persistence is stable.
 4. Keep `PROGRESS.md` updated after each remaining Phase 7 milestone.
 
 ## Decision Log
@@ -320,6 +324,7 @@ Validation gates:
 - 2026-07-01: Started Phase 7 from shared scene contracts and backend permission rules so the UI builder can target a stable automation model.
 - 2026-07-02: Delivered the Phase 7 scene catalog and builder UI against the real scene API contract, with a local fallback store and manual-run evaluator to keep authoring usable without a live backend.
 - 2026-07-02: Added explicit runtime scene evaluation endpoints and run-history support before introducing scheduler and telemetry worker infrastructure.
+- 2026-07-02: Wired schedule scenes into an in-process scheduler and device-threshold scenes into a direct telemetry ingest path so Phase 7 now executes automatically within the running API process.
 
 ## Risks and Controls
 
@@ -347,3 +352,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-01: Phase 7 scene pipeline backend foundation and validation completed successfully.
 - 2026-07-02: Phase 7 scene catalog and builder UI completed with route integration, page tests, and full workspace validation.
 - 2026-07-02: Phase 7 runtime orchestration hooks completed for schedule and device-threshold evaluation, history retrieval, and full workspace validation.
+- 2026-07-02: Phase 7 automatic runtime wiring completed with scheduler bootstrap, telemetry ingest, scheduler tests, and full workspace validation.
