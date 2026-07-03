@@ -15,7 +15,8 @@
 - Current status: Phase 12 PID and device persistence baseline complete
 - Current status: Phase 13 extended persistence and RBAC hardening complete
 - Current status: Phase 14 auth middleware and runtime isolation complete
-- Current phase: Phase 14 - Auth Middleware and Runtime Isolation
+- Current status: Phase 15 queued runtime evaluation and session refresh complete
+- Current phase: Phase 15 - Queued Runtime Evaluation and Session Refresh
 
 ## Working Scope
 
@@ -386,16 +387,38 @@ Validation gates:
 - [x] Scene action worker tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 15 - Queued Runtime Evaluation and Session Refresh
+
+Status: Completed
+
+Deliverables:
+- [x] Scene evaluation job repository abstraction
+- [x] MongoDB-backed scene evaluation job persistence
+- [x] Queue-backed telemetry scene evaluation
+- [x] Queue-backed scheduled scene evaluation
+- [x] Scene runtime evaluation worker bootstrap
+- [x] Device telemetry response updated to return queue receipts
+- [x] Scheduler updated to enqueue runtime jobs instead of evaluating inline
+- [x] PWA refresh-token rotation support
+- [x] PWA session storage metadata for refresh scheduling
+- [x] PWA auth session refresh test coverage
+
+Validation gates:
+- [x] Scene runtime worker tests
+- [x] Scheduler queue tests
+- [x] PWA auth session refresh tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Move telemetry-triggered scene evaluation itself into MQTT or queue-backed workers if runtime volume outgrows the API process.
+1. Feed device telemetry into the Phase 15 scene runtime queue from MQTT consumers so HTTP ingest becomes optional instead of the main ingestion path.
 2. Replace queued OTA placeholder responses with real device rollout delivery, acknowledgement, and rollout-state persistence.
 3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
-4. Add token refresh handling to the PWA runtime so long-lived sessions can rotate without forcing manual re-login.
+4. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
 
 ## Decision Log
 
@@ -423,6 +446,7 @@ Validation gates:
 - 2026-07-02: Added repository abstractions and MongoDB-backed drivers for PID records, PID audit logs, and device records so the core product/device layer now matches the scene durability baseline.
 - 2026-07-03: Added MongoDB-backed HOME, provisioning, OTA, and API access drivers, and replaced header-trusted HOME role handling with server-authoritative membership resolution across device, scene, Matter, and API key flows.
 - 2026-07-03: Added MongoDB-backed auth persistence, signed bearer-auth middleware, PWA bearer-auth migration, local session persistence, and a scene action worker queue for runtime isolation.
+- 2026-07-03: Added queue-backed scene runtime evaluation workers for telemetry and schedules, plus automatic PWA refresh-token rotation before bearer access-token expiry.
 
 ## Risks and Controls
 
@@ -455,3 +479,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-02: Phase 12 core persistence baseline completed with PID/device MongoDB drivers, bootstrap wiring, and full workspace validation.
 - 2026-07-03: Phase 13 extended persistence and RBAC hardening completed with HOME/provisioning/OTA/API access MongoDB drivers, server-authoritative HOME membership checks, and full workspace validation.
 - 2026-07-03: Phase 14 auth middleware and runtime isolation completed with MongoDB-backed auth sessions, bearer-auth route migration, scene action dispatch worker isolation, and full workspace validation.
+- 2026-07-03: Phase 15 queued runtime evaluation and session refresh completed with MongoDB-backed scene evaluation jobs, scheduler/telemetry queue routing, PWA token rotation, and full workspace validation.

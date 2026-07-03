@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 14 - Auth Middleware and Runtime Isolation
+- Phase name: Phase 15 - Queued Runtime Evaluation and Session Refresh
 - Started: 2026-07-03
 - Status: Completed
 
@@ -61,6 +61,11 @@
 - [x] Signed bearer auth middleware
 - [x] PWA bearer-auth migration
 - [x] Local session persistence
+- [x] PWA token refresh rotation
+- [x] Scene evaluation job queue
+- [x] Scene runtime evaluation worker
+- [x] Queue-backed scheduler runtime path
+- [x] Queue-backed telemetry runtime path
 - [x] Scene action dispatch queue
 - [x] Scene action worker isolation
 - [x] Unit tests
@@ -130,6 +135,9 @@
 - Date: 2026-07-03
   Decision: Move user-facing backend identity to signed bearer tokens, persist auth users and refresh sessions behind the same repository pattern, and isolate matched scene action delivery behind a claimed-job worker.
   Reason: Phase 14 needed production-grade identity trust and a real boundary between API request handling and runtime command dispatch without breaking the existing scene authoring and telemetry contracts.
+- Date: 2026-07-03
+  Decision: Split scene runtime into two worker stages by queuing telemetry and schedule evaluation jobs before scene execution, then let the existing action worker handle only post-match action delivery.
+  Reason: Phase 15 needed the evaluation step itself off the API hot path, while still preserving the Phase 14 action-dispatch boundary and existing scene service semantics.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -147,22 +155,22 @@
 - Issue: Provisioning intent storage is still in-memory on the API side with a frontend fallback store when the API is unavailable.
   Impact: Cloud registration intent tracking works for development and tests, but not yet with durable operational history.
   Fix plan: Persist provisioning intents and status transitions in MongoDB and attach them to device lifecycle audit history.
-- Issue: Scheduler leadership is now lease-coordinated across API instances and matched scene actions dispatch through a worker queue, but telemetry-triggered scene evaluation and schedule evaluation still run inside the API process.
-  Impact: Action delivery is isolated, but very high automation volume can still compete with API traffic during trigger evaluation.
-  Fix plan: Move telemetry-triggered and scheduled scene evaluation itself into MQTT or queue-backed workers once deployment load justifies a deeper split.
+- Issue: Scene runtime evaluation is now queue-backed, but most ingestion still reaches that queue through API-owned scheduler and telemetry endpoints rather than a live MQTT consumer.
+  Impact: Evaluation no longer blocks the API request path, but the HTTP/API process still remains the main bridge for runtime event ingestion.
+  Fix plan: Publish device telemetry and schedule-trigger events into the runtime queue from MQTT or a dedicated ingest worker so the API server is no longer the primary event source.
 - Issue: Firmware requests now resolve against published OTA releases, but they still stop at queued intent instead of delivering binaries to real devices.
   Impact: Operators can select the correct PID/hardware-compatible target version, but rollout execution is still a controlled placeholder.
   Fix plan: Add the actual OTA delivery worker, device acknowledgement flow, and rollout state tracking when the firmware transport layer is introduced.
 - Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
   Impact: Phase 11 models Matter capability, permissions, and UI entry points, but live Matter activation is intentionally disabled by default and still does not perform commissioner transport, gateway coordination, or durable Matter-state persistence.
   Fix plan: Keep the activation flag off until vendor ID and CSA readiness are complete, then replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
-- Issue: The PWA now stores bearer-auth sessions locally, but it does not yet auto-refresh access tokens before expiry.
-  Impact: Long-running browser sessions will eventually require manual login again after token expiry.
-  Fix plan: Add refresh-token rotation handling in the client session provider and retry protected calls on 401 where appropriate.
+- Issue: The PWA now auto-refreshes bearer sessions before expiry, but protected service calls do not yet retry once on 401 if a request races an expiry boundary.
+  Impact: Rare edge requests can still fail if they leave just before a scheduled refresh completes.
+  Fix plan: Add a protected fetch wrapper that performs one refresh-and-retry cycle for 401 responses on user-facing API calls.
 
 ## Next Tasks
-1. Move telemetry-triggered and scheduled scene evaluation into MQTT or queue-backed workers when deployment load justifies a deeper runtime split.
-2. Add refresh-token rotation handling to the PWA session provider and protected fetch flows.
+1. Feed device telemetry and schedule events into the Phase 15 scene runtime queue from MQTT consumers or dedicated ingest workers.
+2. Add a protected fetch wrapper with refresh-and-retry behavior for 401 race conditions.
 3. Add real OTA rollout delivery, acknowledgement, and rollout-state persistence.
 4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
@@ -189,3 +197,4 @@
 - 2026-07-02: Completed Phase 12 core persistence baseline with MongoDB-backed PID records, PID audit logs, device records, bootstrap wiring, and full workspace validation.
 - 2026-07-03: Completed Phase 13 with MongoDB-backed HOME, provisioning, OTA, and API access persistence, server-authoritative HOME membership checks, and full workspace validation.
 - 2026-07-03: Completed Phase 14 with MongoDB-backed auth persistence, bearer-auth route migration, scene action worker isolation, and full workspace validation.
+- 2026-07-03: Completed Phase 15 with queue-backed scene evaluation workers, automatic PWA bearer-session refresh, and full workspace validation.
