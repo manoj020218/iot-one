@@ -1,8 +1,11 @@
+import { getRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
 import {
   sceneActionDispatchRepository,
   type ClaimSceneActionDispatchJobsInput
 } from "./scene.model";
 import type { SceneActionDispatchJob } from "./scene.types";
+import { buildOtaDeliveryRequest } from "../ota/ota.service";
+import { deviceRepository } from "../devices/device.model";
 
 export interface SceneActionDispatchWorkerOptions {
   workerId: string;
@@ -21,8 +24,88 @@ export interface SceneActionDispatchWorkerRunResult {
   skippedReason?: "local_overlap";
 }
 
+function normalizeDeviceId(deviceId: string): string {
+  return deviceId.trim().toUpperCase();
+}
+
+function readActionPayloadString(
+  payload: Record<string, unknown> | undefined,
+  key: string
+): string | undefined {
+  const value = payload?.[key];
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 async function dispatchSceneAction(job: SceneActionDispatchJob): Promise<void> {
-  void job;
+  const bridge = getRuntimeMqttBridge();
+
+  if (!bridge) {
+    return;
+  }
+
+  if (job.action.type === "notification") {
+    await bridge.publishNotification({
+      deliveryId: job.jobId,
+      runId: job.runId,
+      sceneId: job.sceneId,
+      homeId: job.homeId,
+      source: job.source,
+      requestedAt: job.requestedAt,
+      message: job.action.message ?? "Scene notification",
+      ...(job.action.payload ? { payload: job.action.payload } : {})
+    });
+    return;
+  }
+
+  if (!job.action.deviceId || !job.action.command) {
+    throw new Error("Scene device command job is missing device target details");
+  }
+
+  const deviceId = normalizeDeviceId(job.action.deviceId);
+
+  if (job.action.command === "ota_force") {
+    const device = await deviceRepository.get(deviceId);
+
+    if (!device) {
+      throw new Error(`Device not found for OTA dispatch: ${deviceId}`);
+    }
+
+    const targetVersion = readActionPayloadString(
+      job.action.payload,
+      "targetVersion"
+    );
+
+    const otaRequest = await buildOtaDeliveryRequest(device, {
+      channel:
+        readActionPayloadString(job.action.payload, "channel") === "beta"
+          ? "beta"
+          : "stable",
+      requestedAt: job.requestedAt,
+      requestedBy: `scene:${job.sceneId}`,
+      ...(targetVersion ? { targetVersion } : {})
+    });
+
+    await bridge.publishOtaRequest(otaRequest);
+    return;
+  }
+
+  await bridge.publishDeviceCommand({
+    deliveryId: job.jobId,
+    runId: job.runId,
+    sceneId: job.sceneId,
+    homeId: job.homeId,
+    source: job.source,
+    requestedAt: job.requestedAt,
+    deviceId,
+    command: job.action.command,
+    ...(job.action.payload ? { payload: job.action.payload } : {})
+  });
 }
 
 export class SceneActionDispatchWorker {

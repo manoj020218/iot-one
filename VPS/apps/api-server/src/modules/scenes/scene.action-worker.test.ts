@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
 import { createSceneActionDispatchWorker } from "./scene.action-worker";
 import { createScene, runSceneManually, sceneTesting } from "./scene.service";
 
@@ -12,6 +13,7 @@ const ownerContext = {
 describe("scene action dispatch worker", () => {
   beforeEach(async () => {
     await sceneTesting.reset();
+    useRuntimeMqttBridge(null);
   });
 
   it("claims queued scene actions and marks them completed", async () => {
@@ -102,5 +104,73 @@ describe("scene action dispatch worker", () => {
     const failedJobs = await sceneTesting.listActionDispatches(scene.sceneId);
     expect(failedJobs[0]?.status).toBe("failed");
     expect(failedJobs[0]?.lastError).toMatch(/dispatcher offline/i);
+  });
+
+  it("publishes scene device commands through the MQTT bridge", async () => {
+    const publishedCommands: Array<{
+      deviceId: string;
+      command: string;
+    }> = [];
+
+    useRuntimeMqttBridge({
+      async publishTelemetryIngress() {
+        throw new Error("not used");
+      },
+      async publishScheduleTick() {
+        throw new Error("not used");
+      },
+      async publishDeviceCommand(message) {
+        publishedCommands.push({
+          deviceId: message.deviceId,
+          command: message.command
+        });
+      },
+      async publishNotification() {
+        throw new Error("not used");
+      },
+      async publishOtaRequest() {
+        throw new Error("not used");
+      }
+    });
+
+    const scene = await createScene(
+      {
+        name: "MQTT Device Sync",
+        status: "active",
+        triggers: [
+          {
+            type: "manual"
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-C3-A7F2",
+            command: "sync"
+          }
+        ]
+      },
+      ownerContext
+    );
+
+    await runSceneManually(scene.sceneId, {}, ownerContext);
+
+    const worker = createSceneActionDispatchWorker({
+      workerId: "scene-worker-test",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined
+    });
+
+    const result = await worker.runOnce("2026-07-03T10:10:00.000Z");
+    expect(result.completedCount).toBe(1);
+    expect(publishedCommands).toEqual([
+      {
+        deviceId: "JNX-TG-C3-A7F2",
+        command: "sync"
+      }
+    ]);
   });
 });

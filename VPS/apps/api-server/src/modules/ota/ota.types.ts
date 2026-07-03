@@ -36,3 +36,24 @@ export type ParsedOtaReleasePayload = CreateOtaReleaseInput;
 export interface DeviceFirmwarePlanResult extends DeviceFirmwarePlanResponse {
   device: DeviceRecord;
 }
+
+export interface OtaDeliveryRequestInput {
+  channel: OtaReleaseRecord["channel"];
+  targetVersion?: string;
+  requestedAt: string;
+  requestedBy: string;
+}
+
+export interface OtaDeliveryRequest {
+  requestId: string;
+  deviceId: string;
+  homeId: string;
+  pid: string;
+  channel: OtaReleaseRecord["channel"];
+  targetVersion: string;
+  artifactUrl: string;
+  checksum: string;
+  requestedAt: string;
+  requestedBy: string;
+  currentVersion?: string;
+}

@@ -4,11 +4,23 @@ import {
   type DeviceRecord
 } from "@jenix/shared";
 
-import { getDeviceFirmwarePlan as resolveDeviceFirmwarePlan, resolveOtaReleaseForDevice } from "../ota/ota.service";
+import {
+  getRuntimeMqttBridge
+} from "../../infrastructure/mqtt/runtime.binding";
+import type { RuntimeTelemetryIngressMessage } from "../../infrastructure/mqtt/runtime.types";
+import {
+  buildOtaDeliveryRequest,
+  getDeviceFirmwarePlan as resolveDeviceFirmwarePlan,
+  resolveOtaReleaseForDevice
+} from "../ota/ota.service";
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
-import { enqueueSceneEvaluationByTelemetry } from "../scenes/scene.service";
+import {
+  createSceneRuntimeQueueResponse,
+  enqueuePreparedSceneEvaluationJobs,
+  prepareTelemetrySceneEvaluationJob
+} from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
 import type {
   DeviceFirmwarePlanResult,
@@ -213,6 +225,25 @@ export async function requestDeviceFirmwareUpdate(
   }
 
   const requestedAt = new Date().toISOString();
+  const status =
+    existing.firmwareVersion === resolution.release.version ? "up_to_date" : "queued";
+
+  if (status === "queued") {
+    const bridge = getRuntimeMqttBridge();
+
+    if (bridge) {
+      await bridge.publishOtaRequest(
+        await buildOtaDeliveryRequest(existing, {
+          channel,
+          requestedAt,
+          requestedBy: resolvedContext.userId ?? existing.ownerUserId,
+          ...(payload.targetVersion
+            ? { targetVersion: payload.targetVersion }
+            : {})
+        })
+      );
+    }
+  }
 
   return {
     deviceId: existing.deviceId,
@@ -220,8 +251,7 @@ export async function requestDeviceFirmwareUpdate(
     channel,
     targetVersion: resolution.release.version,
     ...(existing.firmwareVersion ? { currentVersion: existing.firmwareVersion } : {}),
-    status:
-      existing.firmwareVersion === resolution.release.version ? "up_to_date" : "queued",
+    status,
     requestedAt
   };
 }
@@ -241,10 +271,10 @@ export async function renameDevice(
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }
 
-export async function ingestDeviceTelemetry(
+export async function applyDeviceTelemetryState(
   deviceId: string,
   payload: DeviceTelemetryIngestPayload
-): Promise<DeviceTelemetryIngestResponse> {
+): Promise<DeviceRecord> {
   const existing = await requireDevice(deviceId);
   const occurredAt = payload.occurredAt ?? new Date().toISOString();
   const updatedDevice: DeviceRecord = {
@@ -253,23 +283,56 @@ export async function ingestDeviceTelemetry(
     lastSeenAt: occurredAt,
     ...(payload.mqttStatus ? { mqttStatus: payload.mqttStatus } : {}),
     ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
+      ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
+  };
+  return deviceRepository.save(updatedDevice);
+}
+
+function createRuntimeTelemetryIngressMessage(
+  job: Awaited<ReturnType<typeof prepareTelemetrySceneEvaluationJob>>,
+  payload: DeviceTelemetryIngestPayload
+): RuntimeTelemetryIngressMessage {
+  return {
+    job,
+    ...(payload.mqttStatus ? { mqttStatus: payload.mqttStatus } : {}),
+    ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
-  const savedDevice = await deviceRepository.save(updatedDevice);
-  const sceneRuntimeQueue = await enqueueSceneEvaluationByTelemetry(
+}
+
+export async function ingestDeviceTelemetry(
+  deviceId: string,
+  payload: DeviceTelemetryIngestPayload
+): Promise<DeviceTelemetryIngestResponse> {
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+  const normalizedPayload: DeviceTelemetryIngestPayload = {
+    ...payload,
+    occurredAt
+  };
+  const savedDevice = await applyDeviceTelemetryState(deviceId, normalizedPayload);
+  const sceneEvaluationJob = await prepareTelemetrySceneEvaluationJob(
     {
       deviceId: savedDevice.deviceId,
-      telemetry: payload.telemetry,
+      telemetry: normalizedPayload.telemetry,
       occurredAt
     },
     {
       homeId: savedDevice.homeId
     }
   );
+  const bridge = getRuntimeMqttBridge();
+
+  if (bridge) {
+    await bridge.publishTelemetryIngress(
+      createRuntimeTelemetryIngressMessage(sceneEvaluationJob, normalizedPayload)
+    );
+  } else {
+    await enqueuePreparedSceneEvaluationJobs([sceneEvaluationJob]);
+  }
 
   return {
     device: savedDevice,
-    sceneRuntimeQueue
+    sceneRuntimeQueue: createSceneRuntimeQueueResponse([sceneEvaluationJob])
   };
 }
 

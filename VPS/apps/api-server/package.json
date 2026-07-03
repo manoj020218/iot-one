@@ -7,6 +7,7 @@
     "@jenix/device-schemas": "workspace:*",
     "@jenix/shared": "workspace:*",
     "express": "^4.21.1",
+    "mqtt": "^5.10.4",
     "mongodb": "^6.8.0"
   },
   "scripts": {

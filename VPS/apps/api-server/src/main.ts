@@ -4,6 +4,12 @@ import type { Db } from "mongodb";
 
 import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
+import { createMqttRuntimeBridge } from "./infrastructure/mqtt/mqtt-runtime-bridge";
+import {
+  handleRuntimeScheduleTickMessage,
+  handleRuntimeTelemetryIngressMessage
+} from "./infrastructure/mqtt/runtime.handlers";
+import { useRuntimeMqttBridge } from "./infrastructure/mqtt/runtime.binding";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
 import { useApiAccessPersistenceStore } from "./modules/api-access/api-access.model";
 import { createMongoApiAccessPersistenceStore } from "./modules/api-access/api-access.mongo-store";
@@ -29,6 +35,11 @@ import {
 import { createMongoSceneSchedulerLeaseStore } from "./modules/scenes/scene.scheduler.mongo-store";
 import { createSceneRuntimeScheduler } from "./modules/scenes/scene.scheduler";
 import { createSceneRuntimeEvaluationWorker } from "./modules/scenes/scene.runtime-worker";
+import {
+  createSceneRuntimeQueueResponse,
+  enqueueScheduledSceneEvaluation,
+  prepareScheduledSceneEvaluationJob
+} from "./modules/scenes/scene.service";
 
 async function bootstrap() {
   const config = readAppConfig();
@@ -130,12 +141,58 @@ async function bootstrap() {
           leaseStore: await createMongoSceneSchedulerLeaseStore(database!)
         })
       : createLocalSceneSchedulerCoordinator();
+  const runtimeMqttBridge = config.mqttRuntimeEnabled
+    ? createMqttRuntimeBridge({
+        url: config.mqttUrl!,
+        ...(config.mqttUsername ? { username: config.mqttUsername } : {}),
+        ...(config.mqttPassword ? { password: config.mqttPassword } : {}),
+        clientId: config.mqttClientId,
+        topics: {
+          telemetry: config.mqttTelemetryTopic,
+          schedule: config.mqttScheduleTopic,
+          deviceCommand: config.mqttDeviceCommandTopic,
+          notification: config.mqttNotificationTopic,
+          otaRequest: config.mqttOtaRequestTopic
+        },
+        logger: (message) => console.log(message),
+        onTelemetryMessage: async (message) => {
+          await handleRuntimeTelemetryIngressMessage(message);
+        },
+        onScheduleTickMessage: async (message) => {
+          await handleRuntimeScheduleTickMessage(message);
+        }
+      })
+    : null;
+
+  useRuntimeMqttBridge(runtimeMqttBridge);
 
   const app = createApp();
   const sceneRuntimeScheduler = config.sceneSchedulerEnabled
     ? createSceneRuntimeScheduler({
         intervalMs: config.sceneSchedulerIntervalMs,
         logger: (message) => console.log(message),
+        dispatchHomeTick: async (homeId, occurredAt) => {
+          if (!runtimeMqttBridge) {
+            return enqueueScheduledSceneEvaluation(
+              { occurredAt },
+              {
+                homeId
+              }
+            );
+          }
+
+          const job = await prepareScheduledSceneEvaluationJob(
+            { occurredAt },
+            {
+              homeId
+            }
+          );
+          await runtimeMqttBridge.publishScheduleTick({
+            job
+          });
+
+          return createSceneRuntimeQueueResponse([job]);
+        },
         coordinator: schedulerCoordinator
       })
     : null;
@@ -162,6 +219,10 @@ async function bootstrap() {
       })
     : null;
 
+  if (runtimeMqttBridge) {
+    await runtimeMqttBridge.start();
+  }
+
   const server = app.listen(config.port, () => {
     console.log(
       `[api-server] listening on port ${config.port} in ${config.nodeEnv} mode`
@@ -169,6 +230,11 @@ async function bootstrap() {
     console.log(
       `[api-server] matter runtime enabled: ${config.matterRuntimeEnabled}`
     );
+    if (runtimeMqttBridge) {
+      console.log(
+        `[api-server] mqtt runtime bridge enabled on ${config.mqttUrl} using topics ${config.mqttTelemetryTopic}, ${config.mqttScheduleTopic}, ${config.mqttDeviceCommandTopic}, ${config.mqttOtaRequestTopic}`
+      );
+    }
 
     if (sceneRuntimeScheduler) {
       sceneRuntimeScheduler.start();
@@ -201,6 +267,8 @@ async function bootstrap() {
     sceneRuntimeWorker?.stop();
     sceneActionWorker?.stop();
     server.close(async () => {
+      await runtimeMqttBridge?.stop();
+      useRuntimeMqttBridge(null);
       await closeMongoClient();
       process.exit(0);
     });

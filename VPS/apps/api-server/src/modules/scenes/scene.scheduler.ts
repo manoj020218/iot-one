@@ -2,6 +2,7 @@ import {
   enqueueScheduledSceneEvaluation,
   listActiveSceneHomeIds
 } from "./scene.service";
+import type { SceneRuntimeQueueResponse } from "./scene.types";
 import {
   createLocalSceneSchedulerCoordinator,
   type SceneSchedulerCoordinator
@@ -12,6 +13,10 @@ export interface SceneRuntimeSchedulerOptions {
   now?: () => Date;
   logger?: (message: string) => void;
   getHomeIds?: () => Promise<string[]>;
+  dispatchHomeTick?: (
+    homeId: string,
+    occurredAt: string
+  ) => Promise<SceneRuntimeQueueResponse>;
   coordinator?: SceneSchedulerCoordinator;
 }
 
@@ -26,6 +31,10 @@ export class SceneRuntimeScheduler {
   private readonly now: () => Date;
   private readonly logger: ((message: string) => void) | undefined;
   private readonly getHomeIds: () => Promise<string[]>;
+  private readonly dispatchHomeTick: (
+    homeId: string,
+    occurredAt: string
+  ) => Promise<SceneRuntimeQueueResponse>;
   private readonly coordinator: SceneSchedulerCoordinator;
   private timer: NodeJS.Timeout | null = null;
   private tickInProgress = false;
@@ -35,6 +44,15 @@ export class SceneRuntimeScheduler {
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger;
     this.getHomeIds = options.getHomeIds ?? listActiveSceneHomeIds;
+    this.dispatchHomeTick =
+      options.dispatchHomeTick ??
+      ((homeId, occurredAt) =>
+        enqueueScheduledSceneEvaluation(
+          { occurredAt },
+          {
+            homeId
+          }
+        ));
     this.coordinator =
       options.coordinator ?? createLocalSceneSchedulerCoordinator();
   }
@@ -53,12 +71,7 @@ export class SceneRuntimeScheduler {
     };
 
     for (const homeId of homeIds) {
-      const batch = await enqueueScheduledSceneEvaluation(
-        { occurredAt },
-        {
-          homeId
-        }
-      );
+      const batch = await this.dispatchHomeTick(homeId, occurredAt);
 
       result.evaluatedHomeCount += 1;
       result.enqueuedJobCount += batch.acceptedCount;

@@ -3,6 +3,8 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
+import { handleRuntimeTelemetryIngressMessage } from "../../infrastructure/mqtt/runtime.handlers";
 import { authTesting } from "../auth/auth.service";
 import { deviceTesting } from "./device.service";
 import { homeTesting } from "../homes/home.service";
@@ -79,6 +81,7 @@ async function createOtaRelease(input?: Partial<{
 
 describe("device routes", () => {
   beforeEach(async () => {
+    useRuntimeMqttBridge(null);
     await authTesting.reset();
     await homeTesting.reset();
     await deviceTesting.reset();
@@ -210,6 +213,72 @@ describe("device routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe("queued");
     expect(response.body.data.targetVersion).toBe("1.1.0");
+  });
+
+  it("publishes OTA delivery requests to MQTT when runtime delivery is enabled", async () => {
+    const publishedOtaRequests: Array<{
+      deviceId: string;
+      targetVersion: string;
+      channel: string;
+    }> = [];
+
+    useRuntimeMqttBridge({
+      async publishTelemetryIngress() {
+        throw new Error("not used");
+      },
+      async publishScheduleTick() {
+        throw new Error("not used");
+      },
+      async publishDeviceCommand() {
+        throw new Error("not used");
+      },
+      async publishNotification() {
+        throw new Error("not used");
+      },
+      async publishOtaRequest(message) {
+        publishedOtaRequests.push({
+          deviceId: message.deviceId,
+          targetVersion: message.targetVersion,
+          channel: message.channel
+        });
+      }
+    });
+
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await createOtaRelease({
+      releaseId: "TANK-HW10-STABLE-111",
+      version: "1.1.1"
+    });
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f6b",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
+      firmwareVersion: "0.9.0"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F6B/firmware/request")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        channel: "stable",
+        targetVersion: "1.1.1"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("queued");
+    expect(publishedOtaRequests).toEqual([
+      {
+        deviceId: "JNX-TG-A7F6B",
+        targetVersion: "1.1.1",
+        channel: "stable"
+      }
+    ]);
   });
 
   it("rejects firmware requests from a viewer role", async () => {
@@ -380,6 +449,103 @@ describe("device routes", () => {
     });
 
     const workerResult = await worker.runOnce("2026-07-02T06:00:05.000Z");
+    expect(workerResult.matchedRunCount).toBe(1);
+    expect(workerResult.runCount).toBe(1);
+  });
+
+  it("publishes telemetry to MQTT ingress and lets the consumer enqueue runtime work", async () => {
+    const telemetryMessages: Parameters<typeof handleRuntimeTelemetryIngressMessage>[0][] =
+      [];
+
+    useRuntimeMqttBridge({
+      async publishTelemetryIngress(message) {
+        telemetryMessages.push(message);
+      },
+      async publishScheduleTick() {
+        throw new Error("not used");
+      },
+      async publishDeviceCommand() {
+        throw new Error("not used");
+      },
+      async publishNotification() {
+        throw new Error("not used");
+      },
+      async publishOtaRequest() {
+        throw new Error("not used");
+      }
+    });
+
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f9",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+    const sceneResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "MQTT Tank Level Alert",
+        status: "active",
+        triggers: [
+          {
+            type: "device_threshold",
+            deviceId: "JNX-TG-A7F9",
+            metricKey: "tankLevelPct",
+            comparator: "gte",
+            threshold: 80
+          }
+        ],
+        conditions: [
+          {
+            field: "tankLevelPct",
+            operator: "gte",
+            value: 80
+          }
+        ],
+        actions: [
+          {
+            type: "notification",
+            message: "Tank level is high"
+          }
+        ]
+      });
+
+    expect(sceneResponse.status).toBe(201);
+
+    const response = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F9/telemetry")
+      .send({
+        telemetry: {
+          tankLevelPct: 88
+        },
+        mqttStatus: "online",
+        occurredAt: "2026-07-03T08:00:00.000Z"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.sceneRuntimeQueue.acceptedCount).toBe(1);
+    expect(telemetryMessages).toHaveLength(1);
+    expect((await sceneTesting.listEvaluationJobs(homeId)).length).toBe(0);
+
+    await handleRuntimeTelemetryIngressMessage(telemetryMessages[0]!);
+    expect((await sceneTesting.listEvaluationJobs(homeId)).length).toBe(1);
+
+    const worker = createSceneRuntimeEvaluationWorker({
+      workerId: "scene-runtime-worker-test",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined
+    });
+
+    const workerResult = await worker.runOnce("2026-07-03T08:00:05.000Z");
     expect(workerResult.matchedRunCount).toBe(1);
     expect(workerResult.runCount).toBe(1);
   });

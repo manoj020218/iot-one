@@ -2,6 +2,16 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   mongodbUri?: string;
+  mqttRuntimeEnabled: boolean;
+  mqttUrl?: string;
+  mqttUsername?: string;
+  mqttPassword?: string;
+  mqttClientId: string;
+  mqttTelemetryTopic: string;
+  mqttScheduleTopic: string;
+  mqttDeviceCommandTopic: string;
+  mqttNotificationTopic: string;
+  mqttOtaRequestTopic: string;
   authPersistenceMode: "memory" | "mongodb";
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
@@ -100,6 +110,22 @@ export function readAppConfig(): AppConfig {
   const rawPort = process.env.PORT ?? "4000";
   const port = Number(rawPort);
   const mongodbUri = process.env.MONGODB_URI?.trim() || undefined;
+  const mqttUrl = process.env.MQTT_URL?.trim() || undefined;
+  const mqttUsername = process.env.MQTT_USERNAME?.trim() || undefined;
+  const mqttPassword = process.env.MQTT_PASSWORD?.trim() || undefined;
+  const mqttClientId =
+    process.env.MQTT_CLIENT_ID?.trim() ||
+    `jenix-api-${process.pid.toString()}`;
+  const mqttTelemetryTopic =
+    process.env.MQTT_TELEMETRY_TOPIC?.trim() || "jenix/runtime/telemetry";
+  const mqttScheduleTopic =
+    process.env.MQTT_SCHEDULE_TOPIC?.trim() || "jenix/runtime/schedule";
+  const mqttDeviceCommandTopic =
+    process.env.MQTT_DEVICE_COMMAND_TOPIC?.trim() || "jenix/runtime/commands";
+  const mqttNotificationTopic =
+    process.env.MQTT_NOTIFICATION_TOPIC?.trim() || "jenix/runtime/notifications";
+  const mqttOtaRequestTopic =
+    process.env.MQTT_OTA_REQUEST_TOPIC?.trim() || "jenix/runtime/ota";
   const sceneSchedulerIntervalMs = parsePositiveIntegerEnv(
     process.env.SCENE_SCHEDULER_INTERVAL_MS,
     30_000,
@@ -191,6 +217,15 @@ export function readAppConfig(): AppConfig {
     throw new Error(`Invalid PORT value: ${rawPort}`);
   }
 
+  const mqttRuntimeEnabled = parseBooleanEnv(
+    process.env.MQTT_RUNTIME_ENABLED,
+    false
+  );
+
+  if (mqttRuntimeEnabled && !mqttUrl) {
+    throw new Error("MQTT_RUNTIME_ENABLED=true requires MQTT_URL");
+  }
+
   if (homePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("HOME_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -233,6 +268,16 @@ export function readAppConfig(): AppConfig {
     nodeEnv: process.env.NODE_ENV ?? "development",
     port,
     ...(mongodbUri ? { mongodbUri } : {}),
+    mqttRuntimeEnabled,
+    ...(mqttUrl ? { mqttUrl } : {}),
+    ...(mqttUsername ? { mqttUsername } : {}),
+    ...(mqttPassword ? { mqttPassword } : {}),
+    mqttClientId,
+    mqttTelemetryTopic,
+    mqttScheduleTopic,
+    mqttDeviceCommandTopic,
+    mqttNotificationTopic,
+    mqttOtaRequestTopic,
     authPersistenceMode,
     matterRuntimeEnabled: parseBooleanEnv(
       process.env.MATTER_RUNTIME_ENABLED,

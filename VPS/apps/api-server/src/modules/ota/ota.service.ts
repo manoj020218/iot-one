@@ -11,6 +11,8 @@ import { getPid } from "../pid/pid.service";
 import { otaRepository } from "./ota.model";
 import type {
   CreateOtaReleaseInput,
+  OtaDeliveryRequest,
+  OtaDeliveryRequestInput,
   OtaActorContext,
   OtaModuleState
 } from "./ota.types";
@@ -43,6 +45,10 @@ function normalizePid(pid: string) {
 
 function normalizeHardwareRevision(hardwareRevision: string) {
   return hardwareRevision.trim().toUpperCase();
+}
+
+function createDeliveryRequestId(): string {
+  return `ota-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function toReleaseSummary(record: OtaReleaseRecord): OtaReleaseSummary {
@@ -222,6 +228,38 @@ export async function getDeviceFirmwarePlan(
     recommendedChannel,
     stable,
     beta
+  };
+}
+
+export async function buildOtaDeliveryRequest(
+  device: DeviceRecord,
+  input: OtaDeliveryRequestInput
+): Promise<OtaDeliveryRequest> {
+  const resolution = await resolveOtaReleaseForDevice(
+    device,
+    input.channel,
+    input.targetVersion
+  );
+
+  if (!resolution.release) {
+    throw new OtaModuleError(
+      409,
+      resolution.reason ?? `No ${input.channel} firmware release is available`
+    );
+  }
+
+  return {
+    requestId: createDeliveryRequestId(),
+    deviceId: device.deviceId,
+    homeId: device.homeId,
+    pid: device.pid,
+    channel: input.channel,
+    targetVersion: resolution.release.version,
+    artifactUrl: resolution.release.artifactUrl,
+    checksum: resolution.release.checksum,
+    requestedAt: input.requestedAt,
+    requestedBy: input.requestedBy,
+    ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {})
   };
 }
 

@@ -111,4 +111,46 @@ describe("scene runtime scheduler", () => {
 
     await firstRun;
   });
+
+  it("supports publishing schedule ticks through a custom dispatch boundary", async () => {
+    const dispatchedHomeIds: string[] = [];
+
+    await createScene(
+      {
+        name: "MQTT Morning Sync",
+        status: "active",
+        triggers: [
+          {
+            type: "schedule"
+          }
+        ],
+        conditions: [],
+        actions: [],
+        schedule: {
+          timezone: "Asia/Kolkata",
+          daysOfWeek: [4],
+          time: "09:15"
+        }
+      },
+      ownerContext
+    );
+
+    const scheduler = createSceneRuntimeScheduler({
+      intervalMs: 30_000,
+      now: () => new Date("2026-07-02T03:45:00.000Z"),
+      logger: () => undefined,
+      dispatchHomeTick: async (homeId) => {
+        dispatchedHomeIds.push(homeId);
+        return {
+          acceptedCount: 1,
+          jobs: []
+        };
+      }
+    });
+
+    const result = await scheduler.runOnce();
+    expect(result.evaluatedHomeCount).toBe(1);
+    expect(result.enqueuedJobCount).toBe(1);
+    expect(dispatchedHomeIds).toEqual([ownerContext.homeId]);
+  });
 });

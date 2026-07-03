@@ -313,7 +313,7 @@ function createDispatchJobs(
   }));
 }
 
-function createRuntimeQueueResponse(
+export function createSceneRuntimeQueueResponse(
   jobs: SceneEvaluationJob[]
 ): SceneRuntimeQueueResponse {
   return {
@@ -348,6 +348,45 @@ function createEvaluationJob(input: {
     attemptCount: 0,
     status: "queued"
   };
+}
+
+export async function prepareTelemetrySceneEvaluationJob(
+  payload: TelemetryRuntimePayload,
+  context: SceneRequestContext
+): Promise<SceneEvaluationJob> {
+  const resolvedContext = await resolveContext(context);
+  const homeId = requireHomeId(resolvedContext);
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+
+  return createEvaluationJob({
+    source: "device_threshold",
+    homeId,
+    occurredAt,
+    deviceId: payload.deviceId,
+    telemetry: payload.telemetry
+  });
+}
+
+export async function prepareScheduledSceneEvaluationJob(
+  payload: ScheduleRuntimePayload,
+  context: SceneRequestContext
+): Promise<SceneEvaluationJob> {
+  const resolvedContext = await resolveContext(context);
+  const homeId = requireHomeId(resolvedContext);
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+
+  return createEvaluationJob({
+    source: "schedule",
+    homeId,
+    occurredAt
+  });
+}
+
+export async function enqueuePreparedSceneEvaluationJobs(
+  jobs: SceneEvaluationJob[]
+): Promise<SceneRuntimeQueueResponse> {
+  await sceneEvaluationJobRepository.enqueue(jobs);
+  return createSceneRuntimeQueueResponse(jobs);
 }
 
 async function executeSceneRuntime(
@@ -706,21 +745,8 @@ export async function enqueueSceneEvaluationByTelemetry(
   payload: TelemetryRuntimePayload,
   context: SceneRequestContext
 ): Promise<SceneRuntimeQueueResponse> {
-  const resolvedContext = await resolveContext(context);
-  const homeId = requireHomeId(resolvedContext);
-  const occurredAt = payload.occurredAt ?? new Date().toISOString();
-  const jobs = [
-    createEvaluationJob({
-      source: "device_threshold",
-      homeId,
-      occurredAt,
-      deviceId: payload.deviceId,
-      telemetry: payload.telemetry
-    })
-  ];
-
-  await sceneEvaluationJobRepository.enqueue(jobs);
-  return createRuntimeQueueResponse(jobs);
+  const jobs = [await prepareTelemetrySceneEvaluationJob(payload, context)];
+  return enqueuePreparedSceneEvaluationJobs(jobs);
 }
 
 export async function evaluateScheduledScenes(
@@ -770,19 +796,8 @@ export async function enqueueScheduledSceneEvaluation(
   payload: ScheduleRuntimePayload,
   context: SceneRequestContext
 ): Promise<SceneRuntimeQueueResponse> {
-  const resolvedContext = await resolveContext(context);
-  const homeId = requireHomeId(resolvedContext);
-  const occurredAt = payload.occurredAt ?? new Date().toISOString();
-  const jobs = [
-    createEvaluationJob({
-      source: "schedule",
-      homeId,
-      occurredAt
-    })
-  ];
-
-  await sceneEvaluationJobRepository.enqueue(jobs);
-  return createRuntimeQueueResponse(jobs);
+  const jobs = [await prepareScheduledSceneEvaluationJob(payload, context)];
+  return enqueuePreparedSceneEvaluationJobs(jobs);
 }
 
 export const sceneTesting = {
