@@ -45,6 +45,7 @@ cmd /c pnpm build
 - Auth sessions now use signed bearer access tokens on user-facing routes, and auth users plus refresh sessions can persist in MongoDB with `AUTH_PERSISTENCE_MODE=mongodb`.
 - The PWA now prefers the live `/api/v1/auth/*` contract, keeps the authenticated session in local storage, and automatically rotates refreshable bearer sessions before access-token expiry.
 - The API server now starts an in-process scene scheduler by default.
+- MQTT-backed runtime ingress and delivery can be enabled with `MQTT_RUNTIME_ENABLED=true`. When enabled, telemetry ingress and scheduler ticks publish MQTT envelopes first, and the API server subscribes to MQTT telemetry/schedule topics before enqueuing runtime evaluation work.
 - Scene persistence defaults to MongoDB when `MONGODB_URI` is set, or can be forced with `SCENE_PERSISTENCE_MODE=mongodb`.
 - HOME, provisioning, OTA, and API access persistence also default to MongoDB when `MONGODB_URI` is set, and can be forced with `HOME_PERSISTENCE_MODE`, `PROVISIONING_PERSISTENCE_MODE`, `OTA_PERSISTENCE_MODE`, and `API_ACCESS_PERSISTENCE_MODE`.
 - Auth user records persist in `auth_users`, and refresh sessions persist in `auth_refresh_sessions` when the auth MongoDB driver is enabled.
@@ -56,9 +57,10 @@ cmd /c pnpm build
 - Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
 - Scene runtime worker control comes from `SCENE_RUNTIME_WORKER_ENABLED`, `SCENE_RUNTIME_WORKER_INTERVAL_MS`, `SCENE_RUNTIME_WORKER_BATCH_SIZE`, and `SCENE_RUNTIME_WORKER_VISIBILITY_TIMEOUT_MS`.
 - Scene action worker control comes from `SCENE_ACTION_WORKER_ENABLED`, `SCENE_ACTION_WORKER_INTERVAL_MS`, `SCENE_ACTION_WORKER_BATCH_SIZE`, and `SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS`.
+- MQTT runtime topics are configured with `MQTT_TELEMETRY_TOPIC`, `MQTT_SCHEDULE_TOPIC`, `MQTT_DEVICE_COMMAND_TOPIC`, `MQTT_NOTIFICATION_TOPIC`, and `MQTT_OTA_REQUEST_TOPIC`.
 - Scheduler leadership can be coordinated across multiple API instances with `SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock`, `SCENE_SCHEDULER_LEASE_MS`, and an optional `SCENE_SCHEDULER_INSTANCE_ID`.
-- Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and now queues a scene runtime evaluation job instead of executing the threshold engine inline.
-- Mongo lease coordination prevents duplicate scheduler ownership across instances, scheduler ticks now queue runtime evaluation jobs, and action delivery is isolated behind a claimed-job worker.
+- Device telemetry can still be ingested through `POST /api/v1/devices/:deviceId/telemetry`, but when MQTT runtime is enabled that route now publishes the same telemetry envelope to MQTT so HTTP remains a fallback instead of the only runtime source.
+- Mongo lease coordination prevents duplicate scheduler ownership across instances, scheduler ticks now publish MQTT schedule envelopes when enabled, runtime evaluation is isolated behind claimed-job workers, and scene actions plus firmware requests can publish real MQTT device-delivery messages.
 - PID persistence now supports `PID_PERSISTENCE_MODE=memory|mongodb` and device persistence now supports `DEVICE_PERSISTENCE_MODE=memory|mongodb`. Both default to MongoDB when `MONGODB_URI` is set.
 - PID records and PID audit logs now persist in MongoDB collections `product_pids` and `pid_audit_logs`, and device records persist in the `devices` collection when the MongoDB drivers are enabled.
 - HOME-scoped device, scene, Matter, and API key permissions no longer trust `x-home-role`; the backend now resolves HOME membership from persisted sharing data.

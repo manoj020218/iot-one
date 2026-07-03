@@ -16,7 +16,8 @@
 - Current status: Phase 13 extended persistence and RBAC hardening complete
 - Current status: Phase 14 auth middleware and runtime isolation complete
 - Current status: Phase 15 queued runtime evaluation and session refresh complete
-- Current phase: Phase 15 - Queued Runtime Evaluation and Session Refresh
+- Current status: Phase 16 MQTT runtime ingress and delivery execution complete
+- Current phase: Phase 16 - MQTT Runtime Ingress and Delivery Execution
 
 ## Working Scope
 
@@ -409,14 +410,36 @@ Validation gates:
 - [x] PWA auth session refresh tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 16 - MQTT Runtime Ingress and Delivery Execution
+
+Status: Completed
+
+Deliverables:
+- [x] MQTT runtime bridge binding
+- [x] MQTT client bootstrap and topic subscription support
+- [x] MQTT telemetry ingress message contract
+- [x] MQTT schedule tick message contract
+- [x] Scheduler publish boundary for schedule ticks
+- [x] Device telemetry publish boundary for MQTT-first ingestion
+- [x] MQTT consumer handlers for telemetry and schedule messages
+- [x] Scene action worker MQTT command delivery
+- [x] Firmware request MQTT OTA delivery publishing
+- [x] MQTT runtime env and topic configuration
+
+Validation gates:
+- [x] Device telemetry MQTT ingress tests
+- [x] Scene action MQTT delivery tests
+- [x] Firmware MQTT OTA delivery tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Feed device telemetry into the Phase 15 scene runtime queue from MQTT consumers so HTTP ingest becomes optional instead of the main ingestion path.
-2. Replace queued OTA placeholder responses with real device rollout delivery, acknowledgement, and rollout-state persistence.
+1. Add delivery acknowledgement, retry, and rollout-state persistence for MQTT scene-command and OTA messages.
+2. Move direct firmware request publishing behind a dedicated claimed-job OTA delivery worker for stronger retry isolation.
 3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
 4. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
 
@@ -447,6 +470,7 @@ Validation gates:
 - 2026-07-03: Added MongoDB-backed HOME, provisioning, OTA, and API access drivers, and replaced header-trusted HOME role handling with server-authoritative membership resolution across device, scene, Matter, and API key flows.
 - 2026-07-03: Added MongoDB-backed auth persistence, signed bearer-auth middleware, PWA bearer-auth migration, local session persistence, and a scene action worker queue for runtime isolation.
 - 2026-07-03: Added queue-backed scene runtime evaluation workers for telemetry and schedules, plus automatic PWA refresh-token rotation before bearer access-token expiry.
+- 2026-07-03: Added an MQTT runtime bridge for telemetry ingress, schedule ticks, scene command delivery, and OTA request delivery so MQTT can be the main VPS runtime bus while HTTP telemetry remains a fallback path.
 
 ## Risks and Controls
 
@@ -480,3 +504,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-03: Phase 13 extended persistence and RBAC hardening completed with HOME/provisioning/OTA/API access MongoDB drivers, server-authoritative HOME membership checks, and full workspace validation.
 - 2026-07-03: Phase 14 auth middleware and runtime isolation completed with MongoDB-backed auth sessions, bearer-auth route migration, scene action dispatch worker isolation, and full workspace validation.
 - 2026-07-03: Phase 15 queued runtime evaluation and session refresh completed with MongoDB-backed scene evaluation jobs, scheduler/telemetry queue routing, PWA token rotation, and full workspace validation.
+- 2026-07-03: Phase 16 MQTT runtime ingress and delivery execution completed with MQTT bridge bootstrap, scheduler/telemetry publish boundaries, consumer handlers, scene action MQTT delivery, firmware OTA publish support, and full workspace validation.
