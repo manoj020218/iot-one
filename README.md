@@ -65,6 +65,9 @@ cmd /c pnpm build
 - Mongo lease coordination prevents duplicate scheduler ownership across instances, scheduler ticks now publish MQTT schedule envelopes when enabled, runtime evaluation is isolated behind claimed-job workers, and scene actions plus firmware requests can publish real MQTT device-delivery messages.
 - Scene action dispatch jobs now stay in `dispatched` state until the device returns an MQTT acknowledgement or the worker lease expires and the command becomes retryable again.
 - Firmware requests no longer publish OTA payloads directly from the request path; they now queue durable OTA delivery jobs that a dedicated worker publishes and retries until acknowledgement or failure.
+- Device firmware rollout history is now exposed at `GET /api/v1/devices/:deviceId/firmware/rollouts`, with failed-job replay available at `POST /api/v1/devices/:deviceId/firmware/rollouts/:requestId/replay`.
+- Scene dispatch history is now exposed at `GET /api/v1/scenes/:sceneId/dispatches`, with failed-job replay available at `POST /api/v1/scenes/:sceneId/dispatches/:jobId/replay`.
+- The PWA device detail page now shows rollout acknowledgement state, last delivery error, and a replay action for failed firmware jobs.
 - PID persistence now supports `PID_PERSISTENCE_MODE=memory|mongodb` and device persistence now supports `DEVICE_PERSISTENCE_MODE=memory|mongodb`. Both default to MongoDB when `MONGODB_URI` is set.
 - PID records and PID audit logs now persist in MongoDB collections `product_pids` and `pid_audit_logs`, and device records persist in the `devices` collection when the MongoDB drivers are enabled.
 - HOME-scoped device, scene, Matter, and API key permissions no longer trust `x-home-role`; the backend now resolves HOME membership from persisted sharing data.
