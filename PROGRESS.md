@@ -1,8 +1,8 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 12 - Core Persistence Baseline
-- Started: 2026-07-02
+- Phase name: Phase 13 - Extended Persistence and RBAC Hardening
+- Started: 2026-07-03
 - Status: Completed
 
 ## Completed
@@ -51,6 +51,12 @@
 - [x] PID MongoDB persistence
 - [x] PID audit log persistence
 - [x] Device MongoDB persistence
+- [x] HOME MongoDB persistence
+- [x] Provisioning MongoDB persistence
+- [x] OTA MongoDB persistence
+- [x] API package MongoDB persistence
+- [x] API key MongoDB persistence
+- [x] Server-authoritative HOME membership checks
 - [x] Unit tests
 - [x] Regression tests
 
@@ -112,6 +118,9 @@
 - Date: 2026-07-02
   Decision: Start the persistence-hardening phase with PID and device registry storage first, using the same repository-plus-driver pattern already proven in scenes.
   Reason: PID and device records sit underneath OTA, Matter, provisioning, and public API flows, so making them durable first reduces cross-module risk and keeps the later persistence passes more mechanical.
+- Date: 2026-07-03
+  Decision: Extend the repository-plus-driver pattern to HOME sharing, provisioning, OTA, and API access, then remove backend trust in `x-home-role` by resolving HOME membership server-side.
+  Reason: Phase 13 needed durable collaboration and catalog data, and the role hardening only becomes reliable once membership state is authoritative and persistent.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -135,29 +144,20 @@
 - Issue: Scheduler leadership is now lease-coordinated across API instances, but execution still runs inside the API process instead of a dedicated worker.
   Impact: Duplicate leadership is controlled, but heavy automation volume still competes with API traffic and would benefit from queue-backed isolation at larger scale.
   Fix plan: Move schedule execution and high-volume telemetry-triggered automation to a worker or queue-backed runtime once deployment load justifies it.
-- Issue: HOME sharing state, memberships, share codes, and audit records are currently in-memory on the API side.
-  Impact: Phase 8 role management and share-code flows are functional and tested, but HOME collaboration data is not durable across process restarts.
-  Fix plan: Persist HOME records, members, share codes, and access audit history in MongoDB during the broader persistence-hardening pass.
-- Issue: Shared HOME access for scenes and devices currently trusts the session-provided `x-home-role` context instead of resolving membership on the backend from authenticated middleware.
-  Impact: UI-visible role restrictions work for the current architecture, but final production RBAC still needs server-authoritative membership checks.
-  Fix plan: Replace header-trusted HOME role context with authenticated membership resolution when the auth middleware and durable HOME repository are introduced.
-- Issue: OTA releases, API packages, and third-party API keys are still in-memory on the API side.
-  Impact: Phase 10 compatibility and scope enforcement are functional and tested, but release/package/key data is not durable across process restarts.
-  Fix plan: Persist OTA releases, API packages, and issued API keys in MongoDB during the broader persistence-hardening pass.
 - Issue: Firmware requests now resolve against published OTA releases, but they still stop at queued intent instead of delivering binaries to real devices.
   Impact: Operators can select the correct PID/hardware-compatible target version, but rollout execution is still a controlled placeholder.
   Fix plan: Add the actual OTA delivery worker, device acknowledgement flow, and rollout state tracking when the firmware transport layer is introduced.
 - Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
   Impact: Phase 11 models Matter capability, permissions, and UI entry points, but live Matter activation is intentionally disabled by default and still does not perform commissioner transport, gateway coordination, or durable Matter-state persistence.
   Fix plan: Keep the activation flag off until vendor ID and CSA readiness are complete, then replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
-- Issue: HOME sharing, provisioning intent, OTA release, and API access storage are still in-memory on the API side.
-  Impact: The platform now has durable scenes, PIDs, and devices, but collaboration, onboarding history, firmware catalog data, and issued API credentials still reset with the process.
-  Fix plan: Continue the persistence phase with MongoDB-backed HOME, provisioning, OTA, and API-access drivers using the same repository pattern.
+- Issue: HOME role authorization is now resolved server-side, but the broader auth system still depends on header-supplied user identity instead of signed middleware-backed claims.
+  Impact: HOME role spoofing is blocked, but production identity trust is still incomplete until authenticated middleware replaces the current header-based development contract.
+  Fix plan: Add real auth persistence and middleware, then derive user identity from verified tokens instead of direct request headers.
 
 ## Next Tasks
-1. Move HOME sharing, provisioning intent, OTA release, and API access storage to MongoDB so the rest of the platform matches the scene/PID/device durability baseline.
-2. Replace header-trusted HOME role context with server-authoritative membership checks.
-3. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
+1. Move schedule execution and high-volume telemetry automation to a worker or queue-backed runtime when deployment load justifies process isolation.
+2. Replace header-based user identity with authenticated middleware and persistent auth/session storage.
+3. Add real OTA rollout delivery, acknowledgement, and rollout-state persistence.
 4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
 ## Log
@@ -181,3 +181,4 @@
 - 2026-07-02: Completed Phase 10 OTA release modeling, device firmware compatibility resolution, API package and key management, public API scope enforcement, and full workspace validation.
 - 2026-07-02: Completed Phase 11 Matter readiness with shared Matter contracts, PID mode validation alignment, placeholder backend routes, restricted Matter command coverage, device-detail Matter UI, and full workspace validation.
 - 2026-07-02: Completed Phase 12 core persistence baseline with MongoDB-backed PID records, PID audit logs, device records, bootstrap wiring, and full workspace validation.
+- 2026-07-03: Completed Phase 13 with MongoDB-backed HOME, provisioning, OTA, and API access persistence, server-authoritative HOME membership checks, and full workspace validation.

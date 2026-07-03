@@ -13,7 +13,8 @@
 - Current status: Phase 10 OTA and third-party API foundations complete
 - Current status: Phase 11 Matter readiness complete
 - Current status: Phase 12 PID and device persistence baseline complete
-- Current phase: Phase 12 - Core Persistence Baseline
+- Current status: Phase 13 extended persistence and RBAC hardening complete
+- Current phase: Phase 13 - Extended Persistence and RBAC Hardening
 
 ## Working Scope
 
@@ -329,15 +330,48 @@ Validation gates:
 - [x] Device registry route regression tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 13 - Extended Persistence and RBAC Hardening
+
+Status: Completed
+
+Deliverables:
+- [x] HOME repository abstraction
+- [x] MongoDB-backed HOME persistence
+- [x] MongoDB-backed HOME membership persistence
+- [x] MongoDB-backed HOME share code persistence
+- [x] MongoDB-backed HOME audit log persistence
+- [x] Provisioning repository abstraction
+- [x] MongoDB-backed provisioning intent persistence
+- [x] OTA repository abstraction
+- [x] MongoDB-backed OTA release persistence
+- [x] API access repository abstraction
+- [x] MongoDB-backed API package persistence
+- [x] MongoDB-backed API key persistence
+- [x] MongoDB-backed API key secret persistence
+- [x] Server-authoritative HOME membership resolution for device access
+- [x] Server-authoritative HOME membership resolution for scene access
+- [x] Server-authoritative HOME membership resolution for Matter access
+- [x] Server-authoritative HOME membership resolution for API key management
+- [x] Bootstrap wiring for HOME/provisioning/OTA/API access persistence modes
+
+Validation gates:
+- [x] HOME route regression tests
+- [x] Provisioning route regression tests
+- [x] Device shared-role regression tests
+- [x] Scene shared-role regression tests
+- [x] Matter shared-role regression tests
+- [x] API access regression tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Persist HOME sharing, provisioning intent, OTA release, and API access modules in MongoDB for platform-wide durability.
-2. Replace header-trusted HOME role context with server-authoritative membership checks.
-3. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
+2. Replace mock auth/session handling with database-backed auth, refresh-token storage, and authenticated middleware.
+3. Replace queued OTA placeholder responses with real device rollout delivery, acknowledgement, and rollout-state persistence.
 4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
 
 ## Decision Log
@@ -364,6 +398,7 @@ Validation gates:
 - 2026-07-02: Added Matter readiness contracts, PID matter-mode consistency validation, placeholder commissioning and bridge routes, restricted Matter scene commands, and device-detail Matter status panels for Phase 11.
 - 2026-07-02: Locked Matter runtime behind an explicit activation flag so the MQTT/VPS-side modeling remains in place while live Matter actions stay disabled until vendor ID, CSA, and multi-product rollout readiness are complete.
 - 2026-07-02: Added repository abstractions and MongoDB-backed drivers for PID records, PID audit logs, and device records so the core product/device layer now matches the scene durability baseline.
+- 2026-07-03: Added MongoDB-backed HOME, provisioning, OTA, and API access drivers, and replaced header-trusted HOME role handling with server-authoritative membership resolution across device, scene, Matter, and API key flows.
 
 ## Risks and Controls
 
@@ -394,3 +429,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-02: Phase 7 automatic runtime wiring completed with scheduler bootstrap, telemetry ingest, scheduler tests, and full workspace validation.
 - 2026-07-02: Phase 11 Matter readiness completed with backend placeholders, PID validation alignment, restricted-command coverage, device-detail Matter UI, and full workspace validation.
 - 2026-07-02: Phase 12 core persistence baseline completed with PID/device MongoDB drivers, bootstrap wiring, and full workspace validation.
+- 2026-07-03: Phase 13 extended persistence and RBAC hardening completed with HOME/provisioning/OTA/API access MongoDB drivers, server-authoritative HOME membership checks, and full workspace validation.
