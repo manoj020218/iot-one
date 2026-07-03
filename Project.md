@@ -14,7 +14,8 @@
 - Current status: Phase 11 Matter readiness complete
 - Current status: Phase 12 PID and device persistence baseline complete
 - Current status: Phase 13 extended persistence and RBAC hardening complete
-- Current phase: Phase 13 - Extended Persistence and RBAC Hardening
+- Current status: Phase 14 auth middleware and runtime isolation complete
+- Current phase: Phase 14 - Auth Middleware and Runtime Isolation
 
 ## Working Scope
 
@@ -363,16 +364,38 @@ Validation gates:
 - [x] API access regression tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 14 - Auth Middleware and Runtime Isolation
+
+Status: Completed
+
+Deliverables:
+- [x] Auth repository abstraction
+- [x] MongoDB-backed auth user persistence
+- [x] MongoDB-backed refresh session persistence
+- [x] Signed bearer access-token validation middleware
+- [x] Request-auth user context plumbing
+- [x] Backend user-facing route migration away from raw `x-user-*` identity headers
+- [x] PWA bearer-auth migration for homes, dashboard, scenes, devices, and provisioning
+- [x] PWA session persistence across reloads
+- [x] Scene action dispatch queue
+- [x] Scene action worker bootstrap
+- [x] MongoDB-backed scene action dispatch persistence
+
+Validation gates:
+- [x] Auth route regression tests
+- [x] Scene action worker tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Move scheduled and high-volume runtime execution into MQTT, queue, or worker-backed infrastructure if deployment load requires stronger process isolation.
-2. Replace mock auth/session handling with database-backed auth, refresh-token storage, and authenticated middleware.
-3. Replace queued OTA placeholder responses with real device rollout delivery, acknowledgement, and rollout-state persistence.
-4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
+1. Move telemetry-triggered scene evaluation itself into MQTT or queue-backed workers if runtime volume outgrows the API process.
+2. Replace queued OTA placeholder responses with real device rollout delivery, acknowledgement, and rollout-state persistence.
+3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
+4. Add token refresh handling to the PWA runtime so long-lived sessions can rotate without forcing manual re-login.
 
 ## Decision Log
 
@@ -399,6 +422,7 @@ Validation gates:
 - 2026-07-02: Locked Matter runtime behind an explicit activation flag so the MQTT/VPS-side modeling remains in place while live Matter actions stay disabled until vendor ID, CSA, and multi-product rollout readiness are complete.
 - 2026-07-02: Added repository abstractions and MongoDB-backed drivers for PID records, PID audit logs, and device records so the core product/device layer now matches the scene durability baseline.
 - 2026-07-03: Added MongoDB-backed HOME, provisioning, OTA, and API access drivers, and replaced header-trusted HOME role handling with server-authoritative membership resolution across device, scene, Matter, and API key flows.
+- 2026-07-03: Added MongoDB-backed auth persistence, signed bearer-auth middleware, PWA bearer-auth migration, local session persistence, and a scene action worker queue for runtime isolation.
 
 ## Risks and Controls
 
@@ -430,3 +454,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-02: Phase 11 Matter readiness completed with backend placeholders, PID validation alignment, restricted-command coverage, device-detail Matter UI, and full workspace validation.
 - 2026-07-02: Phase 12 core persistence baseline completed with PID/device MongoDB drivers, bootstrap wiring, and full workspace validation.
 - 2026-07-03: Phase 13 extended persistence and RBAC hardening completed with HOME/provisioning/OTA/API access MongoDB drivers, server-authoritative HOME membership checks, and full workspace validation.
+- 2026-07-03: Phase 14 auth middleware and runtime isolation completed with MongoDB-backed auth sessions, bearer-auth route migration, scene action dispatch worker isolation, and full workspace validation.

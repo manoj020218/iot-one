@@ -42,16 +42,21 @@ cmd /c pnpm build
 
 ## Runtime Notes
 
+- Auth sessions now use signed bearer access tokens on user-facing routes, and auth users plus refresh sessions can persist in MongoDB with `AUTH_PERSISTENCE_MODE=mongodb`.
+- The PWA now prefers the live `/api/v1/auth/*` contract and keeps the authenticated session in local storage so bearer auth survives reloads.
 - The API server now starts an in-process scene scheduler by default.
 - Scene persistence defaults to MongoDB when `MONGODB_URI` is set, or can be forced with `SCENE_PERSISTENCE_MODE=mongodb`.
 - HOME, provisioning, OTA, and API access persistence also default to MongoDB when `MONGODB_URI` is set, and can be forced with `HOME_PERSISTENCE_MODE`, `PROVISIONING_PERSISTENCE_MODE`, `OTA_PERSISTENCE_MODE`, and `API_ACCESS_PERSISTENCE_MODE`.
+- Auth user records persist in `auth_users`, and refresh sessions persist in `auth_refresh_sessions` when the auth MongoDB driver is enabled.
 - Scene records, scene audit logs, and scene run history now persist in MongoDB collections `scenes`, `scene_audit_logs`, and `scene_run_history`.
+- Matched scene actions now enqueue into `scene_action_dispatch_jobs`, and the API process starts a scene action worker by default to drain that queue behind a worker boundary.
 - HOME data now persists in MongoDB collections `homes`, `home_members`, `home_share_codes`, `home_user_profiles`, and `home_audit_logs` when the HOME driver is enabled.
 - Provisioning intents persist in `provisioning_intents`, OTA releases persist in `ota_releases`, and API packages/keys/secrets persist in `api_packages`, `api_keys`, and `api_key_secrets` when their MongoDB drivers are enabled.
 - Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
+- Scene action worker control comes from `SCENE_ACTION_WORKER_ENABLED`, `SCENE_ACTION_WORKER_INTERVAL_MS`, `SCENE_ACTION_WORKER_BATCH_SIZE`, and `SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS`.
 - Scheduler leadership can be coordinated across multiple API instances with `SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock`, `SCENE_SCHEDULER_LEASE_MS`, and an optional `SCENE_SCHEDULER_INSTANCE_ID`.
 - Device telemetry can be ingested through `POST /api/v1/devices/:deviceId/telemetry`, which updates device liveness and evaluates matching device-threshold scenes immediately.
-- Mongo lease coordination prevents duplicate scheduler ownership across instances, but transport-side scale still benefits from a dedicated worker or queue-backed runtime when deployment complexity grows.
+- Mongo lease coordination prevents duplicate scheduler ownership across instances, and action delivery is now isolated behind a claimed-job worker, but telemetry ingestion and schedule evaluation still run inside the API service.
 - PID persistence now supports `PID_PERSISTENCE_MODE=memory|mongodb` and device persistence now supports `DEVICE_PERSISTENCE_MODE=memory|mongodb`. Both default to MongoDB when `MONGODB_URI` is set.
 - PID records and PID audit logs now persist in MongoDB collections `product_pids` and `pid_audit_logs`, and device records persist in the `devices` collection when the MongoDB drivers are enabled.
 - HOME-scoped device, scene, Matter, and API key permissions no longer trust `x-home-role`; the backend now resolves HOME membership from persisted sharing data.
