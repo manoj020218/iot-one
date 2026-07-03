@@ -5,6 +5,7 @@ import type {
   HomeShareCodeRecord
 } from "@jenix/shared";
 
+import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import {
   createDemoHomeShareCode,
   homeDemoStoreTesting,
@@ -28,15 +29,6 @@ export interface HomeRedeemResponse {
   homes: HomeRecord[];
 }
 
-function createHeaders(session: AuthSession): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    "x-user-id": session.user.userId,
-    "x-user-name": session.user.name,
-    "x-user-email": session.user.email
-  };
-}
-
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init);
 
@@ -52,7 +44,7 @@ export async function listHomes(session: AuthSession): Promise<HomeRecord[]> {
   try {
     return await fetchJson<HomeRecord[]>(homeEndpoint, {
       method: "GET",
-      headers: createHeaders(session)
+      headers: createAuthenticatedHeaders(session)
     });
   } catch {
     return listDemoHomes({
@@ -72,7 +64,7 @@ export async function listHomeMembers(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members`,
       {
         method: "GET",
-        headers: createHeaders(session)
+        headers: createAuthenticatedHeaders(session)
       }
     );
   } catch {
@@ -89,7 +81,7 @@ export async function listHomeShareCodes(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/share-codes`,
       {
         method: "GET",
-        headers: createHeaders(session)
+        headers: createAuthenticatedHeaders(session)
       }
     );
   } catch {
@@ -107,7 +99,9 @@ export async function createHomeShareCode(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/share-codes`,
       {
         method: "POST",
-        headers: createHeaders(session),
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json"
+        }),
         body: JSON.stringify(input)
       }
     );
@@ -130,7 +124,9 @@ export async function redeemHomeShareCode(
   try {
     return await fetchJson<HomeRedeemResponse>(`${homeEndpoint}/redeem`, {
       method: "POST",
-      headers: createHeaders(session),
+      headers: createAuthenticatedHeaders(session, {
+        contentType: "application/json"
+      }),
       body: JSON.stringify({
         code
       })
@@ -156,7 +152,9 @@ export async function updateHomeMemberRole(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members/${encodeURIComponent(userId)}`,
       {
         method: "PATCH",
-        headers: createHeaders(session),
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json"
+        }),
         body: JSON.stringify({
           role
         })
@@ -182,7 +180,7 @@ export async function revokeHomeMember(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members/${encodeURIComponent(userId)}`,
       {
         method: "DELETE",
-        headers: createHeaders(session)
+        headers: createAuthenticatedHeaders(session)
       }
     );
   } catch {

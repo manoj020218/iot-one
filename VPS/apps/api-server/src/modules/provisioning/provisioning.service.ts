@@ -3,6 +3,7 @@ import type { ProvisioningStatus } from "@jenix/shared";
 import { provisioningRepository } from "./provisioning.model";
 import type {
   CompleteProvisioningPayload,
+  ProvisioningRequestContext,
   ProvisioningIntentRecord,
   RegisterProvisioningIntentPayload
 } from "./provisioning.types";
@@ -18,7 +19,17 @@ function getInitialProvisioningStatus(
   return method === "ble" ? "BLE_CONNECTED" : "WIFI_SENT";
 }
 
-async function requireIntent(provisioningId: string): Promise<ProvisioningIntentRecord> {
+function requireContextHomeId(context: ProvisioningRequestContext): string {
+  if (!context.homeId) {
+    throw new ProvisioningModuleError(400, "Provisioning actions require x-home-id");
+  }
+
+  return context.homeId;
+}
+
+async function requireIntent(
+  provisioningId: string
+): Promise<ProvisioningIntentRecord> {
   const record = await provisioningRepository.get(provisioningId);
 
   if (!record) {
@@ -28,14 +39,30 @@ async function requireIntent(provisioningId: string): Promise<ProvisioningIntent
   return record;
 }
 
+function assertIntentAccess(
+  record: ProvisioningIntentRecord,
+  context: ProvisioningRequestContext
+): ProvisioningIntentRecord {
+  if (record.userId !== context.userId) {
+    throw new ProvisioningModuleError(403, "Provisioning access denied");
+  }
+
+  if (context.homeId && record.homeId !== context.homeId) {
+    throw new ProvisioningModuleError(403, "Provisioning access denied");
+  }
+
+  return record;
+}
+
 export function registerProvisioningIntent(
-  payload: RegisterProvisioningIntentPayload
+  payload: RegisterProvisioningIntentPayload,
+  context: ProvisioningRequestContext
 ): Promise<ProvisioningIntentRecord> {
   const timestamp = new Date().toISOString();
   const record: ProvisioningIntentRecord = {
     provisioningId: createProvisioningId(),
-    userId: payload.userId,
-    homeId: payload.homeId,
+    userId: context.userId,
+    homeId: requireContextHomeId(context),
     method: payload.method,
     status: getInitialProvisioningStatus(payload.method),
     createdAt: timestamp,
@@ -48,12 +75,14 @@ export function registerProvisioningIntent(
 
 export function completeProvisioning(
   provisioningId: string,
-  payload: CompleteProvisioningPayload
+  payload: CompleteProvisioningPayload,
+  context: ProvisioningRequestContext
 ): Promise<ProvisioningIntentRecord> {
   return requireIntent(provisioningId).then((existing) => {
+    const accessibleIntent = assertIntentAccess(existing, context);
     const nextStatus: ProvisioningStatus = payload.status ?? "SUCCESS";
     const updated: ProvisioningIntentRecord = {
-      ...existing,
+      ...accessibleIntent,
       deviceId: payload.deviceId.trim().toUpperCase(),
       updatedAt: new Date().toISOString(),
       status: nextStatus,
@@ -65,9 +94,12 @@ export function completeProvisioning(
 }
 
 export function getProvisioningStatus(
-  provisioningId: string
+  provisioningId: string,
+  context: ProvisioningRequestContext
 ): Promise<ProvisioningIntentRecord> {
-  return requireIntent(provisioningId);
+  return requireIntent(provisioningId).then((existing) =>
+    assertIntentAccess(existing, context)
+  );
 }
 
 export const provisioningTesting = {

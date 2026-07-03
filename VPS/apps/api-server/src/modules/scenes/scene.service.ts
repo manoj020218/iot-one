@@ -14,6 +14,7 @@ import {
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
 import {
+  sceneActionDispatchRepository,
   sceneAuditRepository,
   sceneRepository,
   sceneRunHistoryRepository
@@ -21,6 +22,7 @@ import {
 import type {
   CreateScenePayload,
   ManualRunPayload,
+  SceneActionDispatchJob,
   ScheduleRuntimePayload,
   SceneActionInput,
   SceneAuditEntry,
@@ -60,6 +62,10 @@ function createRunId(): string {
   return createNestedId("run");
 }
 
+function createDispatchJobId(): string {
+  return createNestedId("dispatch");
+}
+
 function optionalProp<K extends string, V>(
   key: K,
   value: V | undefined
@@ -75,7 +81,7 @@ function optionalProp<K extends string, V>(
 
 function requireActorId(context: SceneRequestContext): string {
   if (!context.userId) {
-    throw new SceneModuleError(400, "Scene actions require x-user-id");
+    throw new SceneModuleError(400, "Scene actions require an authenticated user");
   }
 
   return context.userId;
@@ -257,6 +263,7 @@ function createAuditAction(
 }
 
 function createHistoryEntry(
+  runId: string,
   scene: SceneRecord,
   source: SceneRuntimeSource,
   triggeredAt: string,
@@ -266,7 +273,7 @@ function createHistoryEntry(
   dedupeKey: string | undefined
 ): SceneRunHistoryEntry {
   return {
-    runId: createRunId(),
+    runId,
     sceneId: scene.sceneId,
     source,
     triggeredAt,
@@ -276,6 +283,25 @@ function createHistoryEntry(
     ...optionalProp("telemetry", telemetry),
     ...optionalProp("dedupeKey", dedupeKey)
   };
+}
+
+function createDispatchJobs(
+  scene: SceneRecord,
+  runId: string,
+  source: SceneRuntimeSource,
+  requestedAt: string
+): SceneActionDispatchJob[] {
+  return scene.actions.map((action) => ({
+    jobId: createDispatchJobId(),
+    runId,
+    sceneId: scene.sceneId,
+    homeId: scene.homeId,
+    source,
+    action,
+    requestedAt,
+    attemptCount: 0,
+    status: "queued"
+  }));
 }
 
 async function executeSceneRuntime(
@@ -292,10 +318,12 @@ async function executeSceneRuntime(
   assertRestrictedActionPermission(scene.actions, input.homeRole);
 
   const matchedConditions = evaluateConditions(scene, input.telemetry);
+  const runId = createRunId();
   const executedActions = matchedConditions
     ? scene.actions.map((action: SceneAction) => action.actionId)
     : [];
   const historyEntry = createHistoryEntry(
+    runId,
     scene,
     input.source,
     input.triggeredAt,
@@ -326,6 +354,12 @@ async function executeSceneRuntime(
       ...historyEntry,
       sceneStatus: savedScene.status
     });
+  }
+
+  if (matchedConditions && savedScene.actions.length > 0) {
+    await sceneActionDispatchRepository.enqueue(
+      createDispatchJobs(savedScene, runId, input.source, input.triggeredAt)
+    );
   }
 
   await writeAudit(
@@ -670,11 +704,15 @@ export const sceneTesting = {
     await sceneRepository.reset();
     await sceneAuditRepository.reset();
     await sceneRunHistoryRepository.reset();
+    await sceneActionDispatchRepository.reset();
   },
   listAudit(sceneId: string) {
     return sceneAuditRepository.list(sceneId);
   },
   listRunHistory(sceneId: string) {
     return sceneRunHistoryRepository.list(sceneId);
+  },
+  listActionDispatches(sceneId: string) {
+    return sceneActionDispatchRepository.listByScene(sceneId);
   }
 };

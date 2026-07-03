@@ -8,6 +8,7 @@ import {
   type HomeRecord
 } from "@jenix/shared";
 
+import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import {
   listDemoDevices,
   resetDemoDevices,
@@ -101,10 +102,9 @@ export async function getDashboardDevices(
   try {
     const devices = await fetchJson<DeviceRecord[]>(deviceEndpoint, {
       method: "GET",
-      headers: {
-        "x-user-id": session.user.userId,
-        "x-home-id": currentHome.homeId
-      }
+      headers: createAuthenticatedHeaders(session, {
+        homeId: currentHome.homeId
+      })
     });
 
     return devices.map(mapDeviceToDashboardDevice);
@@ -127,11 +127,10 @@ export async function renameDashboardDevice(
       `${deviceEndpoint}/${encodeURIComponent(deviceId)}/rename`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify({
           displayName
         })

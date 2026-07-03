@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 
 import {
+  readHomeIdFromRequest,
+  requireAuthenticatedRequestUser
+} from "../../infrastructure/http/request-auth";
+import {
   createScene,
   evaluateScheduledScenes,
   evaluateScenesByTelemetry,
@@ -20,20 +24,12 @@ import {
 } from "./scene.validation";
 import type { SceneRequestContext } from "./scene.types";
 
-function readHeaderValue(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) {
-    return value[0]?.trim() || undefined;
-  }
-
-  return value?.trim() || undefined;
-}
-
 function readContext(request: Request): SceneRequestContext {
-  const userId = readHeaderValue(request.header("x-user-id"));
-  const homeId = readHeaderValue(request.header("x-home-id"));
+  const user = requireAuthenticatedRequestUser(request);
+  const homeId = readHomeIdFromRequest(request);
 
   return {
-    ...(userId ? { userId } : {}),
+    userId: user.userId,
     ...(homeId ? { homeId } : {})
   };
 }

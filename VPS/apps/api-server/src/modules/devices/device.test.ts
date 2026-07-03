@@ -3,46 +3,34 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { authTesting } from "../auth/auth.service";
 import { deviceTesting } from "./device.service";
 import { homeTesting } from "../homes/home.service";
 import { otaTesting } from "../ota/ota.service";
 import { pidTesting } from "../pid/pid.service";
+import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 
 const developerHeaders = {
   "x-role": "JENIX_DEVELOPER",
   "x-actor-id": "device-tests"
 };
 
-const ownerIdentityHeaders = {
-  "x-user-id": "user-1",
-  "x-user-name": "Device Owner",
-  "x-user-email": "device-owner@example.com"
-};
-
-const deviceHeaders = {
-  "x-user-id": "user-1",
-  "x-home-id": "home-user-1"
-};
-
 async function shareHomeAccess(
+  ownerHeaders: Record<string, string>,
+  homeId: string,
   role: "member" | "viewer",
-  userId: string,
-  name: string
+  invitedSessionHeaders: Record<string, string>
 ) {
   const shareCodeResponse = await request(createApp())
-    .post("/api/v1/homes/home-user-1/share-codes")
-    .set(ownerIdentityHeaders)
+    .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
+    .set(ownerHeaders)
     .send({ role });
 
   expect(shareCodeResponse.status).toBe(201);
 
   const redeemResponse = await request(createApp())
     .post("/api/v1/homes/redeem")
-    .set({
-      "x-user-id": userId,
-      "x-user-name": name,
-      "x-user-email": `${userId}@example.com`
-    })
+    .set(invitedSessionHeaders)
     .send({
       code: shareCodeResponse.body.data.code
     });
@@ -89,6 +77,7 @@ async function createOtaRelease(input?: Partial<{
 
 describe("device routes", () => {
   beforeEach(async () => {
+    await authTesting.reset();
     await homeTesting.reset();
     await deviceTesting.reset();
     await pidTesting.reset();
@@ -97,14 +86,19 @@ describe("device routes", () => {
 
   it("registers a device against an existing PID", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
 
     const response = await request(createApp())
       .post("/api/v1/devices/register")
       .send({
         deviceId: "jnx-tg-a7f2",
         pid: "JNX-TG-C3-501",
-        homeId: "home-user-1",
-        ownerUserId: "user-1",
+        homeId,
+        ownerUserId: ownerSession.user.userId,
         firmwareVersion: "1.0.0"
       });
 
@@ -116,16 +110,21 @@ describe("device routes", () => {
 
   it("renames a registered device for its owner", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f3",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1"
+      homeId,
+      ownerUserId: ownerSession.user.userId
     });
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F3/rename")
-      .set(deviceHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         displayName: "Main Tank"
       });
@@ -136,21 +135,31 @@ describe("device routes", () => {
 
   it("allows a shared HOME member to rename a device inside the same HOME", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const memberSession = await createAuthenticatedSession({
+      name: "Shared Member",
+      email: "shared-member@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f5",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1"
+      homeId,
+      ownerUserId: ownerSession.user.userId
     });
-    await shareHomeAccess("member", "user-2", "Shared Member");
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "member",
+      createAuthHeaders(memberSession, { homeId })
+    );
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F5/rename")
-      .set({
-        "x-user-id": "user-2",
-        "x-home-id": "home-user-1",
-        "x-home-role": "member"
-      })
+      .set(createAuthHeaders(memberSession, { homeId }))
       .send({
         displayName: "Shared Tank"
       });
@@ -161,6 +170,15 @@ describe("device routes", () => {
 
   it("queues a firmware request for a writable HOME role", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const memberSession = await createAuthenticatedSession({
+      name: "Writable Member",
+      email: "writable-member@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await createOtaRelease({
       releaseId: "TANK-HW10-STABLE-110",
       version: "1.1.0"
@@ -168,19 +186,20 @@ describe("device routes", () => {
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f6",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
       firmwareVersion: "0.9.0"
     });
-    await shareHomeAccess("member", "user-2", "Writable Member");
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "member",
+      createAuthHeaders(memberSession, { homeId })
+    );
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F6/firmware/request")
-      .set({
-        "x-user-id": "user-2",
-        "x-home-id": "home-user-1",
-        "x-home-role": "member"
-      })
+      .set(createAuthHeaders(memberSession, { homeId }))
       .send({
         channel: "stable"
       });
@@ -192,23 +211,33 @@ describe("device routes", () => {
 
   it("rejects firmware requests from a viewer role", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const viewerSession = await createAuthenticatedSession({
+      name: "View Only User",
+      email: "view-only@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await createOtaRelease();
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f7",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
       firmwareVersion: "0.9.0"
     });
-    await shareHomeAccess("viewer", "user-3", "View Only User");
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "viewer",
+      createAuthHeaders(viewerSession, { homeId })
+    );
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F7/firmware/request")
-      .set({
-        "x-user-id": "user-3",
-        "x-home-id": "home-user-1",
-        "x-home-role": "viewer"
-      })
+      .set(createAuthHeaders(viewerSession, { homeId }))
       .send({
         channel: "stable"
       });
@@ -219,6 +248,11 @@ describe("device routes", () => {
 
   it("resolves the correct OTA release by PID and hardware revision", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await request(createApp())
       .post("/api/v1/admin/pids")
       .set(developerHeaders)
@@ -257,15 +291,15 @@ describe("device routes", () => {
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f8",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
       firmwareVersion: "1.0.0",
       hardwareRevision: "HW1.0"
     });
 
     const response = await request(createApp())
       .get("/api/v1/devices/JNX-TG-A7F8/firmware-plan")
-      .set(deviceHeaders);
+      .set(createAuthHeaders(ownerSession));
 
     expect(response.status).toBe(200);
     expect(response.body.data.stable.release.version).toBe("1.2.0");
@@ -276,19 +310,20 @@ describe("device routes", () => {
 
   it("ingests telemetry and triggers matching device-threshold scenes", async () => {
     await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Device Owner",
+      email: "device-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
     await request(createApp()).post("/api/v1/devices/register").send({
       deviceId: "jnx-tg-a7f4",
       pid: "JNX-TG-C3-501",
-      homeId: "home-user-1",
-      ownerUserId: "user-1"
+      homeId,
+      ownerUserId: ownerSession.user.userId
     });
     await request(createApp())
       .post("/api/v1/scenes")
-      .set({
-        "x-user-id": "user-1",
-        "x-home-id": "home-user-1",
-        "x-home-role": "owner"
-      })
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Tank Level Alert",
         status: "active",

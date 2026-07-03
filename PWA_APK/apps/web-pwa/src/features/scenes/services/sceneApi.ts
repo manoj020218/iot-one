@@ -21,6 +21,7 @@ import {
   setDemoScenes,
   upsertDemoScene
 } from "./sceneDemoStore";
+import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 
 const sceneEndpoint = "/api/v1/scenes";
 
@@ -272,11 +273,9 @@ export async function listScenes(session: AuthSession): Promise<SceneRecord[]> {
   try {
     return await fetchJson<SceneRecord[]>(sceneEndpoint, {
       method: "GET",
-      headers: {
-        "x-user-id": session.user.userId,
-        "x-home-id": currentHome.homeId,
-        "x-home-role": getHomeRole(session)
-      }
+      headers: createAuthenticatedHeaders(session, {
+        homeId: currentHome.homeId
+      })
     });
   } catch {
     return listDemoScenes(session.user.userId, currentHome.homeId);
@@ -294,11 +293,9 @@ export async function getScene(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}`,
       {
         method: "GET",
-        headers: {
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": getHomeRole(session)
-        }
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
       }
     );
   } catch {
@@ -323,12 +320,10 @@ export async function createScene(
   try {
     return await fetchJson<SceneRecord>(sceneEndpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": session.user.userId,
-        "x-home-id": currentHome.homeId,
-        "x-home-role": getHomeRole(session)
-      },
+      headers: createAuthenticatedHeaders(session, {
+        contentType: "application/json",
+        homeId: currentHome.homeId
+      }),
       body: JSON.stringify(input)
     });
   } catch {
@@ -348,12 +343,10 @@ export async function updateScene(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}`,
       {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": getHomeRole(session)
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify(patch)
       }
     );
@@ -374,12 +367,10 @@ export async function runSceneManually(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}/run`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": getHomeRole(session)
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify(input)
       }
     );

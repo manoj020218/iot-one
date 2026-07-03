@@ -32,17 +32,13 @@ export function parseRegisterProvisioningIntentPayload(
     return null;
   }
 
-  const userId = readString(body, "userId");
-  const homeId = readString(body, "homeId");
   const method = readString(body, "method");
 
-  if (!userId || !homeId || (method !== "ble" && method !== "ap")) {
+  if (method !== "ble" && method !== "ap") {
     return null;
   }
 
   return {
-    userId,
-    homeId,
     method,
     ...optionalProp("pid", readString(body, "pid"))
   };

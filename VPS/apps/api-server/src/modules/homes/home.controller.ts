@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import { requireAuthenticatedRequestUser } from "../../infrastructure/http/request-auth";
 import {
   createHomeShareCode,
   listHomeMembers,
@@ -16,23 +17,13 @@ import {
   parseUpdateHomeMemberRolePayload
 } from "./home.validation";
 
-function readHeaderValue(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) {
-    return value[0]?.trim() || undefined;
-  }
-
-  return value?.trim() || undefined;
-}
-
 function readContext(request: Request) {
-  const userId = readHeaderValue(request.header("x-user-id"));
-  const userName = readHeaderValue(request.header("x-user-name"));
-  const userEmail = readHeaderValue(request.header("x-user-email"));
+  const user = requireAuthenticatedRequestUser(request);
 
   return {
-    ...(userId ? { userId } : {}),
-    ...(userName ? { userName } : {}),
-    ...(userEmail ? { userEmail } : {})
+    userId: user.userId,
+    userName: user.name,
+    userEmail: user.email
   };
 }
 

@@ -84,7 +84,7 @@ export async function provisionApDevice({
   await waitForNextStep();
   onStatusChange?.("DEVICE_REGISTERED");
 
-  await completeProvisioningIntent(intent.provisioningId, {
+  await completeProvisioningIntent(session, intent.provisioningId, {
     deviceId: record.deviceId,
     pid: record.pid,
     status: "SUCCESS"

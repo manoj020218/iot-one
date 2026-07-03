@@ -1,6 +1,10 @@
 import type { SceneRecord } from "@jenix/shared";
 
-import type { SceneAuditEntry, SceneRunHistoryEntry } from "./scene.types";
+import type {
+  SceneActionDispatchJob,
+  SceneAuditEntry,
+  SceneRunHistoryEntry
+} from "./scene.types";
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -25,16 +29,37 @@ export interface SceneRunHistoryRepository {
   reset(): Promise<void>;
 }
 
+export interface ClaimSceneActionDispatchJobsInput {
+  workerId: string;
+  limit: number;
+  now: string;
+  visibilityTimeoutMs: number;
+}
+
+export interface SceneActionDispatchRepository {
+  listByScene(sceneId: string): Promise<SceneActionDispatchJob[]>;
+  listByRun(runId: string): Promise<SceneActionDispatchJob[]>;
+  enqueue(entries: SceneActionDispatchJob[]): Promise<void>;
+  claimNextBatch(
+    input: ClaimSceneActionDispatchJobsInput
+  ): Promise<SceneActionDispatchJob[]>;
+  complete(jobId: string, completedAt: string): Promise<void>;
+  fail(jobId: string, failedAt: string, errorMessage: string): Promise<void>;
+  reset(): Promise<void>;
+}
+
 export interface ScenePersistenceStore {
   scenes: SceneRepository;
   audits: SceneAuditRepository;
   runHistory: SceneRunHistoryRepository;
+  dispatches: SceneActionDispatchRepository;
 }
 
 function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
   const sceneStore = new Map<string, SceneRecord>();
   const sceneAuditStore = new Map<string, SceneAuditEntry[]>();
   const sceneRunHistoryStore = new Map<string, SceneRunHistoryEntry[]>();
+  const sceneActionDispatchStore = new Map<string, SceneActionDispatchJob>();
 
   const scenes: SceneRepository = {
     async get(sceneId: string) {
@@ -92,10 +117,110 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
     }
   };
 
+  const dispatches: SceneActionDispatchRepository = {
+    async listByScene(sceneId) {
+      return Array.from(sceneActionDispatchStore.values())
+        .filter((entry) => entry.sceneId === sceneId)
+        .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))
+        .map(clone);
+    },
+    async listByRun(runId) {
+      return Array.from(sceneActionDispatchStore.values())
+        .filter((entry) => entry.runId === runId)
+        .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))
+        .map(clone);
+    },
+    async enqueue(entries) {
+      for (const entry of entries) {
+        sceneActionDispatchStore.set(entry.jobId, clone(entry));
+      }
+    },
+    async claimNextBatch(input) {
+      const nowValue = new Date(input.now).getTime();
+      const leaseExpiry = new Date(nowValue + input.visibilityTimeoutMs).toISOString();
+      const claimable = Array.from(sceneActionDispatchStore.values())
+        .filter((entry) => {
+          const visibleAfter = entry.visibleAfter
+            ? new Date(entry.visibleAfter).getTime()
+            : Number.NEGATIVE_INFINITY;
+
+          if (entry.status === "queued") {
+            return visibleAfter <= nowValue;
+          }
+
+          return entry.status === "processing" && visibleAfter <= nowValue;
+        })
+        .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))
+        .slice(0, input.limit);
+
+      for (const entry of claimable) {
+        sceneActionDispatchStore.set(entry.jobId, {
+          ...entry,
+          status: "processing",
+          attemptCount: entry.attemptCount + 1,
+          processingWorkerId: input.workerId,
+          processingStartedAt: input.now,
+          visibleAfter: leaseExpiry
+        });
+      }
+
+      return claimable.map((entry) =>
+        clone({
+          ...entry,
+          status: "processing",
+          attemptCount: entry.attemptCount + 1,
+          processingWorkerId: input.workerId,
+          processingStartedAt: input.now,
+          visibleAfter: leaseExpiry
+        })
+      );
+    },
+    async complete(jobId, completedAt) {
+      const existing = sceneActionDispatchStore.get(jobId);
+
+      if (!existing) {
+        return;
+      }
+
+      const {
+        visibleAfter: _visibleAfter,
+        lastError: _lastError,
+        ...baseRecord
+      } = existing;
+      sceneActionDispatchStore.set(jobId, {
+        ...baseRecord,
+        status: "completed",
+        completedAt
+      });
+    },
+    async fail(jobId, failedAt, errorMessage) {
+      const existing = sceneActionDispatchStore.get(jobId);
+
+      if (!existing) {
+        return;
+      }
+
+      const {
+        visibleAfter: _visibleAfter,
+        ...baseRecord
+      } = existing;
+      sceneActionDispatchStore.set(jobId, {
+        ...baseRecord,
+        status: "failed",
+        failedAt,
+        lastError: errorMessage
+      });
+    },
+    async reset() {
+      sceneActionDispatchStore.clear();
+    }
+  };
+
   return {
     scenes,
     audits,
-    runHistory
+    runHistory,
+    dispatches
   };
 }
 
@@ -146,5 +271,33 @@ export const sceneRunHistoryRepository: SceneRunHistoryRepository = {
   },
   reset() {
     return activeScenePersistenceStore.runHistory.reset();
+  }
+};
+
+export const sceneActionDispatchRepository: SceneActionDispatchRepository = {
+  listByScene(sceneId) {
+    return activeScenePersistenceStore.dispatches.listByScene(sceneId);
+  },
+  listByRun(runId) {
+    return activeScenePersistenceStore.dispatches.listByRun(runId);
+  },
+  enqueue(entries) {
+    return activeScenePersistenceStore.dispatches.enqueue(entries);
+  },
+  claimNextBatch(input) {
+    return activeScenePersistenceStore.dispatches.claimNextBatch(input);
+  },
+  complete(jobId, completedAt) {
+    return activeScenePersistenceStore.dispatches.complete(jobId, completedAt);
+  },
+  fail(jobId, failedAt, errorMessage) {
+    return activeScenePersistenceStore.dispatches.fail(
+      jobId,
+      failedAt,
+      errorMessage
+    );
+  },
+  reset() {
+    return activeScenePersistenceStore.dispatches.reset();
   }
 };

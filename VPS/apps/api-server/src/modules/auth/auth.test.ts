@@ -2,10 +2,12 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { authTesting } from "./auth.service";
 import { homeTesting } from "../homes/home.service";
 
 describe("auth routes", () => {
   beforeEach(async () => {
+    await authTesting.reset();
     await homeTesting.reset();
   });
 
@@ -23,10 +25,18 @@ describe("auth routes", () => {
     expect(response.body.data.homes[0].name).toBe("HOME");
     expect(response.body.data.homes[0].role).toBe("owner");
     expect(response.body.data.activeHomeId).toBe("home-user-asha-example-com");
-    expect(response.body.data.tokens.accessToken).toBe("access-user-asha-example-com");
+    expect(response.body.data.tokens.accessToken).toMatch(/^[^.]+\.[^.]+\.[^.]+$/);
   });
 
   it("supports email login and keeps the token contract stable", async () => {
+    await request(createApp())
+      .post("/api/v1/auth/email/signup")
+      .send({
+        name: "Operator",
+        email: "operator@example.com",
+        password: "Password123!"
+      });
+
     const response = await request(createApp())
       .post("/api/v1/auth/email/login")
       .send({
@@ -36,8 +46,6 @@ describe("auth routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.user.provider).toBe("email");
-    expect(response.body.data.tokens.refreshToken).toBe(
-      "refresh-user-operator-example-com"
-    );
+    expect(response.body.data.tokens.refreshToken).toMatch(/^[^.]+\.[^.]+\.[^.]+$/);
   });
 });

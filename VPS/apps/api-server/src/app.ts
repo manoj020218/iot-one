@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 
+import { requireAuthenticatedUser } from "./infrastructure/http/request-auth";
 import {
   adminApiPackageRouter,
   apiKeyRouter,
@@ -22,17 +23,17 @@ export function createApp(): Express {
   app.disable("x-powered-by");
   app.use(express.json());
   app.use("/api/v1/auth", authRouter);
-  app.use("/api/v1/homes", homeRouter);
-  app.use("/api/v1/api-keys", apiKeyRouter);
+  app.use("/api/v1/homes", requireAuthenticatedUser, homeRouter);
+  app.use("/api/v1/api-keys", requireAuthenticatedUser, apiKeyRouter);
   app.use("/api/v1/devices", deviceRouter);
-  app.use("/api/v1/matter", matterRouter);
+  app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/public", publicApiRouter);
   app.use("/api/v1/pids", publicPidRouter);
   app.use("/api/v1/admin/api-packages", adminApiPackageRouter);
   app.use("/api/v1/admin/ota", otaRouter);
   app.use("/api/v1/admin/pids", pidRouter);
-  app.use("/api/v1/provisioning", provisioningRouter);
-  app.use("/api/v1/scenes", sceneRouter);
+  app.use("/api/v1/provisioning", requireAuthenticatedUser, provisioningRouter);
+  app.use("/api/v1/scenes", requireAuthenticatedUser, sceneRouter);
   app.use("/api/v1", healthRouter);
 
   return app;

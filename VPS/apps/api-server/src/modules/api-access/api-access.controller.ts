@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 
 import {
+  readHomeIdFromRequest,
+  requireAuthenticatedRequestUser
+} from "../../infrastructure/http/request-auth";
+import {
   createApiKey,
   createApiPackage,
   executePublicDeviceCommand,
@@ -32,11 +36,11 @@ function readHeaderValue(value: string | string[] | undefined): string | undefin
 }
 
 function readApiKeyContext(request: Request): ApiKeyRequestContext {
-  const userId = readHeaderValue(request.header("x-user-id"));
-  const homeId = readHeaderValue(request.header("x-home-id"));
+  const user = requireAuthenticatedRequestUser(request);
+  const homeId = readHomeIdFromRequest(request);
 
   return {
-    ...(userId ? { userId } : {}),
+    userId: user.userId,
     ...(homeId ? { homeId } : {})
   };
 }

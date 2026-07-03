@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 
 import {
+  readHomeIdFromRequest,
+  requireAuthenticatedRequestUser
+} from "../../infrastructure/http/request-auth";
+import {
   completeProvisioning,
   getProvisioningStatus,
   registerProvisioningIntent
@@ -10,6 +14,16 @@ import {
   parseCompleteProvisioningPayload,
   parseRegisterProvisioningIntentPayload
 } from "./provisioning.validation";
+
+function readContext(request: Request) {
+  const user = requireAuthenticatedRequestUser(request);
+  const homeId = readHomeIdFromRequest(request);
+
+  return {
+    userId: user.userId,
+    ...(homeId ? { homeId } : {})
+  };
+}
 
 function sendError(response: Response, error: unknown) {
   if (error instanceof ProvisioningModuleError) {
@@ -38,7 +52,7 @@ export async function registerProvisioningIntentController(
   }
 
   response.status(201).json({
-    data: await registerProvisioningIntent(payload)
+    data: await registerProvisioningIntent(payload, readContext(request))
   });
 }
 
@@ -57,7 +71,11 @@ export async function completeProvisioningController(
 
   try {
     response.status(200).json({
-      data: await completeProvisioning(request.params.provisioningId ?? "", payload)
+      data: await completeProvisioning(
+        request.params.provisioningId ?? "",
+        payload,
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);
@@ -70,7 +88,10 @@ export async function getProvisioningStatusController(
 ) {
   try {
     response.status(200).json({
-      data: await getProvisioningStatus(request.params.provisioningId ?? "")
+      data: await getProvisioningStatus(
+        request.params.provisioningId ?? "",
+        readContext(request)
+      )
     });
   } catch (error) {
     sendError(response, error);

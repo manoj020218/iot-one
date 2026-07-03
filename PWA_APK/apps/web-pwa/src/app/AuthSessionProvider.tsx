@@ -1,9 +1,15 @@
 import type { AuthSession, AuthProvider, HomeRecord } from "@jenix/shared";
-import { createContext, useState, type PropsWithChildren } from "react";
+import {
+  createContext,
+  useEffect,
+  useState,
+  type PropsWithChildren
+} from "react";
 
 import {
   loginWithEmail as loginWithEmailRequest,
   loginWithProvider as loginWithProviderRequest,
+  logoutSession as logoutSessionRequest,
   signupWithEmail as signupWithEmailRequest
 } from "../features/auth/services/authApi";
 
@@ -22,16 +28,51 @@ export interface AuthContextValue {
 }
 
 export const AuthSessionContext = createContext<AuthContextValue | null>(null);
+const authSessionStorageKey = "jenix.auth.session.v1";
 
 export interface AuthSessionProviderProps extends PropsWithChildren {
   initialSession?: AuthSession | null;
+}
+
+function readStoredSession(): AuthSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const rawValue = window.localStorage.getItem(authSessionStorageKey);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawValue) as AuthSession;
+  } catch {
+    window.localStorage.removeItem(authSessionStorageKey);
+    return null;
+  }
 }
 
 export function AuthSessionProvider({
   children,
   initialSession = null
 }: AuthSessionProviderProps) {
-  const [session, setSession] = useState<AuthSession | null>(initialSession);
+  const [session, setSession] = useState<AuthSession | null>(
+    () => initialSession ?? readStoredSession()
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!session) {
+      window.localStorage.removeItem(authSessionStorageKey);
+      return;
+    }
+
+    window.localStorage.setItem(authSessionStorageKey, JSON.stringify(session));
+  }, [session]);
 
   function getNextActiveHomeId(
     homes: HomeRecord[],
@@ -98,7 +139,10 @@ export function AuthSessionProvider({
       });
     },
     logout() {
-      setSession(null);
+      setSession((current) => {
+        void logoutSessionRequest(current);
+        return null;
+      });
     }
   };
 

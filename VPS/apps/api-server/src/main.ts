@@ -7,6 +7,8 @@ import { readAppConfig } from "./config/env";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
 import { useApiAccessPersistenceStore } from "./modules/api-access/api-access.model";
 import { createMongoApiAccessPersistenceStore } from "./modules/api-access/api-access.mongo-store";
+import { useAuthPersistenceStore } from "./modules/auth/auth.model";
+import { createMongoAuthPersistenceStore } from "./modules/auth/auth.mongo-store";
 import { useDeviceRepository } from "./modules/devices/device.model";
 import { createMongoDeviceRepository } from "./modules/devices/device.mongo-store";
 import { useHomePersistenceStore } from "./modules/homes/home.model";
@@ -18,6 +20,7 @@ import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
+import { createSceneActionDispatchWorker } from "./modules/scenes/scene.action-worker";
 import { createMongoScenePersistenceStore } from "./modules/scenes/scene.mongo-store";
 import {
   createLeaseBasedSceneSchedulerCoordinator,
@@ -31,6 +34,7 @@ async function bootstrap() {
   let database: Db | null = null;
 
   if (
+    config.authPersistenceMode === "mongodb" ||
     config.homePersistenceMode === "mongodb" ||
     config.pidPersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
@@ -41,6 +45,15 @@ async function bootstrap() {
     config.sceneSchedulerCoordinationMode === "mongodb-lock"
   ) {
     database = await getMongoDb(config.mongodbUri!);
+  }
+
+  if (config.authPersistenceMode === "mongodb") {
+    useAuthPersistenceStore(
+      await createMongoAuthPersistenceStore(database!)
+    );
+    console.log("[api-server] auth persistence driver: mongodb");
+  } else {
+    console.log("[api-server] auth persistence driver: memory");
   }
 
   if (config.homePersistenceMode === "mongodb") {
@@ -125,6 +138,17 @@ async function bootstrap() {
         coordinator: schedulerCoordinator
       })
     : null;
+  const sceneActionWorker = config.sceneActionWorkerEnabled
+    ? createSceneActionDispatchWorker({
+        workerId:
+          config.sceneSchedulerInstanceId ??
+          `${hostname()}:${process.pid.toString()}:scene-action-worker`,
+        intervalMs: config.sceneActionWorkerIntervalMs,
+        batchSize: config.sceneActionWorkerBatchSize,
+        visibilityTimeoutMs: config.sceneActionWorkerVisibilityTimeoutMs,
+        logger: (message) => console.log(message)
+      })
+    : null;
 
   const server = app.listen(config.port, () => {
     console.log(
@@ -143,11 +167,19 @@ async function bootstrap() {
         `[api-server] scene scheduler coordination mode: ${config.sceneSchedulerCoordinationMode}`
       );
     }
+
+    if (sceneActionWorker) {
+      sceneActionWorker.start();
+      console.log(
+        `[api-server] scene action worker enabled with ${config.sceneActionWorkerIntervalMs}ms interval`
+      );
+    }
   });
 
   async function shutdown(signal: string) {
     console.log(`[api-server] received ${signal}, shutting down`);
     sceneRuntimeScheduler?.stop();
+    sceneActionWorker?.stop();
     server.close(async () => {
       await closeMongoClient();
       process.exit(0);

@@ -1,5 +1,7 @@
 import { Router, type Router as ExpressRouter } from "express";
 
+import { requireAuthenticatedUser } from "../../infrastructure/http/request-auth";
+
 import {
   getDeviceController,
   getDeviceFirmwarePlanController,
@@ -13,11 +15,12 @@ import {
 
 export const deviceRouter: ExpressRouter = Router();
 
-deviceRouter.get("/", listDevicesController);
 deviceRouter.post("/register", registerDeviceController);
+deviceRouter.post("/:deviceId/telemetry", ingestDeviceTelemetryController);
+deviceRouter.use(requireAuthenticatedUser);
+deviceRouter.get("/", listDevicesController);
 deviceRouter.get("/:deviceId", getDeviceController);
 deviceRouter.get("/:deviceId/firmware-plan", getDeviceFirmwarePlanController);
 deviceRouter.patch("/:deviceId", patchDeviceController);
 deviceRouter.post("/:deviceId/firmware/request", requestDeviceFirmwareUpdateController);
-deviceRouter.post("/:deviceId/telemetry", ingestDeviceTelemetryController);
 deviceRouter.post("/:deviceId/rename", renameDeviceController);

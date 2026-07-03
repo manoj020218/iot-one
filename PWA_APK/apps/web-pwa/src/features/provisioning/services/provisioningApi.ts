@@ -10,6 +10,7 @@ import {
   type ProvisioningStatus
 } from "@jenix/shared";
 
+import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import { upsertDemoDevice } from "../../dashboard/services/deviceDemoStore";
 
 const provisioningEndpoint = "/api/v1/provisioning";
@@ -88,11 +89,10 @@ async function patchProvisionedDeviceState(
 
   return fetchJson<DeviceRecord>(`${devicesEndpoint}/${encodeURIComponent(deviceId)}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": session.user.userId,
-      "x-home-id": currentHome.homeId
-    },
+    headers: createAuthenticatedHeaders(session, {
+      contentType: "application/json",
+      homeId: currentHome.homeId
+    }),
     body: JSON.stringify({
       mqttStatus: "online",
       cloudStatus: "online",
@@ -161,12 +161,11 @@ export async function registerProvisioningIntent(
   try {
     return await fetchJson<ProvisioningIntent>(`${provisioningEndpoint}/register-intent`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: createAuthenticatedHeaders(session, {
+        contentType: "application/json",
+        homeId: currentHome.homeId
+      }),
       body: JSON.stringify({
-        userId: session.user.userId,
-        homeId: currentHome.homeId,
         method: input.method,
         pid: input.pid ?? foundationPidBlueprint.pid
       })
@@ -177,17 +176,21 @@ export async function registerProvisioningIntent(
 }
 
 export async function completeProvisioningIntent(
+  session: AuthSession,
   provisioningId: string,
   input: CompleteProvisioningIntentInput
 ): Promise<ProvisioningIntent> {
+  const currentHome = getCurrentHome(session);
+
   try {
     return await fetchJson<ProvisioningIntent>(
       `${provisioningEndpoint}/${encodeURIComponent(provisioningId)}/complete`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify(input)
       }
     );
@@ -220,11 +223,10 @@ export async function registerProvisionedDevice(
   try {
     const registeredRecord = await fetchJson<DeviceRecord>(`${devicesEndpoint}/register`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": session.user.userId,
-        "x-home-id": currentHome.homeId
-      },
+      headers: createAuthenticatedHeaders(session, {
+        contentType: "application/json",
+        homeId: currentHome.homeId
+      }),
       body: JSON.stringify({
         deviceId: input.deviceId,
         pid: input.pid,

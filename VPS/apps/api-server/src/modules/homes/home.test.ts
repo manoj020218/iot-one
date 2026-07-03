@@ -2,29 +2,24 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { authTesting } from "../auth/auth.service";
 import { homeTesting } from "./home.service";
-
-const ownerHeaders = {
-  "x-user-id": "user-owner-1",
-  "x-user-name": "Owner One",
-  "x-user-email": "owner1@example.com"
-};
-
-const invitedUserHeaders = {
-  "x-user-id": "user-member-1",
-  "x-user-name": "Member One",
-  "x-user-email": "member1@example.com"
-};
+import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 
 describe("home routes", () => {
   beforeEach(async () => {
+    await authTesting.reset();
     await homeTesting.reset();
   });
 
   it("lists the default HOME for the current user", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
     const response = await request(createApp())
       .get("/api/v1/homes")
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -33,14 +28,22 @@ describe("home routes", () => {
   });
 
   it("creates a share code, redeems it, and returns the shared HOME", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+    const invitedSession = await createAuthenticatedSession({
+      name: "Member One",
+      email: "member1@example.com"
+    });
     const homesResponse = await request(createApp())
       .get("/api/v1/homes")
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
     const homeId = homesResponse.body.data[0].homeId as string;
 
     const shareCodeResponse = await request(createApp())
       .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         role: "member",
         expiresInHours: 24
@@ -51,7 +54,7 @@ describe("home routes", () => {
 
     const redeemResponse = await request(createApp())
       .post("/api/v1/homes/redeem")
-      .set(invitedUserHeaders)
+      .set(createAuthHeaders(invitedSession))
       .send({
         code: shareCodeResponse.body.data.code
       });
@@ -63,28 +66,38 @@ describe("home routes", () => {
   });
 
   it("lets the owner update and revoke a shared member", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+    const invitedSession = await createAuthenticatedSession({
+      name: "Member One",
+      email: "member1@example.com"
+    });
     const homesResponse = await request(createApp())
       .get("/api/v1/homes")
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
     const homeId = homesResponse.body.data[0].homeId as string;
 
     const shareCodeResponse = await request(createApp())
       .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         role: "member"
       });
 
     await request(createApp())
       .post("/api/v1/homes/redeem")
-      .set(invitedUserHeaders)
+      .set(createAuthHeaders(invitedSession))
       .send({
         code: shareCodeResponse.body.data.code
       });
 
     const promoteResponse = await request(createApp())
-      .patch(`/api/v1/homes/${encodeURIComponent(homeId)}/members/user-member-1`)
-      .set(ownerHeaders)
+      .patch(
+        `/api/v1/homes/${encodeURIComponent(homeId)}/members/${encodeURIComponent(invitedSession.user.userId)}`
+      )
+      .set(createAuthHeaders(ownerSession))
       .send({
         role: "admin"
       });
@@ -93,37 +106,47 @@ describe("home routes", () => {
     expect(promoteResponse.body.data[1].role).toBe("admin");
 
     const revokeResponse = await request(createApp())
-      .delete(`/api/v1/homes/${encodeURIComponent(homeId)}/members/user-member-1`)
-      .set(ownerHeaders);
+      .delete(
+        `/api/v1/homes/${encodeURIComponent(homeId)}/members/${encodeURIComponent(invitedSession.user.userId)}`
+      )
+      .set(createAuthHeaders(ownerSession));
 
     expect(revokeResponse.status).toBe(200);
     expect(revokeResponse.body.data).toHaveLength(1);
-    expect(revokeResponse.body.data[0].userId).toBe("user-owner-1");
+    expect(revokeResponse.body.data[0].userId).toBe(ownerSession.user.userId);
   });
 
   it("blocks non-admin users from creating share codes", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+    const invitedSession = await createAuthenticatedSession({
+      name: "Member One",
+      email: "member1@example.com"
+    });
     const homesResponse = await request(createApp())
       .get("/api/v1/homes")
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
     const homeId = homesResponse.body.data[0].homeId as string;
 
     const shareCodeResponse = await request(createApp())
       .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         role: "viewer"
       });
 
     await request(createApp())
       .post("/api/v1/homes/redeem")
-      .set(invitedUserHeaders)
+      .set(createAuthHeaders(invitedSession))
       .send({
         code: shareCodeResponse.body.data.code
       });
 
     const blockedResponse = await request(createApp())
       .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
-      .set(invitedUserHeaders)
+      .set(createAuthHeaders(invitedSession))
       .send({
         role: "member"
       });

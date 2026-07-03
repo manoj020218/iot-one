@@ -2,12 +2,20 @@ import { MongoServerError, type Db } from "mongodb";
 
 import type { SceneRecord } from "@jenix/shared";
 
-import type { SceneAuditEntry, SceneRunHistoryEntry } from "./scene.types";
-import type { ScenePersistenceStore } from "./scene.model";
+import type {
+  SceneActionDispatchJob,
+  SceneAuditEntry,
+  SceneRunHistoryEntry
+} from "./scene.types";
+import type {
+  ClaimSceneActionDispatchJobsInput,
+  ScenePersistenceStore
+} from "./scene.model";
 
 const sceneCollectionName = "scenes";
 const sceneAuditCollectionName = "scene_audit_logs";
 const sceneRunHistoryCollectionName = "scene_run_history";
+const sceneActionDispatchCollectionName = "scene_action_dispatch_jobs";
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -24,6 +32,8 @@ export async function createMongoScenePersistenceStore(
     database.collection<SceneAuditEntry>(sceneAuditCollectionName);
   const sceneRunHistoryCollection =
     database.collection<SceneRunHistoryEntry>(sceneRunHistoryCollectionName);
+  const sceneActionDispatchCollection =
+    database.collection<SceneActionDispatchJob>(sceneActionDispatchCollectionName);
 
   await Promise.all([
     sceneCollection.createIndex({ sceneId: 1 }, { unique: true }),
@@ -42,8 +52,68 @@ export async function createMongoScenePersistenceStore(
           }
         }
       }
-    )
+    ),
+    sceneActionDispatchCollection.createIndex({ jobId: 1 }, { unique: true }),
+    sceneActionDispatchCollection.createIndex({ sceneId: 1, requestedAt: 1 }),
+    sceneActionDispatchCollection.createIndex({ runId: 1, requestedAt: 1 }),
+    sceneActionDispatchCollection.createIndex({ status: 1, visibleAfter: 1, requestedAt: 1 })
   ]);
+
+  async function claimOneDispatchJob(
+    input: ClaimSceneActionDispatchJobsInput
+  ): Promise<SceneActionDispatchJob | undefined> {
+    const leaseExpiry = new Date(
+      new Date(input.now).getTime() + input.visibilityTimeoutMs
+    ).toISOString();
+
+    const claimed = await sceneActionDispatchCollection.findOneAndUpdate(
+      {
+        $or: [
+          {
+            status: "queued",
+            $or: [
+              {
+                visibleAfter: {
+                  $exists: false
+                }
+              },
+              {
+                visibleAfter: {
+                  $lte: input.now
+                }
+              }
+            ]
+          },
+          {
+            status: "processing",
+            visibleAfter: {
+              $lte: input.now
+            }
+          }
+        ]
+      },
+      {
+        $set: {
+          status: "processing",
+          processingWorkerId: input.workerId,
+          processingStartedAt: input.now,
+          visibleAfter: leaseExpiry
+        },
+        $inc: {
+          attemptCount: 1
+        }
+      },
+      {
+        sort: {
+          requestedAt: 1,
+          jobId: 1
+        },
+        returnDocument: "after"
+      }
+    );
+
+    return claimed ?? undefined;
+  }
 
   return {
     scenes: {
@@ -107,6 +177,77 @@ export async function createMongoScenePersistenceStore(
       },
       async reset() {
         await sceneRunHistoryCollection.deleteMany({});
+      }
+    },
+    dispatches: {
+      async listByScene(sceneId) {
+        return sceneActionDispatchCollection
+          .find({ sceneId })
+          .sort({ requestedAt: 1, jobId: 1 })
+          .toArray();
+      },
+      async listByRun(runId) {
+        return sceneActionDispatchCollection
+          .find({ runId })
+          .sort({ requestedAt: 1, jobId: 1 })
+          .toArray();
+      },
+      async enqueue(entries) {
+        if (entries.length === 0) {
+          return;
+        }
+
+        await sceneActionDispatchCollection.insertMany(entries, {
+          ordered: true
+        });
+      },
+      async claimNextBatch(input) {
+        const claimedEntries: SceneActionDispatchJob[] = [];
+
+        for (let index = 0; index < input.limit; index += 1) {
+          const claimed = await claimOneDispatchJob(input);
+
+          if (!claimed) {
+            break;
+          }
+
+          claimedEntries.push(claimed);
+        }
+
+        return claimedEntries;
+      },
+      async complete(jobId, completedAt) {
+        await sceneActionDispatchCollection.updateOne(
+          { jobId },
+          {
+            $set: {
+              status: "completed",
+              completedAt
+            },
+            $unset: {
+              visibleAfter: "",
+              lastError: ""
+            }
+          }
+        );
+      },
+      async fail(jobId, failedAt, errorMessage) {
+        await sceneActionDispatchCollection.updateOne(
+          { jobId },
+          {
+            $set: {
+              status: "failed",
+              failedAt,
+              lastError: errorMessage
+            },
+            $unset: {
+              visibleAfter: ""
+            }
+          }
+        );
+      },
+      async reset() {
+        await sceneActionDispatchCollection.deleteMany({});
       }
     }
   };

@@ -5,10 +5,13 @@ import type {
 } from "@jenix/shared";
 
 export interface RegisterProvisioningIntentPayload {
-  userId: string;
-  homeId: string;
   method: ProvisioningMethod;
   pid?: string;
+}
+
+export interface ProvisioningRequestContext {
+  userId: string;
+  homeId?: string;
 }
 
 export interface CompleteProvisioningPayload {

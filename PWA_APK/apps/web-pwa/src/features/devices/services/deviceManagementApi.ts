@@ -22,6 +22,7 @@ import {
   resetDemoDevices,
   setDemoDevices
 } from "../../dashboard/services/deviceDemoStore";
+import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 
 export interface ManagedDeviceSummary {
   deviceId: string;
@@ -415,11 +416,9 @@ export async function listManagedDevices(
   try {
     const devices = await fetchJson<DeviceRecord[]>(deviceEndpoint, {
       method: "GET",
-      headers: {
-        "x-user-id": session.user.userId,
-        "x-home-id": currentHome.homeId,
-        "x-home-role": getHomeRole(session)
-      }
+      headers: createAuthenticatedHeaders(session, {
+        homeId: currentHome.homeId
+      })
     });
 
     return devices.map(mapDeviceToSummary);
@@ -439,11 +438,9 @@ export async function getManagedDevice(
       `${deviceEndpoint}/${encodeURIComponent(deviceId)}`,
       {
         method: "GET",
-        headers: {
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": getHomeRole(session)
-        }
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
       }
     );
   } catch {
@@ -485,11 +482,9 @@ export async function getResolvedFirmwarePlan(
       `${deviceEndpoint}/${encodeURIComponent(device.deviceId)}/firmware-plan`,
       {
         method: "GET",
-        headers: {
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": homeRole
-        }
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
       }
     );
 
@@ -516,12 +511,10 @@ export async function requestFirmwareUpdate(
       `${deviceEndpoint}/${encodeURIComponent(deviceId)}/firmware/request`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": homeRole
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify(input)
       }
     );
@@ -554,18 +547,15 @@ export async function getMatterStatus(
   pidProfile: DevicePidProfile
 ): Promise<MatterDeviceStatus> {
   const currentHome = getCurrentHome(session);
-  const homeRole = getHomeRole(session);
 
   try {
     return await fetchJson<MatterDeviceStatus>(
       `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/status`,
       {
         method: "GET",
-        headers: {
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": homeRole
-        }
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
       }
     );
   } catch {
@@ -590,12 +580,10 @@ export async function requestMatterCommissioning(
       `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/commission`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": homeRole
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify({})
       }
     );
@@ -652,12 +640,10 @@ export async function requestMatterBridgeSync(
       `${matterEndpoint}/${encodeURIComponent(device.deviceId)}/bridge-sync`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.user.userId,
-          "x-home-id": currentHome.homeId,
-          "x-home-role": homeRole
-        },
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json",
+          homeId: currentHome.homeId
+        }),
         body: JSON.stringify({})
       }
     );

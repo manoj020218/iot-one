@@ -86,6 +86,30 @@ export interface SceneRunHistoryEntry extends SceneRunResult {
   dedupeKey?: string;
 }
 
+export type SceneActionDispatchStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export interface SceneActionDispatchJob {
+  jobId: string;
+  runId: string;
+  sceneId: string;
+  homeId: string;
+  source: SceneRuntimeSource;
+  action: SceneAction;
+  requestedAt: string;
+  attemptCount: number;
+  status: SceneActionDispatchStatus;
+  processingWorkerId?: string;
+  processingStartedAt?: string;
+  visibleAfter?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
+}
+
 export interface SceneRuntimeBatchResponse {
   evaluatedSceneCount: number;
   matchedRunCount: number;

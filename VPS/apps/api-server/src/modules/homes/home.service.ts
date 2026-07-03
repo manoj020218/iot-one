@@ -51,7 +51,7 @@ function createShareCodeValue(): string {
 
 function requireUserId(context: HomeRequestContext): string {
   if (!context.userId) {
-    throw new HomeModuleError(400, "HOME actions require x-user-id");
+    throw new HomeModuleError(400, "HOME actions require an authenticated user");
   }
 
   return context.userId;

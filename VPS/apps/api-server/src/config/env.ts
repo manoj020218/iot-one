@@ -2,6 +2,7 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   mongodbUri?: string;
+  authPersistenceMode: "memory" | "mongodb";
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
@@ -15,6 +16,10 @@ export interface AppConfig {
   sceneSchedulerInstanceId?: string;
   sceneSchedulerIntervalMs: number;
   sceneSchedulerLeaseMs: number;
+  sceneActionWorkerEnabled: boolean;
+  sceneActionWorkerIntervalMs: number;
+  sceneActionWorkerBatchSize: number;
+  sceneActionWorkerVisibilityTimeoutMs: number;
 }
 
 function parseBooleanEnv(
@@ -96,6 +101,11 @@ export function readAppConfig(): AppConfig {
     30_000,
     "SCENE_SCHEDULER_INTERVAL_MS"
   );
+  const authPersistenceMode = parsePersistenceMode(
+    process.env.AUTH_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "AUTH_PERSISTENCE_MODE"
+  );
   const homePersistenceMode = parsePersistenceMode(
     process.env.HOME_PERSISTENCE_MODE,
     Boolean(mongodbUri),
@@ -140,6 +150,21 @@ export function readAppConfig(): AppConfig {
     Math.max(sceneSchedulerIntervalMs * 2, 60_000),
     "SCENE_SCHEDULER_LEASE_MS"
   );
+  const sceneActionWorkerIntervalMs = parsePositiveIntegerEnv(
+    process.env.SCENE_ACTION_WORKER_INTERVAL_MS,
+    5_000,
+    "SCENE_ACTION_WORKER_INTERVAL_MS"
+  );
+  const sceneActionWorkerBatchSize = parsePositiveIntegerEnv(
+    process.env.SCENE_ACTION_WORKER_BATCH_SIZE,
+    25,
+    "SCENE_ACTION_WORKER_BATCH_SIZE"
+  );
+  const sceneActionWorkerVisibilityTimeoutMs = parsePositiveIntegerEnv(
+    process.env.SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS,
+    Math.max(sceneActionWorkerIntervalMs * 3, 30_000),
+    "SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS"
+  );
   const sceneSchedulerInstanceId =
     process.env.SCENE_SCHEDULER_INSTANCE_ID?.trim() || undefined;
 
@@ -149,6 +174,10 @@ export function readAppConfig(): AppConfig {
 
   if (homePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("HOME_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (authPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("AUTH_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
   if (scenePersistenceMode === "mongodb" && !mongodbUri) {
@@ -185,6 +214,7 @@ export function readAppConfig(): AppConfig {
     nodeEnv: process.env.NODE_ENV ?? "development",
     port,
     ...(mongodbUri ? { mongodbUri } : {}),
+    authPersistenceMode,
     matterRuntimeEnabled: parseBooleanEnv(
       process.env.MATTER_RUNTIME_ENABLED,
       false
@@ -203,6 +233,13 @@ export function readAppConfig(): AppConfig {
     sceneSchedulerCoordinationMode,
     ...(sceneSchedulerInstanceId ? { sceneSchedulerInstanceId } : {}),
     sceneSchedulerIntervalMs,
-    sceneSchedulerLeaseMs
+    sceneSchedulerLeaseMs,
+    sceneActionWorkerEnabled: parseBooleanEnv(
+      process.env.SCENE_ACTION_WORKER_ENABLED,
+      true
+    ),
+    sceneActionWorkerIntervalMs,
+    sceneActionWorkerBatchSize,
+    sceneActionWorkerVisibilityTimeoutMs
   };
 }

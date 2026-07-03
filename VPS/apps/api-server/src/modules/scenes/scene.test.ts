@@ -2,40 +2,27 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { authTesting } from "../auth/auth.service";
 import { homeTesting } from "../homes/home.service";
 import { sceneTesting } from "./scene.service";
-
-const ownerHeaders = {
-  "x-user-id": "user-scene-owner",
-  "x-home-id": "home-user-scene-owner",
-  "x-home-role": "owner"
-};
-
-const ownerIdentityHeaders = {
-  "x-user-id": "user-scene-owner",
-  "x-user-name": "Scene Owner",
-  "x-user-email": "scene-owner@example.com"
-};
+import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 
 async function shareHomeAccess(
+  ownerHeaders: Record<string, string>,
+  homeId: string,
   role: "member" | "viewer",
-  userId: string,
-  name: string
+  memberHeaders: Record<string, string>
 ) {
   const shareCodeResponse = await request(createApp())
-    .post("/api/v1/homes/home-user-scene-owner/share-codes")
-    .set(ownerIdentityHeaders)
+    .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
+    .set(ownerHeaders)
     .send({ role });
 
   expect(shareCodeResponse.status).toBe(201);
 
   const redeemResponse = await request(createApp())
     .post("/api/v1/homes/redeem")
-    .set({
-      "x-user-id": userId,
-      "x-user-name": name,
-      "x-user-email": `${userId}@example.com`
-    })
+    .set(memberHeaders)
     .send({
       code: shareCodeResponse.body.data.code
     });
@@ -45,14 +32,19 @@ async function shareHomeAccess(
 
 describe("scene routes", () => {
   beforeEach(async () => {
+    await authTesting.reset();
     await homeTesting.reset();
     await sceneTesting.reset();
   });
 
   it("creates and lists scenes for the current HOME", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "High Tank Alert",
         status: "active",
@@ -85,16 +77,20 @@ describe("scene routes", () => {
 
     const listResponse = await request(createApp())
       .get("/api/v1/scenes")
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
 
     expect(listResponse.status).toBe(200);
     expect(listResponse.body.data).toHaveLength(1);
   });
 
   it("runs a scene manually when telemetry conditions match", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Sync On High Level",
         status: "active",
@@ -123,7 +119,7 @@ describe("scene routes", () => {
 
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         telemetry: {
           tankLevelPct: 94
@@ -137,11 +133,25 @@ describe("scene routes", () => {
   });
 
   it("blocks restricted scene commands for non-owner roles", async () => {
-    await shareHomeAccess("member", "user-scene-member", "Scene Member");
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
+    const memberSession = await createAuthenticatedSession({
+      name: "Scene Member",
+      email: "scene-member@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "member",
+      createAuthHeaders(memberSession, { homeId })
+    );
 
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Restricted Recovery Scene",
         status: "active",
@@ -164,11 +174,7 @@ describe("scene routes", () => {
 
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
-      .set({
-        "x-user-id": "user-scene-member",
-        "x-home-id": "home-user-scene-owner",
-        "x-home-role": "member"
-      })
+      .set(createAuthHeaders(memberSession, { homeId }))
       .send({});
 
     expect(runResponse.status).toBe(403);
@@ -176,11 +182,25 @@ describe("scene routes", () => {
   });
 
   it("blocks restricted Matter scene commands for non-owner roles", async () => {
-    await shareHomeAccess("member", "user-scene-member", "Scene Member");
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
+    const memberSession = await createAuthenticatedSession({
+      name: "Scene Member",
+      email: "scene-member@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "member",
+      createAuthHeaders(memberSession, { homeId })
+    );
 
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Restricted Matter Scene",
         status: "active",
@@ -203,11 +223,7 @@ describe("scene routes", () => {
 
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
-      .set({
-        "x-user-id": "user-scene-member",
-        "x-home-id": "home-user-scene-owner",
-        "x-home-role": "member"
-      })
+      .set(createAuthHeaders(memberSession, { homeId }))
       .send({});
 
     expect(runResponse.status).toBe(403);
@@ -215,11 +231,25 @@ describe("scene routes", () => {
   });
 
   it("blocks viewer access from manually running a scene", async () => {
-    await shareHomeAccess("viewer", "user-scene-viewer", "Scene Viewer");
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
+    const viewerSession = await createAuthenticatedSession({
+      name: "Scene Viewer",
+      email: "scene-viewer@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "viewer",
+      createAuthHeaders(viewerSession, { homeId })
+    );
 
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Viewer Read Only Scene",
         status: "active",
@@ -241,11 +271,7 @@ describe("scene routes", () => {
 
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
-      .set({
-        "x-user-id": "user-scene-viewer",
-        "x-home-id": "home-user-scene-owner",
-        "x-home-role": "viewer"
-      })
+      .set(createAuthHeaders(viewerSession, { homeId }))
       .send({});
 
     expect(runResponse.status).toBe(403);
@@ -253,9 +279,13 @@ describe("scene routes", () => {
   });
 
   it("evaluates active device-threshold scenes from telemetry runtime events", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
     await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Tank Alert Runtime",
         status: "active",
@@ -285,7 +315,7 @@ describe("scene routes", () => {
 
     const runtimeResponse = await request(createApp())
       .post("/api/v1/scenes/runtime/device-threshold")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         deviceId: "JNX-TG-C3-A7F2",
         telemetry: {
@@ -301,9 +331,13 @@ describe("scene routes", () => {
   });
 
   it("dedupes schedule runtime evaluation for the same schedule window", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
     await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "Morning Sync",
         status: "active",
@@ -329,7 +363,7 @@ describe("scene routes", () => {
 
     const firstRunResponse = await request(createApp())
       .post("/api/v1/scenes/runtime/schedule")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         occurredAt: "2026-07-02T03:45:00.000Z"
       });
@@ -340,7 +374,7 @@ describe("scene routes", () => {
 
     const secondRunResponse = await request(createApp())
       .post("/api/v1/scenes/runtime/schedule")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         occurredAt: "2026-07-02T03:45:00.000Z"
       });
@@ -351,9 +385,13 @@ describe("scene routes", () => {
   });
 
   it("returns run history for a scene after runtime execution", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner@example.com"
+    });
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         name: "History Alert",
         status: "active",
@@ -379,7 +417,7 @@ describe("scene routes", () => {
 
     await request(createApp())
       .post("/api/v1/scenes/runtime/device-threshold")
-      .set(ownerHeaders)
+      .set(createAuthHeaders(ownerSession))
       .send({
         deviceId: "JNX-TG-C3-A7F2",
         telemetry: {
@@ -389,7 +427,7 @@ describe("scene routes", () => {
 
     const historyResponse = await request(createApp())
       .get(`/api/v1/scenes/${sceneId}/history`)
-      .set(ownerHeaders);
+      .set(createAuthHeaders(ownerSession));
 
     expect(historyResponse.status).toBe(200);
     expect(historyResponse.body.data).toHaveLength(1);
