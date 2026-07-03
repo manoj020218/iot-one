@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { deviceTesting } from "../devices/device.service";
+import { homeTesting } from "../homes/home.service";
 import { matterTesting } from "./matter.service";
 import { pidTesting } from "../pid/pid.service";
 
@@ -16,6 +17,12 @@ const ownerHeaders = {
   "x-user-id": "user-matter-owner",
   "x-home-id": "home-user-matter-owner",
   "x-home-role": "owner"
+};
+
+const ownerIdentityHeaders = {
+  "x-user-id": "user-matter-owner",
+  "x-user-name": "Matter Owner",
+  "x-user-email": "matter-owner@example.com"
 };
 
 const originalMatterRuntimeEnabled = process.env.MATTER_RUNTIME_ENABLED;
@@ -69,12 +76,37 @@ async function registerMatterDevice(pid: string, deviceId = "JNX-TG-MTR-1") {
     });
 }
 
+async function shareHomeAccess(userId: string) {
+  const shareCodeResponse = await request(createApp())
+    .post("/api/v1/homes/home-user-matter-owner/share-codes")
+    .set(ownerIdentityHeaders)
+    .send({
+      role: "member"
+    });
+
+  expect(shareCodeResponse.status).toBe(201);
+
+  const redeemResponse = await request(createApp())
+    .post("/api/v1/homes/redeem")
+    .set({
+      "x-user-id": userId,
+      "x-user-name": "Matter Member",
+      "x-user-email": `${userId}@example.com`
+    })
+    .send({
+      code: shareCodeResponse.body.data.code
+    });
+
+  expect(redeemResponse.status).toBe(200);
+}
+
 describe("matter routes", () => {
   beforeEach(async () => {
     delete process.env.MATTER_RUNTIME_ENABLED;
+    await homeTesting.reset();
     await pidTesting.reset();
     await deviceTesting.reset();
-    matterTesting.reset();
+    await matterTesting.reset();
   });
 
   afterEach(() => {
@@ -140,11 +172,12 @@ describe("matter routes", () => {
     process.env.MATTER_RUNTIME_ENABLED = "true";
     await createMatterPid("JNX-TG-C3-303", "NATIVE_MATTER");
     await registerMatterDevice("JNX-TG-C3-303");
+    await shareHomeAccess("user-matter-member");
 
     const response = await request(createApp())
       .post("/api/v1/matter/devices/JNX-TG-MTR-1/commission")
       .set({
-        "x-user-id": ownerHeaders["x-user-id"],
+        "x-user-id": "user-matter-member",
         "x-home-id": ownerHeaders["x-home-id"],
         "x-home-role": "member"
       })

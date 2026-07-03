@@ -2,6 +2,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
+import { homeTesting } from "../homes/home.service";
 import { sceneTesting } from "./scene.service";
 
 const ownerHeaders = {
@@ -10,8 +11,41 @@ const ownerHeaders = {
   "x-home-role": "owner"
 };
 
+const ownerIdentityHeaders = {
+  "x-user-id": "user-scene-owner",
+  "x-user-name": "Scene Owner",
+  "x-user-email": "scene-owner@example.com"
+};
+
+async function shareHomeAccess(
+  role: "member" | "viewer",
+  userId: string,
+  name: string
+) {
+  const shareCodeResponse = await request(createApp())
+    .post("/api/v1/homes/home-user-scene-owner/share-codes")
+    .set(ownerIdentityHeaders)
+    .send({ role });
+
+  expect(shareCodeResponse.status).toBe(201);
+
+  const redeemResponse = await request(createApp())
+    .post("/api/v1/homes/redeem")
+    .set({
+      "x-user-id": userId,
+      "x-user-name": name,
+      "x-user-email": `${userId}@example.com`
+    })
+    .send({
+      code: shareCodeResponse.body.data.code
+    });
+
+  expect(redeemResponse.status).toBe(200);
+}
+
 describe("scene routes", () => {
   beforeEach(async () => {
+    await homeTesting.reset();
     await sceneTesting.reset();
   });
 
@@ -103,6 +137,8 @@ describe("scene routes", () => {
   });
 
   it("blocks restricted scene commands for non-owner roles", async () => {
+    await shareHomeAccess("member", "user-scene-member", "Scene Member");
+
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
       .set(ownerHeaders)
@@ -129,7 +165,7 @@ describe("scene routes", () => {
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
       .set({
-        "x-user-id": "user-scene-owner",
+        "x-user-id": "user-scene-member",
         "x-home-id": "home-user-scene-owner",
         "x-home-role": "member"
       })
@@ -140,6 +176,8 @@ describe("scene routes", () => {
   });
 
   it("blocks restricted Matter scene commands for non-owner roles", async () => {
+    await shareHomeAccess("member", "user-scene-member", "Scene Member");
+
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
       .set(ownerHeaders)
@@ -166,7 +204,7 @@ describe("scene routes", () => {
     const runResponse = await request(createApp())
       .post(`/api/v1/scenes/${sceneId}/run`)
       .set({
-        "x-user-id": "user-scene-owner",
+        "x-user-id": "user-scene-member",
         "x-home-id": "home-user-scene-owner",
         "x-home-role": "member"
       })
@@ -177,6 +215,8 @@ describe("scene routes", () => {
   });
 
   it("blocks viewer access from manually running a scene", async () => {
+    await shareHomeAccess("viewer", "user-scene-viewer", "Scene Viewer");
+
     const createResponse = await request(createApp())
       .post("/api/v1/scenes")
       .set(ownerHeaders)

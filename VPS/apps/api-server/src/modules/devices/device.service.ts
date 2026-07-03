@@ -5,6 +5,8 @@ import {
 } from "@jenix/shared";
 
 import { getDeviceFirmwarePlan as resolveDeviceFirmwarePlan, resolveOtaReleaseForDevice } from "../ota/ota.service";
+import { resolveHomeAccessContext } from "../homes/home.service";
+import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
 import { evaluateScenesByTelemetry } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
@@ -23,6 +25,20 @@ import { DeviceModuleError } from "./device.types";
 
 function normalizeDeviceId(deviceId: string): string {
   return deviceId.trim().toUpperCase();
+}
+
+async function resolveContext(
+  context: DeviceRequestContext
+): Promise<DeviceRequestContext> {
+  try {
+    return await resolveHomeAccessContext(context);
+  } catch (error) {
+    if (error instanceof HomeModuleError) {
+      throw new DeviceModuleError(error.statusCode, error.message);
+    }
+
+    throw error;
+  }
 }
 
 async function requireDevice(deviceId: string): Promise<DeviceRecord> {
@@ -53,12 +69,18 @@ function ensureAccess(
 export async function listDevices(
   context: DeviceRequestContext
 ): Promise<DeviceRecord[]> {
+  const resolvedContext = await resolveContext(context);
+
   return (await deviceRepository.list()).filter((device) => {
-    if (context.homeId && device.homeId !== context.homeId) {
+    if (resolvedContext.homeId && device.homeId !== resolvedContext.homeId) {
       return false;
     }
 
-    if (!context.homeRole && context.userId && device.ownerUserId !== context.userId) {
+    if (
+      !resolvedContext.homeRole &&
+      resolvedContext.userId &&
+      device.ownerUserId !== resolvedContext.userId
+    ) {
       return false;
     }
 
@@ -70,7 +92,9 @@ export function getDevice(
   deviceId: string,
   context: DeviceRequestContext
 ): Promise<DeviceRecord> {
-  return requireDevice(deviceId).then((device) => ensureAccess(device, context));
+  return resolveContext(context).then((resolvedContext) =>
+    requireDevice(deviceId).then((device) => ensureAccess(device, resolvedContext))
+  );
 }
 
 export async function registerDevice(
@@ -104,11 +128,13 @@ export async function patchDevice(
   patch: DevicePatchPayload,
   context: DeviceRequestContext
 ): Promise<DeviceRecord> {
-  if (context.homeRole === "viewer") {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot modify devices");
   }
 
-  const existing = ensureAccess(await requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
   const updated: DeviceRecord = {
     ...existing,
     updatedAt: new Date().toISOString()
@@ -153,7 +179,10 @@ export async function getDeviceFirmwarePlan(
   deviceId: string,
   context: DeviceRequestContext
 ): Promise<DeviceFirmwarePlanResult> {
-  const existing = ensureAccess(await requireDevice(deviceId), context);
+  const existing = ensureAccess(
+    await requireDevice(deviceId),
+    await resolveContext(context)
+  );
   return resolveDeviceFirmwarePlan(existing);
 }
 
@@ -162,11 +191,13 @@ export async function requestDeviceFirmwareUpdate(
   payload: DeviceFirmwareRequestPayload,
   context: DeviceRequestContext
 ): Promise<DeviceFirmwareRequestResponse> {
-  if (context.homeRole === "viewer") {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot request firmware updates");
   }
 
-  const existing = ensureAccess(await requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
   const channel = payload.channel ?? "stable";
   const resolution = await resolveOtaReleaseForDevice(
     existing,
@@ -200,11 +231,13 @@ export async function renameDevice(
   payload: RenameDevicePayload,
   context: DeviceRequestContext
 ): Promise<DeviceRecord> {
-  if (context.homeRole === "viewer") {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
     throw new DeviceModuleError(403, "Viewer access cannot rename devices");
   }
 
-  const existing = ensureAccess(await requireDevice(deviceId), context);
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }
 

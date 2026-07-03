@@ -11,6 +11,8 @@ import {
   type SceneTrigger
 } from "@jenix/shared";
 
+import { resolveHomeAccessContext } from "../homes/home.service";
+import { HomeModuleError } from "../homes/home.types";
 import {
   sceneAuditRepository,
   sceneRepository,
@@ -90,6 +92,20 @@ function requireHomeId(context: SceneRequestContext): string {
 function requireWriteRole(context: SceneRequestContext) {
   if (context.homeRole === "viewer") {
     throw new SceneModuleError(403, "Viewer access cannot modify scenes");
+  }
+}
+
+async function resolveContext(
+  context: SceneRequestContext
+): Promise<SceneRequestContext> {
+  try {
+    return await resolveHomeAccessContext(context);
+  } catch (error) {
+    if (error instanceof HomeModuleError) {
+      throw new SceneModuleError(error.statusCode, error.message);
+    }
+
+    throw error;
   }
 }
 
@@ -439,12 +455,18 @@ function toBatchResponse(runs: SceneRunResponse[]): SceneRuntimeBatchResponse {
 export async function listScenes(
   context: SceneRequestContext
 ): Promise<SceneRecord[]> {
+  const resolvedContext = await resolveContext(context);
+
   return (await sceneRepository.list()).filter((scene) => {
-    if (context.homeId && scene.homeId !== context.homeId) {
+    if (resolvedContext.homeId && scene.homeId !== resolvedContext.homeId) {
       return false;
     }
 
-    if (!context.homeRole && context.userId && scene.ownerUserId !== context.userId) {
+    if (
+      !resolvedContext.homeRole &&
+      resolvedContext.userId &&
+      scene.ownerUserId !== resolvedContext.userId
+    ) {
       return false;
     }
 
@@ -456,14 +478,14 @@ export async function getScene(
   sceneId: string,
   context: SceneRequestContext
 ): Promise<SceneRecord> {
-  return assertAccess(await requireScene(sceneId), context);
+  return assertAccess(await requireScene(sceneId), await resolveContext(context));
 }
 
 export async function listSceneRunHistory(
   sceneId: string,
   context: SceneRequestContext
 ): Promise<SceneRunHistoryEntry[]> {
-  const scene = assertAccess(await requireScene(sceneId), context);
+  const scene = assertAccess(await requireScene(sceneId), await resolveContext(context));
   return sceneRunHistoryRepository.list(scene.sceneId);
 }
 
@@ -471,12 +493,13 @@ export async function createScene(
   payload: CreateScenePayload,
   context: SceneRequestContext
 ): Promise<SceneRecord> {
-  const actorId = requireActorId(context);
-  const homeId = requireHomeId(context);
-  requireWriteRole(context);
+  const resolvedContext = await resolveContext(context);
+  const actorId = requireActorId(resolvedContext);
+  const homeId = requireHomeId(resolvedContext);
+  requireWriteRole(resolvedContext);
   const actions = payload.actions.map(toActionRecord);
 
-  assertRestrictedActionPermission(actions, context.homeRole);
+  assertRestrictedActionPermission(actions, resolvedContext.homeRole);
 
   const timestamp = new Date().toISOString();
   const record: SceneRecord = {
@@ -506,13 +529,18 @@ export async function patchScene(
   patch: ScenePatchPayload,
   context: SceneRequestContext
 ): Promise<SceneRecord> {
-  const actorId = requireActorId(context);
-  const existing = assertAccess(await requireScene(sceneId), context, "write");
+  const resolvedContext = await resolveContext(context);
+  const actorId = requireActorId(resolvedContext);
+  const existing = assertAccess(
+    await requireScene(sceneId),
+    resolvedContext,
+    "write"
+  );
   const nextActions = patch.actions
     ? patch.actions.map(toActionRecord)
     : existing.actions;
 
-  assertRestrictedActionPermission(nextActions, context.homeRole);
+  assertRestrictedActionPermission(nextActions, resolvedContext.homeRole);
 
   const updated: SceneRecord = {
     ...existing,
@@ -537,8 +565,13 @@ export async function runSceneManually(
   payload: ManualRunPayload,
   context: SceneRequestContext
 ): Promise<SceneRunResponse> {
-  const actorId = requireActorId(context);
-  const existing = assertAccess(await requireScene(sceneId), context, "write");
+  const resolvedContext = await resolveContext(context);
+  const actorId = requireActorId(resolvedContext);
+  const existing = assertAccess(
+    await requireScene(sceneId),
+    resolvedContext,
+    "write"
+  );
 
   if (existing.status === "paused") {
     throw new SceneModuleError(409, "Paused scenes cannot be run manually");
@@ -548,7 +581,7 @@ export async function runSceneManually(
     source: "manual",
     actorId,
     triggeredAt: new Date().toISOString(),
-    homeRole: context.homeRole,
+    homeRole: resolvedContext.homeRole,
     telemetry: payload.telemetry
   });
 
@@ -563,8 +596,9 @@ export async function evaluateScenesByTelemetry(
   payload: TelemetryRuntimePayload,
   context: SceneRequestContext
 ): Promise<SceneRuntimeBatchResponse> {
-  const actorId = resolveActorId(context);
-  const homeId = requireHomeId(context);
+  const resolvedContext = await resolveContext(context);
+  const actorId = resolveActorId(resolvedContext);
+  const homeId = requireHomeId(resolvedContext);
   const triggeredAt = payload.occurredAt ?? new Date().toISOString();
   const candidateScenes = (await listActiveScenesForHome(homeId)).filter((scene) =>
     sceneHasMatchingThresholdTrigger(scene, payload)
@@ -575,7 +609,7 @@ export async function evaluateScenesByTelemetry(
         source: "device_threshold",
         actorId,
         triggeredAt,
-        homeRole: context.homeRole,
+        homeRole: resolvedContext.homeRole,
         telemetry: payload.telemetry
       })
     )
@@ -592,8 +626,9 @@ export async function evaluateScheduledScenes(
   payload: ScheduleRuntimePayload,
   context: SceneRequestContext
 ): Promise<SceneRuntimeBatchResponse> {
-  const actorId = resolveActorId(context);
-  const homeId = requireHomeId(context);
+  const resolvedContext = await resolveContext(context);
+  const actorId = resolveActorId(resolvedContext);
+  const homeId = requireHomeId(resolvedContext);
   const triggeredAt = payload.occurredAt ?? new Date().toISOString();
   const scheduleCandidates = (await listActiveScenesForHome(homeId))
     .map((scene) => ({
@@ -617,7 +652,7 @@ export async function evaluateScheduledScenes(
         source: "schedule",
         actorId,
         triggeredAt,
-        homeRole: context.homeRole,
+        homeRole: resolvedContext.homeRole,
         dedupeKey
       })
     )

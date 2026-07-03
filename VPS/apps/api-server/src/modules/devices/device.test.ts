@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { deviceTesting } from "./device.service";
+import { homeTesting } from "../homes/home.service";
 import { otaTesting } from "../ota/ota.service";
 import { pidTesting } from "../pid/pid.service";
 
@@ -12,10 +13,42 @@ const developerHeaders = {
   "x-actor-id": "device-tests"
 };
 
+const ownerIdentityHeaders = {
+  "x-user-id": "user-1",
+  "x-user-name": "Device Owner",
+  "x-user-email": "device-owner@example.com"
+};
+
 const deviceHeaders = {
   "x-user-id": "user-1",
   "x-home-id": "home-user-1"
 };
+
+async function shareHomeAccess(
+  role: "member" | "viewer",
+  userId: string,
+  name: string
+) {
+  const shareCodeResponse = await request(createApp())
+    .post("/api/v1/homes/home-user-1/share-codes")
+    .set(ownerIdentityHeaders)
+    .send({ role });
+
+  expect(shareCodeResponse.status).toBe(201);
+
+  const redeemResponse = await request(createApp())
+    .post("/api/v1/homes/redeem")
+    .set({
+      "x-user-id": userId,
+      "x-user-name": name,
+      "x-user-email": `${userId}@example.com`
+    })
+    .send({
+      code: shareCodeResponse.body.data.code
+    });
+
+  expect(redeemResponse.status).toBe(200);
+}
 
 async function createPid() {
   await request(createApp())
@@ -56,6 +89,7 @@ async function createOtaRelease(input?: Partial<{
 
 describe("device routes", () => {
   beforeEach(async () => {
+    await homeTesting.reset();
     await deviceTesting.reset();
     await pidTesting.reset();
     await otaTesting.reset();
@@ -108,6 +142,7 @@ describe("device routes", () => {
       homeId: "home-user-1",
       ownerUserId: "user-1"
     });
+    await shareHomeAccess("member", "user-2", "Shared Member");
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F5/rename")
@@ -137,6 +172,7 @@ describe("device routes", () => {
       ownerUserId: "user-1",
       firmwareVersion: "0.9.0"
     });
+    await shareHomeAccess("member", "user-2", "Writable Member");
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F6/firmware/request")
@@ -164,6 +200,7 @@ describe("device routes", () => {
       ownerUserId: "user-1",
       firmwareVersion: "0.9.0"
     });
+    await shareHomeAccess("viewer", "user-3", "View Only User");
 
     const response = await request(createApp())
       .post("/api/v1/devices/JNX-TG-A7F7/firmware/request")

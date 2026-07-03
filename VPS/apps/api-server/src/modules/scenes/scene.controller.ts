@@ -1,4 +1,3 @@
-import type { HomeAccessRole } from "@jenix/shared";
 import type { Request, Response } from "express";
 
 import {
@@ -29,24 +28,13 @@ function readHeaderValue(value: string | string[] | undefined): string | undefin
   return value?.trim() || undefined;
 }
 
-function parseHomeRole(value: string | undefined): HomeAccessRole | undefined {
-  return value === "owner" ||
-    value === "admin" ||
-    value === "member" ||
-    value === "viewer"
-    ? value
-    : undefined;
-}
-
 function readContext(request: Request): SceneRequestContext {
   const userId = readHeaderValue(request.header("x-user-id"));
   const homeId = readHeaderValue(request.header("x-home-id"));
-  const homeRole = parseHomeRole(readHeaderValue(request.header("x-home-role")));
 
   return {
     ...(userId ? { userId } : {}),
-    ...(homeId ? { homeId } : {}),
-    ...(homeRole ? { homeRole } : {})
+    ...(homeId ? { homeId } : {})
   };
 }
 

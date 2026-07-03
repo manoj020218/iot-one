@@ -7,6 +7,8 @@ import type {
 } from "@jenix/shared";
 
 import { getDevice } from "../devices/device.service";
+import { resolveHomeAccessContext } from "../homes/home.service";
+import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
 import { matterRuntimeRepository } from "./matter.model";
 import type { MatterRequestContext, MatterRuntimeRecord } from "./matter.types";
@@ -148,11 +150,26 @@ function getMatterStateRecord(deviceId: string): MatterRuntimeRecord | undefined
   return matterRuntimeRepository.get(deviceId);
 }
 
+async function resolveContext(
+  context: MatterRequestContext
+): Promise<MatterRequestContext> {
+  try {
+    return await resolveHomeAccessContext(context);
+  } catch (error) {
+    if (error instanceof HomeModuleError) {
+      throw new MatterModuleError(error.statusCode, error.message);
+    }
+
+    throw error;
+  }
+}
+
 export function getMatterDeviceStatus(
   deviceId: string,
   context: MatterRequestContext
 ): Promise<MatterDeviceStatus> {
-  return getDevice(deviceId, context).then(async (device) => {
+  return resolveContext(context).then((resolvedContext) =>
+    getDevice(deviceId, resolvedContext).then(async (device) => {
     const pid = await getPid(device.pid);
     const runtime = getMatterStateRecord(device.deviceId);
     const deviceMatterEnabled = device.matterEnabled ?? pid.matter.enabled;
@@ -162,17 +179,19 @@ export function getMatterDeviceStatus(
       pid: pid.pid,
       ...buildStatus(pid, deviceMatterEnabled, runtime)
     };
-  });
+    })
+  );
 }
 
 export async function requestMatterCommissioning(
   deviceId: string,
   context: MatterRequestContext
 ): Promise<MatterPlaceholderActionResult> {
-  const device = await getDevice(deviceId, context);
-  requireMatterOperatorAccess(device.ownerUserId, context);
+  const resolvedContext = await resolveContext(context);
+  const device = await getDevice(deviceId, resolvedContext);
+  requireMatterOperatorAccess(device.ownerUserId, resolvedContext);
 
-  const status = await getMatterDeviceStatus(device.deviceId, context);
+  const status = await getMatterDeviceStatus(device.deviceId, resolvedContext);
 
   if (!status.activationEnabled) {
     throw new MatterModuleError(409, status.activationMessage);
@@ -215,10 +234,11 @@ export async function requestMatterBridgeSync(
   deviceId: string,
   context: MatterRequestContext
 ): Promise<MatterPlaceholderActionResult> {
-  const device = await getDevice(deviceId, context);
-  requireMatterOperatorAccess(device.ownerUserId, context);
+  const resolvedContext = await resolveContext(context);
+  const device = await getDevice(deviceId, resolvedContext);
+  requireMatterOperatorAccess(device.ownerUserId, resolvedContext);
 
-  const status = await getMatterDeviceStatus(device.deviceId, context);
+  const status = await getMatterDeviceStatus(device.deviceId, resolvedContext);
 
   if (!status.activationEnabled) {
     throw new MatterModuleError(409, status.activationMessage);
