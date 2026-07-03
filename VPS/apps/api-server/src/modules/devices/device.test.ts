@@ -215,35 +215,7 @@ describe("device routes", () => {
     expect(response.body.data.targetVersion).toBe("1.1.0");
   });
 
-  it("publishes OTA delivery requests to MQTT when runtime delivery is enabled", async () => {
-    const publishedOtaRequests: Array<{
-      deviceId: string;
-      targetVersion: string;
-      channel: string;
-    }> = [];
-
-    useRuntimeMqttBridge({
-      async publishTelemetryIngress() {
-        throw new Error("not used");
-      },
-      async publishScheduleTick() {
-        throw new Error("not used");
-      },
-      async publishDeviceCommand() {
-        throw new Error("not used");
-      },
-      async publishNotification() {
-        throw new Error("not used");
-      },
-      async publishOtaRequest(message) {
-        publishedOtaRequests.push({
-          deviceId: message.deviceId,
-          targetVersion: message.targetVersion,
-          channel: message.channel
-        });
-      }
-    });
-
+  it("queues an OTA delivery job for firmware rollout execution", async () => {
     await createPid();
     const ownerSession = await createAuthenticatedSession({
       name: "Device Owner",
@@ -272,13 +244,13 @@ describe("device routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe("queued");
-    expect(publishedOtaRequests).toEqual([
-      {
-        deviceId: "JNX-TG-A7F6B",
-        targetVersion: "1.1.1",
-        channel: "stable"
-      }
-    ]);
+    expect(response.body.data.requestId).toBeTruthy();
+    expect(response.body.data.deliveryState).toBe("queued");
+
+    const queuedJobs = await otaTesting.listDeliveryJobs("JNX-TG-A7F6B");
+    expect(queuedJobs).toHaveLength(1);
+    expect(queuedJobs[0]?.targetVersion).toBe("1.1.1");
+    expect(queuedJobs[0]?.status).toBe("queued");
   });
 
   it("rejects firmware requests from a viewer role", async () => {

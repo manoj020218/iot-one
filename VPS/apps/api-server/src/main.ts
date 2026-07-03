@@ -6,6 +6,8 @@ import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
 import { createMqttRuntimeBridge } from "./infrastructure/mqtt/mqtt-runtime-bridge";
 import {
+  handleRuntimeDeviceCommandAckMessage,
+  handleRuntimeOtaAckMessage,
   handleRuntimeScheduleTickMessage,
   handleRuntimeTelemetryIngressMessage
 } from "./infrastructure/mqtt/runtime.handlers";
@@ -19,8 +21,12 @@ import { useDeviceRepository } from "./modules/devices/device.model";
 import { createMongoDeviceRepository } from "./modules/devices/device.mongo-store";
 import { useHomePersistenceStore } from "./modules/homes/home.model";
 import { createMongoHomePersistenceStore } from "./modules/homes/home.mongo-store";
-import { useOtaRepository } from "./modules/ota/ota.model";
-import { createMongoOtaRepository } from "./modules/ota/ota.mongo-store";
+import {
+  useOtaDeliveryJobRepository,
+  useOtaRepository
+} from "./modules/ota/ota.model";
+import { createMongoOtaPersistenceStore } from "./modules/ota/ota.mongo-store";
+import { createOtaDeliveryWorker } from "./modules/ota/ota.delivery-worker";
 import { usePidPersistenceStore } from "./modules/pid/pid.model";
 import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
@@ -105,9 +111,10 @@ async function bootstrap() {
   }
 
   if (config.otaPersistenceMode === "mongodb") {
-    useOtaRepository(
-      await createMongoOtaRepository(database!)
-    );
+    const otaPersistenceStore =
+      await createMongoOtaPersistenceStore(database!);
+    useOtaRepository(otaPersistenceStore.releases);
+    useOtaDeliveryJobRepository(otaPersistenceStore.deliveryJobs);
     console.log("[api-server] ota persistence driver: mongodb");
   } else {
     console.log("[api-server] ota persistence driver: memory");
@@ -151,8 +158,10 @@ async function bootstrap() {
           telemetry: config.mqttTelemetryTopic,
           schedule: config.mqttScheduleTopic,
           deviceCommand: config.mqttDeviceCommandTopic,
+          deviceCommandAck: config.mqttDeviceCommandAckTopic,
           notification: config.mqttNotificationTopic,
-          otaRequest: config.mqttOtaRequestTopic
+          otaRequest: config.mqttOtaRequestTopic,
+          otaAck: config.mqttOtaAckTopic
         },
         logger: (message) => console.log(message),
         onTelemetryMessage: async (message) => {
@@ -160,6 +169,12 @@ async function bootstrap() {
         },
         onScheduleTickMessage: async (message) => {
           await handleRuntimeScheduleTickMessage(message);
+        },
+        onDeviceCommandAckMessage: async (message) => {
+          await handleRuntimeDeviceCommandAckMessage(message);
+        },
+        onOtaAckMessage: async (message) => {
+          await handleRuntimeOtaAckMessage(message);
         }
       })
     : null;
@@ -218,6 +233,18 @@ async function bootstrap() {
         logger: (message) => console.log(message)
       })
     : null;
+  const otaDeliveryWorker =
+    config.otaDeliveryWorkerEnabled && runtimeMqttBridge
+      ? createOtaDeliveryWorker({
+          workerId:
+            config.sceneSchedulerInstanceId ??
+            `${hostname()}:${process.pid.toString()}:ota-delivery-worker`,
+          intervalMs: config.otaDeliveryWorkerIntervalMs,
+          batchSize: config.otaDeliveryWorkerBatchSize,
+          visibilityTimeoutMs: config.otaDeliveryWorkerVisibilityTimeoutMs,
+          logger: (message) => console.log(message)
+        })
+      : null;
 
   if (runtimeMqttBridge) {
     await runtimeMqttBridge.start();
@@ -232,7 +259,7 @@ async function bootstrap() {
     );
     if (runtimeMqttBridge) {
       console.log(
-        `[api-server] mqtt runtime bridge enabled on ${config.mqttUrl} using topics ${config.mqttTelemetryTopic}, ${config.mqttScheduleTopic}, ${config.mqttDeviceCommandTopic}, ${config.mqttOtaRequestTopic}`
+        `[api-server] mqtt runtime bridge enabled on ${config.mqttUrl} using topics ${config.mqttTelemetryTopic}, ${config.mqttScheduleTopic}, ${config.mqttDeviceCommandTopic}, ${config.mqttDeviceCommandAckTopic}, ${config.mqttOtaRequestTopic}, ${config.mqttOtaAckTopic}`
       );
     }
 
@@ -259,6 +286,13 @@ async function bootstrap() {
         `[api-server] scene runtime worker enabled with ${config.sceneRuntimeWorkerIntervalMs}ms interval`
       );
     }
+
+    if (otaDeliveryWorker) {
+      otaDeliveryWorker.start();
+      console.log(
+        `[api-server] ota delivery worker enabled with ${config.otaDeliveryWorkerIntervalMs}ms interval`
+      );
+    }
   });
 
   async function shutdown(signal: string) {
@@ -266,6 +300,7 @@ async function bootstrap() {
     sceneRuntimeScheduler?.stop();
     sceneRuntimeWorker?.stop();
     sceneActionWorker?.stop();
+    otaDeliveryWorker?.stop();
     server.close(async () => {
       await runtimeMqttBridge?.stop();
       useRuntimeMqttBridge(null);

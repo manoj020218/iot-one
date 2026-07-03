@@ -7,10 +7,12 @@ import type {
   OtaResolutionResult
 } from "@jenix/shared";
 
+import { deviceRepository } from "../devices/device.model";
 import { getPid } from "../pid/pid.service";
-import { otaRepository } from "./ota.model";
+import { otaDeliveryJobRepository, otaRepository } from "./ota.model";
 import type {
   CreateOtaReleaseInput,
+  OtaDeliveryJob,
   OtaDeliveryRequest,
   OtaDeliveryRequestInput,
   OtaActorContext,
@@ -49,6 +51,10 @@ function normalizeHardwareRevision(hardwareRevision: string) {
 
 function createDeliveryRequestId(): string {
   return `ota-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeDeviceId(deviceId: string) {
+  return deviceId.trim().toUpperCase();
 }
 
 function toReleaseSummary(record: OtaReleaseRecord): OtaReleaseSummary {
@@ -263,13 +269,76 @@ export async function buildOtaDeliveryRequest(
   };
 }
 
+function createOtaDeliveryJob(request: OtaDeliveryRequest): OtaDeliveryJob {
+  return {
+    ...request,
+    attemptCount: 0,
+    status: "queued"
+  };
+}
+
+export async function queueOtaDeliveryForDevice(
+  device: DeviceRecord,
+  input: OtaDeliveryRequestInput
+): Promise<OtaDeliveryJob> {
+  return otaDeliveryJobRepository.enqueue(
+    createOtaDeliveryJob(await buildOtaDeliveryRequest(device, input))
+  );
+}
+
+export async function acknowledgeOtaDeliverySuccess(
+  requestId: string,
+  acknowledgedAt: string,
+  appliedVersion?: string
+): Promise<void> {
+  const job = await otaDeliveryJobRepository.get(requestId);
+
+  if (!job) {
+    throw new OtaModuleError(404, `OTA delivery job not found: ${requestId}`);
+  }
+
+  await otaDeliveryJobRepository.complete(requestId, acknowledgedAt, acknowledgedAt);
+
+  const device = await deviceRepository.get(normalizeDeviceId(job.deviceId));
+
+  if (!device) {
+    return;
+  }
+
+  await deviceRepository.save({
+    ...device,
+    firmwareVersion: appliedVersion ?? job.targetVersion,
+    updatedAt: acknowledgedAt,
+    lastSeenAt: acknowledgedAt
+  });
+}
+
+export async function acknowledgeOtaDeliveryFailure(
+  requestId: string,
+  failedAt: string,
+  errorMessage: string
+): Promise<void> {
+  const job = await otaDeliveryJobRepository.get(requestId);
+
+  if (!job) {
+    throw new OtaModuleError(404, `OTA delivery job not found: ${requestId}`);
+  }
+
+  await otaDeliveryJobRepository.fail(requestId, failedAt, errorMessage);
+}
+
 export const otaTesting = {
-  reset() {
-    return otaRepository.reset();
+  async reset() {
+    await otaRepository.reset();
+    await otaDeliveryJobRepository.reset();
   },
   async snapshot(): Promise<OtaModuleState> {
     return {
-      releases: await listOtaReleases()
+      releases: await listOtaReleases(),
+      deliveryJobs: await otaDeliveryJobRepository.listAll()
     };
+  },
+  listDeliveryJobs(deviceId: string) {
+    return otaDeliveryJobRepository.listByDevice(normalizeDeviceId(deviceId));
   }
 };

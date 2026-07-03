@@ -31,6 +31,15 @@ export interface RuntimeDeviceCommandMessage {
   payload?: Record<string, unknown>;
 }
 
+export interface RuntimeDeviceCommandAckMessage {
+  deliveryId: string;
+  deviceId: string;
+  acknowledgedAt: string;
+  status: "completed" | "failed";
+  errorMessage?: string;
+  payload?: Record<string, unknown>;
+}
+
 export interface RuntimeNotificationMessage {
   deliveryId: string;
   runId: string;
@@ -54,6 +63,15 @@ export interface RuntimeOtaRequestMessage {
   requestedAt: string;
   requestedBy: string;
   currentVersion?: string;
+}
+
+export interface RuntimeOtaAckMessage {
+  requestId: string;
+  deviceId: string;
+  acknowledgedAt: string;
+  status: "completed" | "failed";
+  appliedVersion?: string;
+  errorMessage?: string;
 }
 
 export interface RuntimeMqttBridge {

@@ -44,7 +44,16 @@ export interface SceneActionDispatchRepository {
   claimNextBatch(
     input: ClaimSceneActionDispatchJobsInput
   ): Promise<SceneActionDispatchJob[]>;
-  complete(jobId: string, completedAt: string): Promise<void>;
+  markDispatched(
+    jobId: string,
+    dispatchedAt: string,
+    visibleAfter: string
+  ): Promise<void>;
+  complete(
+    jobId: string,
+    completedAt: string,
+    acknowledgedAt?: string
+  ): Promise<void>;
   fail(jobId: string, failedAt: string, errorMessage: string): Promise<void>;
   reset(): Promise<void>;
 }
@@ -169,7 +178,10 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
             return visibleAfter <= nowValue;
           }
 
-          return entry.status === "processing" && visibleAfter <= nowValue;
+          return (
+            (entry.status === "processing" || entry.status === "dispatched") &&
+            visibleAfter <= nowValue
+          );
         })
         .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))
         .slice(0, input.limit);
@@ -196,7 +208,28 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
         })
       );
     },
-    async complete(jobId, completedAt) {
+    async markDispatched(jobId, dispatchedAt, visibleAfter) {
+      const existing = sceneActionDispatchStore.get(jobId);
+
+      if (!existing) {
+        return;
+      }
+
+      const {
+        completedAt: _completedAt,
+        failedAt: _failedAt,
+        acknowledgedAt: _acknowledgedAt,
+        lastError: _lastError,
+        ...baseRecord
+      } = existing;
+      sceneActionDispatchStore.set(jobId, {
+        ...baseRecord,
+        status: "dispatched",
+        dispatchedAt,
+        visibleAfter
+      });
+    },
+    async complete(jobId, completedAt, acknowledgedAt) {
       const existing = sceneActionDispatchStore.get(jobId);
 
       if (!existing) {
@@ -211,7 +244,8 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
       sceneActionDispatchStore.set(jobId, {
         ...baseRecord,
         status: "completed",
-        completedAt
+        completedAt,
+        ...(acknowledgedAt ? { acknowledgedAt } : {})
       });
     },
     async fail(jobId, failedAt, errorMessage) {
@@ -402,8 +436,19 @@ export const sceneActionDispatchRepository: SceneActionDispatchRepository = {
   claimNextBatch(input) {
     return activeScenePersistenceStore.dispatches.claimNextBatch(input);
   },
-  complete(jobId, completedAt) {
-    return activeScenePersistenceStore.dispatches.complete(jobId, completedAt);
+  markDispatched(jobId, dispatchedAt, visibleAfter) {
+    return activeScenePersistenceStore.dispatches.markDispatched(
+      jobId,
+      dispatchedAt,
+      visibleAfter
+    );
+  },
+  complete(jobId, completedAt, acknowledgedAt) {
+    return activeScenePersistenceStore.dispatches.complete(
+      jobId,
+      completedAt,
+      acknowledgedAt
+    );
   },
   fail(jobId, failedAt, errorMessage) {
     return activeScenePersistenceStore.dispatches.fail(

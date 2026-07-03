@@ -90,6 +90,7 @@ export interface SceneRunHistoryEntry extends SceneRunResult {
 export type SceneActionDispatchStatus =
   | "queued"
   | "processing"
+  | "dispatched"
   | "completed"
   | "failed";
 
@@ -106,6 +107,8 @@ export interface SceneActionDispatchJob {
   processingWorkerId?: string;
   processingStartedAt?: string;
   visibleAfter?: string;
+  dispatchedAt?: string;
+  acknowledgedAt?: string;
   completedAt?: string;
   failedAt?: string;
   lastError?: string;

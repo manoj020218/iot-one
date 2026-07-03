@@ -1,9 +1,13 @@
 import { applyDeviceTelemetryState } from "../../modules/devices/device.service";
+import { acknowledgeOtaDeliveryFailure, acknowledgeOtaDeliverySuccess } from "../../modules/ota/ota.service";
 import {
   enqueuePreparedSceneEvaluationJobs
 } from "../../modules/scenes/scene.service";
+import { sceneActionDispatchRepository } from "../../modules/scenes/scene.model";
 import type { SceneRuntimeQueueResponse } from "../../modules/scenes/scene.types";
 import type {
+  RuntimeDeviceCommandAckMessage,
+  RuntimeOtaAckMessage,
   RuntimeScheduleTickMessage,
   RuntimeTelemetryIngressMessage
 } from "./runtime.types";
@@ -26,4 +30,42 @@ export async function handleRuntimeScheduleTickMessage(
   message: RuntimeScheduleTickMessage
 ): Promise<SceneRuntimeQueueResponse> {
   return enqueuePreparedSceneEvaluationJobs([message.job]);
+}
+
+export async function handleRuntimeDeviceCommandAckMessage(
+  message: RuntimeDeviceCommandAckMessage
+): Promise<void> {
+  if (message.status === "completed") {
+    await sceneActionDispatchRepository.complete(
+      message.deliveryId,
+      message.acknowledgedAt,
+      message.acknowledgedAt
+    );
+    return;
+  }
+
+  await sceneActionDispatchRepository.fail(
+    message.deliveryId,
+    message.acknowledgedAt,
+    message.errorMessage ?? "Device command delivery failed"
+  );
+}
+
+export async function handleRuntimeOtaAckMessage(
+  message: RuntimeOtaAckMessage
+): Promise<void> {
+  if (message.status === "completed") {
+    await acknowledgeOtaDeliverySuccess(
+      message.requestId,
+      message.acknowledgedAt,
+      message.appliedVersion
+    );
+    return;
+  }
+
+  await acknowledgeOtaDeliveryFailure(
+    message.requestId,
+    message.acknowledgedAt,
+    message.errorMessage ?? "OTA delivery failed"
+  );
 }

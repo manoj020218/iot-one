@@ -19,6 +19,7 @@ export interface CreateOtaReleaseInput {
 
 export interface OtaModuleState {
   releases: OtaReleaseRecord[];
+  deliveryJobs: OtaDeliveryJob[];
 }
 
 export class OtaModuleError extends Error {
@@ -56,4 +57,24 @@ export interface OtaDeliveryRequest {
   requestedAt: string;
   requestedBy: string;
   currentVersion?: string;
+}
+
+export type OtaDeliveryJobStatus =
+  | "queued"
+  | "processing"
+  | "dispatched"
+  | "completed"
+  | "failed";
+
+export interface OtaDeliveryJob extends OtaDeliveryRequest {
+  attemptCount: number;
+  status: OtaDeliveryJobStatus;
+  processingWorkerId?: string;
+  processingStartedAt?: string;
+  visibleAfter?: string;
+  dispatchedAt?: string;
+  acknowledgedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
 }

@@ -4,13 +4,11 @@ import {
   type DeviceRecord
 } from "@jenix/shared";
 
-import {
-  getRuntimeMqttBridge
-} from "../../infrastructure/mqtt/runtime.binding";
+import { getRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
 import type { RuntimeTelemetryIngressMessage } from "../../infrastructure/mqtt/runtime.types";
 import {
-  buildOtaDeliveryRequest,
   getDeviceFirmwarePlan as resolveDeviceFirmwarePlan,
+  queueOtaDeliveryForDevice,
   resolveOtaReleaseForDevice
 } from "../ota/ota.service";
 import { resolveHomeAccessContext } from "../homes/home.service";
@@ -227,13 +225,9 @@ export async function requestDeviceFirmwareUpdate(
   const requestedAt = new Date().toISOString();
   const status =
     existing.firmwareVersion === resolution.release.version ? "up_to_date" : "queued";
-
-  if (status === "queued") {
-    const bridge = getRuntimeMqttBridge();
-
-    if (bridge) {
-      await bridge.publishOtaRequest(
-        await buildOtaDeliveryRequest(existing, {
+  const deliveryJob =
+    status === "queued"
+      ? await queueOtaDeliveryForDevice(existing, {
           channel,
           requestedAt,
           requestedBy: resolvedContext.userId ?? existing.ownerUserId,
@@ -241,9 +235,7 @@ export async function requestDeviceFirmwareUpdate(
             ? { targetVersion: payload.targetVersion }
             : {})
         })
-      );
-    }
-  }
+      : null;
 
   return {
     deviceId: existing.deviceId,
@@ -252,7 +244,13 @@ export async function requestDeviceFirmwareUpdate(
     targetVersion: resolution.release.version,
     ...(existing.firmwareVersion ? { currentVersion: existing.firmwareVersion } : {}),
     status,
-    requestedAt
+    requestedAt,
+    ...(deliveryJob
+      ? {
+          requestId: deliveryJob.requestId,
+          deliveryState: "queued" as const
+        }
+      : {})
   };
 }
 
@@ -283,7 +281,7 @@ export async function applyDeviceTelemetryState(
     lastSeenAt: occurredAt,
     ...(payload.mqttStatus ? { mqttStatus: payload.mqttStatus } : {}),
     ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
-      ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
+    ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
   return deviceRepository.save(updatedDevice);
 }

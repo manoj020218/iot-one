@@ -1,9 +1,11 @@
 import { connect, type IClientOptions, type MqttClient } from "mqtt";
 
 import type {
+  RuntimeDeviceCommandAckMessage,
   RuntimeDeviceCommandMessage,
   RuntimeMqttBridge,
   RuntimeNotificationMessage,
+  RuntimeOtaAckMessage,
   RuntimeOtaRequestMessage,
   RuntimeScheduleTickMessage,
   RuntimeTelemetryIngressMessage
@@ -13,8 +15,10 @@ interface MqttRuntimeTopics {
   telemetry: string;
   schedule: string;
   deviceCommand: string;
+  deviceCommandAck: string;
   notification: string;
   otaRequest: string;
+  otaAck: string;
 }
 
 export interface MqttRuntimeBridgeOptions {
@@ -26,6 +30,10 @@ export interface MqttRuntimeBridgeOptions {
   logger?: (message: string) => void;
   onTelemetryMessage: (message: RuntimeTelemetryIngressMessage) => Promise<void>;
   onScheduleTickMessage: (message: RuntimeScheduleTickMessage) => Promise<void>;
+  onDeviceCommandAckMessage: (
+    message: RuntimeDeviceCommandAckMessage
+  ) => Promise<void>;
+  onOtaAckMessage: (message: RuntimeOtaAckMessage) => Promise<void>;
 }
 
 function parseJsonMessage<T>(payload: Buffer): T {
@@ -81,6 +89,10 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   private readonly onScheduleTickMessage: (
     message: RuntimeScheduleTickMessage
   ) => Promise<void>;
+  private readonly onDeviceCommandAckMessage: (
+    message: RuntimeDeviceCommandAckMessage
+  ) => Promise<void>;
+  private readonly onOtaAckMessage: (message: RuntimeOtaAckMessage) => Promise<void>;
   private client: MqttClient | null = null;
   private ready: Promise<void> | null = null;
 
@@ -97,6 +109,8 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     this.logger = options.logger;
     this.onTelemetryMessage = options.onTelemetryMessage;
     this.onScheduleTickMessage = options.onScheduleTickMessage;
+    this.onDeviceCommandAckMessage = options.onDeviceCommandAckMessage;
+    this.onOtaAckMessage = options.onOtaAckMessage;
   }
 
   private registerMessageHandlers(client: MqttClient) {
@@ -122,6 +136,19 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
       );
       return;
     }
+
+    if (topic === this.topics.deviceCommandAck) {
+      await this.onDeviceCommandAckMessage(
+        parseJsonMessage<RuntimeDeviceCommandAckMessage>(payload)
+      );
+      return;
+    }
+
+    if (topic === this.topics.otaAck) {
+      await this.onOtaAckMessage(
+        parseJsonMessage<RuntimeOtaAckMessage>(payload)
+      );
+    }
   }
 
   async start(): Promise<void> {
@@ -143,11 +170,13 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
         this.registerMessageHandlers(client);
         void Promise.all([
           subscribeAsync(client, this.topics.telemetry),
-          subscribeAsync(client, this.topics.schedule)
+          subscribeAsync(client, this.topics.schedule),
+          subscribeAsync(client, this.topics.deviceCommandAck),
+          subscribeAsync(client, this.topics.otaAck)
         ])
           .then(() => {
             this.logger?.(
-              `[mqtt-runtime] connected and subscribed to ${this.topics.telemetry}, ${this.topics.schedule}`
+              `[mqtt-runtime] connected and subscribed to ${this.topics.telemetry}, ${this.topics.schedule}, ${this.topics.deviceCommandAck}, ${this.topics.otaAck}`
             );
             resolve();
           })

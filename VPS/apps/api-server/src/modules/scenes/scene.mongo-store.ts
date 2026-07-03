@@ -97,6 +97,12 @@ export async function createMongoScenePersistenceStore(
             visibleAfter: {
               $lte: input.now
             }
+          },
+          {
+            status: "dispatched",
+            visibleAfter: {
+              $lte: input.now
+            }
           }
         ]
       },
@@ -280,13 +286,32 @@ export async function createMongoScenePersistenceStore(
 
         return claimedEntries;
       },
-      async complete(jobId, completedAt) {
+      async markDispatched(jobId, dispatchedAt, visibleAfter) {
+        await sceneActionDispatchCollection.updateOne(
+          { jobId },
+          {
+            $set: {
+              status: "dispatched",
+              dispatchedAt,
+              visibleAfter
+            },
+            $unset: {
+              completedAt: "",
+              failedAt: "",
+              acknowledgedAt: "",
+              lastError: ""
+            }
+          }
+        );
+      },
+      async complete(jobId, completedAt, acknowledgedAt) {
         await sceneActionDispatchCollection.updateOne(
           { jobId },
           {
             $set: {
               status: "completed",
-              completedAt
+              completedAt,
+              ...(acknowledgedAt ? { acknowledgedAt } : {})
             },
             $unset: {
               visibleAfter: "",

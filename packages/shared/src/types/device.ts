@@ -5,6 +5,11 @@ export type DeviceLocalStatus = "available" | "unavailable" | "unknown";
 export type DeviceFirmwareChannel = "stable" | "beta";
 
 export type DeviceFirmwareRequestStatus = "queued" | "up_to_date";
+export type DeviceFirmwareDeliveryState =
+  | "queued"
+  | "dispatched"
+  | "completed"
+  | "failed";
 
 export interface DeviceRecord {
   deviceId: string;
@@ -47,4 +52,6 @@ export interface DeviceFirmwareRequestResult {
   currentVersion?: string;
   status: DeviceFirmwareRequestStatus;
   requestedAt: string;
+  requestId?: string;
+  deliveryState?: DeviceFirmwareDeliveryState;
 }

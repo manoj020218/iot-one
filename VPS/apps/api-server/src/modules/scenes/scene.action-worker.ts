@@ -4,7 +4,7 @@ import {
   type ClaimSceneActionDispatchJobsInput
 } from "./scene.model";
 import type { SceneActionDispatchJob } from "./scene.types";
-import { buildOtaDeliveryRequest } from "../ota/ota.service";
+import { queueOtaDeliveryForDevice } from "../ota/ota.service";
 import { deviceRepository } from "../devices/device.model";
 
 export interface SceneActionDispatchWorkerOptions {
@@ -14,14 +14,19 @@ export interface SceneActionDispatchWorkerOptions {
   visibilityTimeoutMs: number;
   now?: () => Date;
   logger?: (message: string) => void;
-  dispatch?: (job: SceneActionDispatchJob) => Promise<void>;
+  dispatch?: (job: SceneActionDispatchJob) => Promise<SceneActionDispatchOutcome>;
 }
 
 export interface SceneActionDispatchWorkerRunResult {
   claimedCount: number;
   completedCount: number;
+  dispatchedCount: number;
   failedCount: number;
   skippedReason?: "local_overlap";
+}
+
+interface SceneActionDispatchOutcome {
+  status: "completed" | "dispatched";
 }
 
 function normalizeDeviceId(deviceId: string): string {
@@ -42,25 +47,28 @@ function readActionPayloadString(
   return normalized.length > 0 ? normalized : undefined;
 }
 
-async function dispatchSceneAction(job: SceneActionDispatchJob): Promise<void> {
+async function dispatchSceneAction(
+  job: SceneActionDispatchJob
+): Promise<SceneActionDispatchOutcome> {
   const bridge = getRuntimeMqttBridge();
 
-  if (!bridge) {
-    return;
-  }
-
   if (job.action.type === "notification") {
-    await bridge.publishNotification({
-      deliveryId: job.jobId,
-      runId: job.runId,
-      sceneId: job.sceneId,
-      homeId: job.homeId,
-      source: job.source,
-      requestedAt: job.requestedAt,
-      message: job.action.message ?? "Scene notification",
-      ...(job.action.payload ? { payload: job.action.payload } : {})
-    });
-    return;
+    if (bridge) {
+      await bridge.publishNotification({
+        deliveryId: job.jobId,
+        runId: job.runId,
+        sceneId: job.sceneId,
+        homeId: job.homeId,
+        source: job.source,
+        requestedAt: job.requestedAt,
+        message: job.action.message ?? "Scene notification",
+        ...(job.action.payload ? { payload: job.action.payload } : {})
+      });
+    }
+
+    return {
+      status: "completed"
+    };
   }
 
   if (!job.action.deviceId || !job.action.command) {
@@ -81,7 +89,7 @@ async function dispatchSceneAction(job: SceneActionDispatchJob): Promise<void> {
       "targetVersion"
     );
 
-    const otaRequest = await buildOtaDeliveryRequest(device, {
+    await queueOtaDeliveryForDevice(device, {
       channel:
         readActionPayloadString(job.action.payload, "channel") === "beta"
           ? "beta"
@@ -91,8 +99,15 @@ async function dispatchSceneAction(job: SceneActionDispatchJob): Promise<void> {
       ...(targetVersion ? { targetVersion } : {})
     });
 
-    await bridge.publishOtaRequest(otaRequest);
-    return;
+    return {
+      status: "completed"
+    };
+  }
+
+  if (!bridge) {
+    return {
+      status: "completed"
+    };
   }
 
   await bridge.publishDeviceCommand({
@@ -106,6 +121,10 @@ async function dispatchSceneAction(job: SceneActionDispatchJob): Promise<void> {
     command: job.action.command,
     ...(job.action.payload ? { payload: job.action.payload } : {})
   });
+
+  return {
+    status: "dispatched"
+  };
 }
 
 export class SceneActionDispatchWorker {
@@ -115,7 +134,9 @@ export class SceneActionDispatchWorker {
   private readonly visibilityTimeoutMs: number;
   private readonly now: () => Date;
   private readonly logger: ((message: string) => void) | undefined;
-  private readonly dispatch: (job: SceneActionDispatchJob) => Promise<void>;
+  private readonly dispatch: (
+    job: SceneActionDispatchJob
+  ) => Promise<SceneActionDispatchOutcome>;
   private timer: NodeJS.Timeout | null = null;
   private runInProgress = false;
 
@@ -152,6 +173,7 @@ export class SceneActionDispatchWorker {
       return {
         claimedCount: 0,
         completedCount: 0,
+        dispatchedCount: 0,
         failedCount: 0,
         skippedReason: "local_overlap"
       };
@@ -166,14 +188,28 @@ export class SceneActionDispatchWorker {
       const result: SceneActionDispatchWorkerRunResult = {
         claimedCount: claimedJobs.length,
         completedCount: 0,
+        dispatchedCount: 0,
         failedCount: 0
       };
 
       for (const job of claimedJobs) {
         try {
-          await this.dispatch(job);
-          await sceneActionDispatchRepository.complete(job.jobId, occurredAt);
-          result.completedCount += 1;
+          const dispatchResult = await this.dispatch(job);
+
+          if (dispatchResult.status === "dispatched") {
+            const visibleAfter = new Date(
+              new Date(occurredAt).getTime() + this.visibilityTimeoutMs
+            ).toISOString();
+            await sceneActionDispatchRepository.markDispatched(
+              job.jobId,
+              occurredAt,
+              visibleAfter
+            );
+            result.dispatchedCount += 1;
+          } else {
+            await sceneActionDispatchRepository.complete(job.jobId, occurredAt);
+            result.completedCount += 1;
+          }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           await sceneActionDispatchRepository.fail(job.jobId, occurredAt, message);
@@ -183,7 +219,7 @@ export class SceneActionDispatchWorker {
 
       if (result.claimedCount > 0) {
         this.logger?.(
-          `[scene-action-worker] claimed ${result.claimedCount} job(s), completed ${result.completedCount}, failed ${result.failedCount}`
+          `[scene-action-worker] claimed ${result.claimedCount} job(s), completed ${result.completedCount}, dispatched ${result.dispatchedCount}, failed ${result.failedCount}`
         );
       }
 

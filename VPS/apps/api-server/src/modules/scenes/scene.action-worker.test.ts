@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
+import { handleRuntimeDeviceCommandAckMessage } from "../../infrastructure/mqtt/runtime.handlers";
 import { createSceneActionDispatchWorker } from "./scene.action-worker";
 import { createScene, runSceneManually, sceneTesting } from "./scene.service";
 
@@ -165,12 +166,87 @@ describe("scene action dispatch worker", () => {
     });
 
     const result = await worker.runOnce("2026-07-03T10:10:00.000Z");
-    expect(result.completedCount).toBe(1);
+    expect(result.dispatchedCount).toBe(1);
     expect(publishedCommands).toEqual([
       {
         deviceId: "JNX-TG-C3-A7F2",
         command: "sync"
       }
     ]);
+
+    const dispatchedJobs = await sceneTesting.listActionDispatches(scene.sceneId);
+    expect(dispatchedJobs[0]?.status).toBe("dispatched");
+    expect(dispatchedJobs[0]?.dispatchedAt).toBe("2026-07-03T10:10:00.000Z");
+
+    await handleRuntimeDeviceCommandAckMessage({
+      deliveryId: dispatchedJobs[0]!.jobId,
+      deviceId: "JNX-TG-C3-A7F2",
+      acknowledgedAt: "2026-07-03T10:10:05.000Z",
+      status: "completed"
+    });
+
+    const completedJobs = await sceneTesting.listActionDispatches(scene.sceneId);
+    expect(completedJobs[0]?.status).toBe("completed");
+    expect(completedJobs[0]?.acknowledgedAt).toBe("2026-07-03T10:10:05.000Z");
+  });
+
+  it("retries dispatched scene commands when no acknowledgement arrives before the lease expires", async () => {
+    const publishedCommands: string[] = [];
+
+    useRuntimeMqttBridge({
+      async publishTelemetryIngress() {
+        throw new Error("not used");
+      },
+      async publishScheduleTick() {
+        throw new Error("not used");
+      },
+      async publishDeviceCommand(message) {
+        publishedCommands.push(message.deliveryId);
+      },
+      async publishNotification() {
+        throw new Error("not used");
+      },
+      async publishOtaRequest() {
+        throw new Error("not used");
+      }
+    });
+
+    const scene = await createScene(
+      {
+        name: "Retry Device Sync",
+        status: "active",
+        triggers: [
+          {
+            type: "manual"
+          }
+        ],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-C3-A7F3",
+            command: "sync"
+          }
+        ]
+      },
+      ownerContext
+    );
+
+    await runSceneManually(scene.sceneId, {}, ownerContext);
+
+    const worker = createSceneActionDispatchWorker({
+      workerId: "scene-worker-test",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined
+    });
+
+    const firstRun = await worker.runOnce("2026-07-03T10:20:00.000Z");
+    expect(firstRun.dispatchedCount).toBe(1);
+
+    const secondRun = await worker.runOnce("2026-07-03T10:20:35.000Z");
+    expect(secondRun.dispatchedCount).toBe(1);
+    expect(publishedCommands).toHaveLength(2);
   });
 });

@@ -10,8 +10,10 @@ export interface AppConfig {
   mqttTelemetryTopic: string;
   mqttScheduleTopic: string;
   mqttDeviceCommandTopic: string;
+  mqttDeviceCommandAckTopic: string;
   mqttNotificationTopic: string;
   mqttOtaRequestTopic: string;
+  mqttOtaAckTopic: string;
   authPersistenceMode: "memory" | "mongodb";
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
@@ -30,6 +32,10 @@ export interface AppConfig {
   sceneActionWorkerIntervalMs: number;
   sceneActionWorkerBatchSize: number;
   sceneActionWorkerVisibilityTimeoutMs: number;
+  otaDeliveryWorkerEnabled: boolean;
+  otaDeliveryWorkerIntervalMs: number;
+  otaDeliveryWorkerBatchSize: number;
+  otaDeliveryWorkerVisibilityTimeoutMs: number;
   sceneRuntimeWorkerEnabled: boolean;
   sceneRuntimeWorkerIntervalMs: number;
   sceneRuntimeWorkerBatchSize: number;
@@ -122,10 +128,15 @@ export function readAppConfig(): AppConfig {
     process.env.MQTT_SCHEDULE_TOPIC?.trim() || "jenix/runtime/schedule";
   const mqttDeviceCommandTopic =
     process.env.MQTT_DEVICE_COMMAND_TOPIC?.trim() || "jenix/runtime/commands";
+  const mqttDeviceCommandAckTopic =
+    process.env.MQTT_DEVICE_COMMAND_ACK_TOPIC?.trim() ||
+    "jenix/runtime/commands/ack";
   const mqttNotificationTopic =
     process.env.MQTT_NOTIFICATION_TOPIC?.trim() || "jenix/runtime/notifications";
   const mqttOtaRequestTopic =
     process.env.MQTT_OTA_REQUEST_TOPIC?.trim() || "jenix/runtime/ota";
+  const mqttOtaAckTopic =
+    process.env.MQTT_OTA_ACK_TOPIC?.trim() || "jenix/runtime/ota/ack";
   const sceneSchedulerIntervalMs = parsePositiveIntegerEnv(
     process.env.SCENE_SCHEDULER_INTERVAL_MS,
     30_000,
@@ -199,6 +210,21 @@ export function readAppConfig(): AppConfig {
     process.env.SCENE_RUNTIME_WORKER_INTERVAL_MS,
     5_000,
     "SCENE_RUNTIME_WORKER_INTERVAL_MS"
+  );
+  const otaDeliveryWorkerIntervalMs = parsePositiveIntegerEnv(
+    process.env.OTA_DELIVERY_WORKER_INTERVAL_MS,
+    5_000,
+    "OTA_DELIVERY_WORKER_INTERVAL_MS"
+  );
+  const otaDeliveryWorkerBatchSize = parsePositiveIntegerEnv(
+    process.env.OTA_DELIVERY_WORKER_BATCH_SIZE,
+    25,
+    "OTA_DELIVERY_WORKER_BATCH_SIZE"
+  );
+  const otaDeliveryWorkerVisibilityTimeoutMs = parsePositiveIntegerEnv(
+    process.env.OTA_DELIVERY_WORKER_VISIBILITY_TIMEOUT_MS,
+    Math.max(otaDeliveryWorkerIntervalMs * 3, 30_000),
+    "OTA_DELIVERY_WORKER_VISIBILITY_TIMEOUT_MS"
   );
   const sceneRuntimeWorkerBatchSize = parsePositiveIntegerEnv(
     process.env.SCENE_RUNTIME_WORKER_BATCH_SIZE,
@@ -276,8 +302,10 @@ export function readAppConfig(): AppConfig {
     mqttTelemetryTopic,
     mqttScheduleTopic,
     mqttDeviceCommandTopic,
+    mqttDeviceCommandAckTopic,
     mqttNotificationTopic,
     mqttOtaRequestTopic,
+    mqttOtaAckTopic,
     authPersistenceMode,
     matterRuntimeEnabled: parseBooleanEnv(
       process.env.MATTER_RUNTIME_ENABLED,
@@ -305,6 +333,13 @@ export function readAppConfig(): AppConfig {
     sceneActionWorkerIntervalMs,
     sceneActionWorkerBatchSize,
     sceneActionWorkerVisibilityTimeoutMs,
+    otaDeliveryWorkerEnabled: parseBooleanEnv(
+      process.env.OTA_DELIVERY_WORKER_ENABLED,
+      true
+    ),
+    otaDeliveryWorkerIntervalMs,
+    otaDeliveryWorkerBatchSize,
+    otaDeliveryWorkerVisibilityTimeoutMs,
     sceneRuntimeWorkerEnabled: parseBooleanEnv(
       process.env.SCENE_RUNTIME_WORKER_ENABLED,
       true
