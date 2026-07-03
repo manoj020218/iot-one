@@ -1,7 +1,7 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 16 - MQTT Runtime Ingress and Delivery Execution
+- Phase name: Phase 17 - Delivery Acknowledgement and Rollout Persistence
 - Started: 2026-07-03
 - Status: Completed
 
@@ -71,6 +71,12 @@
 - [x] MQTT schedule tick publishing path
 - [x] MQTT scene command delivery
 - [x] MQTT OTA delivery publishing
+- [x] MQTT scene command acknowledgement handling
+- [x] Scene command retry-safe dispatch leasing
+- [x] OTA delivery job queue
+- [x] OTA delivery worker
+- [x] MQTT OTA acknowledgement handling
+- [x] OTA firmware version update on acknowledgement
 - [x] Scene action dispatch queue
 - [x] Scene action worker isolation
 - [x] Unit tests
@@ -146,6 +152,9 @@
 - Date: 2026-07-03
   Decision: Put MQTT at the ingress and delivery edges by publishing telemetry and schedule envelopes before runtime evaluation, then publish scene commands and OTA requests through the same runtime bridge.
   Reason: Phase 16 needed MQTT to become the primary VPS-side transport boundary without replacing the queue-backed evaluation and worker model already completed in Phase 15.
+- Date: 2026-07-03
+  Decision: Keep MQTT delivery acknowledgement and retry state in durable job repositories, and move OTA publishing behind a claimed-job worker instead of letting firmware requests publish directly.
+  Reason: Phase 17 needed device-delivery visibility and replay safety to match the existing queue-based runtime model rather than ending at broker dispatch.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -163,12 +172,12 @@
 - Issue: Provisioning intent storage is still in-memory on the API side with a frontend fallback store when the API is unavailable.
   Impact: Cloud registration intent tracking works for development and tests, but not yet with durable operational history.
   Fix plan: Persist provisioning intents and status transitions in MongoDB and attach them to device lifecycle audit history.
-- Issue: MQTT delivery now publishes scene commands and OTA requests, but there is no device acknowledgement, retry ledger, or rollout-state persistence yet.
-  Impact: The VPS can publish real transport messages, but operational visibility still ends at broker-side dispatch instead of confirmed device execution.
-  Fix plan: Add delivery acknowledgement storage, retry rules, and rollout state models for scene and OTA transport jobs.
-- Issue: Direct firmware requests publish OTA messages immediately instead of going through a dedicated claimed-job OTA delivery worker.
-  Impact: MQTT transport is real, but firmware rollout retries and replay safety are still weaker than the scene-action worker path.
-  Fix plan: Add a dedicated OTA delivery job queue and worker so firmware rollouts match the same isolation and retry model used by scene actions.
+- Issue: Delivery acknowledgement and OTA rollout state are now durable on the backend, but there is no user-facing status endpoint or PWA presentation for those job states yet.
+  Impact: Operators can rely on persisted backend delivery state, but app users still cannot directly inspect rollout progress or failed-command history from the UI.
+  Fix plan: Expose delivery and rollout status through API endpoints and wire that state into the device detail and admin surfaces.
+- Issue: Failed scene-command and OTA jobs can be marked failed, but there are no manual dead-letter or replay controls yet.
+  Impact: Operational recovery still depends on backend intervention or automatic retry windows instead of explicit support tooling.
+  Fix plan: Add replay and dead-letter controls for failed delivery jobs, starting with backend endpoints and then admin UI actions.
 - Issue: Matter readiness, commissioning requests, and bridge sync state are currently placeholder flows backed by in-memory module state.
   Impact: Phase 11 models Matter capability, permissions, and UI entry points, but live Matter activation is intentionally disabled by default and still does not perform commissioner transport, gateway coordination, or durable Matter-state persistence.
   Fix plan: Keep the activation flag off until vendor ID and CSA readiness are complete, then replace the placeholder routes with live Matter transport integration and persist Matter runtime state alongside the broader MongoDB hardening pass.
@@ -177,8 +186,8 @@
   Fix plan: Add a protected fetch wrapper that performs one refresh-and-retry cycle for 401 responses on user-facing API calls.
 
 ## Next Tasks
-1. Add MQTT delivery acknowledgement, retry, and rollout-state persistence for scene commands and OTA requests.
-2. Move firmware request publishing behind a dedicated OTA delivery worker queue.
+1. Expose delivery and rollout status on API routes and device detail UI.
+2. Add dead-letter and replay controls for failed scene and OTA delivery jobs.
 3. Add a protected fetch wrapper with refresh-and-retry behavior for 401 race conditions.
 4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
@@ -207,3 +216,4 @@
 - 2026-07-03: Completed Phase 14 with MongoDB-backed auth persistence, bearer-auth route migration, scene action worker isolation, and full workspace validation.
 - 2026-07-03: Completed Phase 15 with queue-backed scene evaluation workers, automatic PWA bearer-session refresh, and full workspace validation.
 - 2026-07-03: Completed Phase 16 with an MQTT runtime bridge, MQTT-first telemetry and schedule ingestion, scene-command and OTA MQTT delivery publishing, and full workspace validation.
+- 2026-07-03: Completed Phase 17 with scene-command acknowledgement persistence, retryable dispatch leases, dedicated OTA delivery jobs and worker bootstrapping, MQTT OTA acknowledgement handling, and full workspace validation.

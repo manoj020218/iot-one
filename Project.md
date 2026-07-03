@@ -17,7 +17,8 @@
 - Current status: Phase 14 auth middleware and runtime isolation complete
 - Current status: Phase 15 queued runtime evaluation and session refresh complete
 - Current status: Phase 16 MQTT runtime ingress and delivery execution complete
-- Current phase: Phase 16 - MQTT Runtime Ingress and Delivery Execution
+- Current status: Phase 17 delivery acknowledgement and OTA dispatch persistence complete
+- Current phase: Phase 17 - Delivery Acknowledgement and Rollout Persistence
 
 ## Working Scope
 
@@ -432,16 +433,39 @@ Validation gates:
 - [x] Firmware MQTT OTA delivery tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 17 - Delivery Acknowledgement and Rollout Persistence
+
+Status: Completed
+
+Deliverables:
+- [x] Scene action dispatch state extended with durable `dispatched` tracking
+- [x] Scene command acknowledgement handler on MQTT runtime ingress
+- [x] Scene command retry-on-timeout claim behavior
+- [x] OTA delivery job repository abstraction
+- [x] MongoDB-backed OTA delivery job persistence
+- [x] Dedicated OTA delivery worker bootstrap
+- [x] Firmware request route changed to queue OTA delivery jobs instead of direct publish
+- [x] OTA acknowledgement and failure handling on MQTT runtime ingress
+- [x] Device firmware version update on successful OTA acknowledgement
+- [x] MQTT runtime env and topic configuration for delivery acknowledgements
+
+Validation gates:
+- [x] Scene action acknowledgement tests
+- [x] Scene action retry tests
+- [x] OTA delivery worker tests
+- [x] OTA acknowledgement and firmware update tests
+- [x] Workspace lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Add delivery acknowledgement, retry, and rollout-state persistence for MQTT scene-command and OTA messages.
-2. Move direct firmware request publishing behind a dedicated claimed-job OTA delivery worker for stronger retry isolation.
-3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
-4. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
+1. Expose delivery and rollout status on user-facing and operator-facing APIs so the PWA can show acknowledgement and failure state directly on device detail pages.
+2. Add dead-letter and replay controls for failed scene-command and OTA delivery jobs.
+3. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
+4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
 
 ## Decision Log
 
@@ -471,6 +495,7 @@ Validation gates:
 - 2026-07-03: Added MongoDB-backed auth persistence, signed bearer-auth middleware, PWA bearer-auth migration, local session persistence, and a scene action worker queue for runtime isolation.
 - 2026-07-03: Added queue-backed scene runtime evaluation workers for telemetry and schedules, plus automatic PWA refresh-token rotation before bearer access-token expiry.
 - 2026-07-03: Added an MQTT runtime bridge for telemetry ingress, schedule ticks, scene command delivery, and OTA request delivery so MQTT can be the main VPS runtime bus while HTTP telemetry remains a fallback path.
+- 2026-07-03: Added durable scene-command acknowledgement handling, OTA delivery job persistence, MQTT acknowledgement topics, and a dedicated OTA delivery worker so runtime delivery can retry safely beyond the request path.
 
 ## Risks and Controls
 
@@ -505,3 +530,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-03: Phase 14 auth middleware and runtime isolation completed with MongoDB-backed auth sessions, bearer-auth route migration, scene action dispatch worker isolation, and full workspace validation.
 - 2026-07-03: Phase 15 queued runtime evaluation and session refresh completed with MongoDB-backed scene evaluation jobs, scheduler/telemetry queue routing, PWA token rotation, and full workspace validation.
 - 2026-07-03: Phase 16 MQTT runtime ingress and delivery execution completed with MQTT bridge bootstrap, scheduler/telemetry publish boundaries, consumer handlers, scene action MQTT delivery, firmware OTA publish support, and full workspace validation.
+- 2026-07-03: Phase 17 delivery acknowledgement and rollout persistence completed with scene-command ack tracking, retryable dispatch leases, OTA delivery jobs, a dedicated OTA worker, MQTT ack handlers, and full workspace validation.

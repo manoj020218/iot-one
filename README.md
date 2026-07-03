@@ -54,13 +54,17 @@ cmd /c pnpm build
 - Matched scene actions now enqueue into `scene_action_dispatch_jobs`, and the API process starts a scene action worker by default to drain that queue behind a worker boundary.
 - HOME data now persists in MongoDB collections `homes`, `home_members`, `home_share_codes`, `home_user_profiles`, and `home_audit_logs` when the HOME driver is enabled.
 - Provisioning intents persist in `provisioning_intents`, OTA releases persist in `ota_releases`, and API packages/keys/secrets persist in `api_packages`, `api_keys`, and `api_key_secrets` when their MongoDB drivers are enabled.
+- OTA delivery jobs now persist in `ota_delivery_jobs` when the OTA MongoDB driver is enabled.
 - Scheduler control comes from `SCENE_SCHEDULER_ENABLED` and `SCENE_SCHEDULER_INTERVAL_MS`.
 - Scene runtime worker control comes from `SCENE_RUNTIME_WORKER_ENABLED`, `SCENE_RUNTIME_WORKER_INTERVAL_MS`, `SCENE_RUNTIME_WORKER_BATCH_SIZE`, and `SCENE_RUNTIME_WORKER_VISIBILITY_TIMEOUT_MS`.
 - Scene action worker control comes from `SCENE_ACTION_WORKER_ENABLED`, `SCENE_ACTION_WORKER_INTERVAL_MS`, `SCENE_ACTION_WORKER_BATCH_SIZE`, and `SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS`.
-- MQTT runtime topics are configured with `MQTT_TELEMETRY_TOPIC`, `MQTT_SCHEDULE_TOPIC`, `MQTT_DEVICE_COMMAND_TOPIC`, `MQTT_NOTIFICATION_TOPIC`, and `MQTT_OTA_REQUEST_TOPIC`.
+- OTA delivery worker control comes from `OTA_DELIVERY_WORKER_ENABLED`, `OTA_DELIVERY_WORKER_INTERVAL_MS`, `OTA_DELIVERY_WORKER_BATCH_SIZE`, and `OTA_DELIVERY_WORKER_VISIBILITY_TIMEOUT_MS`.
+- MQTT runtime topics are configured with `MQTT_TELEMETRY_TOPIC`, `MQTT_SCHEDULE_TOPIC`, `MQTT_DEVICE_COMMAND_TOPIC`, `MQTT_DEVICE_COMMAND_ACK_TOPIC`, `MQTT_NOTIFICATION_TOPIC`, `MQTT_OTA_REQUEST_TOPIC`, and `MQTT_OTA_ACK_TOPIC`.
 - Scheduler leadership can be coordinated across multiple API instances with `SCENE_SCHEDULER_COORDINATION_MODE=mongodb-lock`, `SCENE_SCHEDULER_LEASE_MS`, and an optional `SCENE_SCHEDULER_INSTANCE_ID`.
 - Device telemetry can still be ingested through `POST /api/v1/devices/:deviceId/telemetry`, but when MQTT runtime is enabled that route now publishes the same telemetry envelope to MQTT so HTTP remains a fallback instead of the only runtime source.
 - Mongo lease coordination prevents duplicate scheduler ownership across instances, scheduler ticks now publish MQTT schedule envelopes when enabled, runtime evaluation is isolated behind claimed-job workers, and scene actions plus firmware requests can publish real MQTT device-delivery messages.
+- Scene action dispatch jobs now stay in `dispatched` state until the device returns an MQTT acknowledgement or the worker lease expires and the command becomes retryable again.
+- Firmware requests no longer publish OTA payloads directly from the request path; they now queue durable OTA delivery jobs that a dedicated worker publishes and retries until acknowledgement or failure.
 - PID persistence now supports `PID_PERSISTENCE_MODE=memory|mongodb` and device persistence now supports `DEVICE_PERSISTENCE_MODE=memory|mongodb`. Both default to MongoDB when `MONGODB_URI` is set.
 - PID records and PID audit logs now persist in MongoDB collections `product_pids` and `pid_audit_logs`, and device records persist in the `devices` collection when the MongoDB drivers are enabled.
 - HOME-scoped device, scene, Matter, and API key permissions no longer trust `x-home-role`; the backend now resolves HOME membership from persisted sharing data.
