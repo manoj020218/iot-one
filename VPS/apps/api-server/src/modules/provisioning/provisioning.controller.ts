@@ -24,7 +24,7 @@ function sendError(response: Response, error: unknown) {
   });
 }
 
-export function registerProvisioningIntentController(
+export async function registerProvisioningIntentController(
   request: Request,
   response: Response
 ) {
@@ -38,11 +38,11 @@ export function registerProvisioningIntentController(
   }
 
   response.status(201).json({
-    data: registerProvisioningIntent(payload)
+    data: await registerProvisioningIntent(payload)
   });
 }
 
-export function completeProvisioningController(
+export async function completeProvisioningController(
   request: Request,
   response: Response
 ) {
@@ -57,20 +57,20 @@ export function completeProvisioningController(
 
   try {
     response.status(200).json({
-      data: completeProvisioning(request.params.provisioningId ?? "", payload)
+      data: await completeProvisioning(request.params.provisioningId ?? "", payload)
     });
   } catch (error) {
     sendError(response, error);
   }
 }
 
-export function getProvisioningStatusController(
+export async function getProvisioningStatusController(
   request: Request,
   response: Response
 ) {
   try {
     response.status(200).json({
-      data: getProvisioningStatus(request.params.provisioningId ?? "")
+      data: await getProvisioningStatus(request.params.provisioningId ?? "")
     });
   } catch (error) {
     sendError(response, error);

@@ -11,8 +11,14 @@ import {
 
 import { DeviceModuleError } from "../devices/device.types";
 import { getDevice, listDevices } from "../devices/device.service";
+import { resolveHomeAccessContext } from "../homes/home.service";
+import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
-import { apiAccessRepository } from "./api-access.model";
+import {
+  apiAccessKeyRepository,
+  apiAccessKeySecretRepository,
+  apiAccessPackageRepository
+} from "./api-access.model";
 import type {
   ApiKeyRequestContext,
   ApiPackageActorContext,
@@ -44,20 +50,40 @@ function normalizePid(pid: string) {
   return pid.trim().toUpperCase();
 }
 
-function readContextHome(context: ApiKeyRequestContext) {
-  if (!context.homeId || !context.userId || !context.homeRole) {
+async function readContextHome(
+  context: ApiKeyRequestContext
+): Promise<{
+  homeId: string;
+  userId: string;
+  homeRole: NonNullable<ApiKeyRequestContext["homeRole"]>;
+}> {
+  if (!context.homeId || !context.userId) {
     throw new ApiAccessModuleError(400, "HOME context is required");
   }
 
-  return {
-    homeId: context.homeId,
-    userId: context.userId,
-    homeRole: context.homeRole
-  };
+  try {
+    const resolved = await resolveHomeAccessContext(context);
+
+    if (!resolved.homeRole) {
+      throw new ApiAccessModuleError(403, "HOME access denied");
+    }
+
+    return {
+      homeId: context.homeId,
+      userId: context.userId,
+      homeRole: resolved.homeRole
+    };
+  } catch (error) {
+    if (error instanceof HomeModuleError) {
+      throw new ApiAccessModuleError(error.statusCode, error.message);
+    }
+
+    throw error;
+  }
 }
 
-function requireHomeManager(context: ApiKeyRequestContext) {
-  const resolved = readContextHome(context);
+async function requireHomeManager(context: ApiKeyRequestContext) {
+  const resolved = await readContextHome(context);
 
   if (!canManageHomeMembership(resolved.homeRole)) {
     throw new ApiAccessModuleError(403, "API key management requires owner/admin access");
@@ -66,8 +92,8 @@ function requireHomeManager(context: ApiKeyRequestContext) {
   return resolved;
 }
 
-function requirePackage(packageId: string): ApiPackageRecord {
-  const record = apiAccessRepository.getPackage(normalizePackageId(packageId));
+async function requirePackage(packageId: string): Promise<ApiPackageRecord> {
+  const record = await apiAccessPackageRepository.get(normalizePackageId(packageId));
 
   if (!record) {
     throw new ApiAccessModuleError(
@@ -79,8 +105,8 @@ function requirePackage(packageId: string): ApiPackageRecord {
   return record;
 }
 
-function requireKey(keyId: string): ApiKeyRecord {
-  const record = apiAccessRepository.getKey(keyId);
+async function requireKey(keyId: string): Promise<ApiKeyRecord> {
+  const record = await apiAccessKeyRepository.get(keyId);
 
   if (!record) {
     throw new ApiAccessModuleError(404, `API key not found: ${keyId}`);
@@ -149,7 +175,7 @@ async function authorizePublicDeviceScope(
     throw new ApiAccessModuleError(401, "API key is required");
   }
 
-  const keyRecord = apiAccessRepository.findKeyBySecret(normalizedSecret);
+  const keyRecord = await apiAccessKeySecretRepository.findKeyBySecret(normalizedSecret);
 
   if (!keyRecord || keyRecord.status !== "active") {
     throw new ApiAccessModuleError(401, "API key is invalid");
@@ -159,7 +185,7 @@ async function authorizePublicDeviceScope(
     throw new ApiAccessModuleError(401, "API key has expired");
   }
 
-  const packageRecord = requirePackage(keyRecord.packageId);
+  const packageRecord = await requirePackage(keyRecord.packageId);
 
   if (packageRecord.status !== "active") {
     throw new ApiAccessModuleError(403, "API package is not active");
@@ -223,13 +249,13 @@ async function authorizePublicDeviceScope(
   }
 }
 
-export function listApiPackages(): ApiPackageRecord[] {
-  return apiAccessRepository.listPackages().sort((left, right) =>
+export async function listApiPackages(): Promise<ApiPackageRecord[]> {
+  return (await apiAccessPackageRepository.list()).sort((left, right) =>
     left.packageId.localeCompare(right.packageId)
   );
 }
 
-export function getApiPackage(packageId: string): ApiPackageRecord {
+export async function getApiPackage(packageId: string): Promise<ApiPackageRecord> {
   return requirePackage(packageId);
 }
 
@@ -239,7 +265,7 @@ export async function createApiPackage(
 ): Promise<ApiPackageRecord> {
   const packageId = normalizePackageId(input.packageId);
 
-  if (apiAccessRepository.getPackage(packageId)) {
+  if (await apiAccessPackageRepository.get(packageId)) {
     throw new ApiAccessModuleError(409, `API package already exists: ${packageId}`);
   }
 
@@ -267,14 +293,15 @@ export async function createApiPackage(
     throw new ApiAccessModuleError(409, `PID mismatch for API package ${packageId}`);
   }
 
-  return apiAccessRepository.savePackage(record);
+  return apiAccessPackageRepository.save(record);
 }
 
-export function listApiKeys(context: ApiKeyRequestContext): ApiKeyRecord[] {
-  const { homeId } = requireHomeManager(context);
+export async function listApiKeys(
+  context: ApiKeyRequestContext
+): Promise<ApiKeyRecord[]> {
+  const { homeId } = await requireHomeManager(context);
 
-  return apiAccessRepository
-    .listKeys()
+  return (await apiAccessKeyRepository.list())
     .filter((record) => record.homeId === homeId)
     .sort((left, right) => left.keyId.localeCompare(right.keyId));
 }
@@ -283,8 +310,8 @@ export async function createApiKey(
   input: CreateApiKeyInput,
   context: ApiKeyRequestContext
 ): Promise<ApiKeyCreateResult> {
-  const { homeId, userId } = requireHomeManager(context);
-  const packageRecord = requirePackage(input.packageId);
+  const { homeId, userId } = await requireHomeManager(context);
+  const packageRecord = await requirePackage(input.packageId);
 
   if (packageRecord.status !== "active") {
     throw new ApiAccessModuleError(409, "API package must be active before keys can be issued");
@@ -332,8 +359,8 @@ export async function createApiKey(
     ...(input.expiresAt ? { expiresAt: input.expiresAt } : {})
   };
 
-  apiAccessRepository.saveKey(record);
-  apiAccessRepository.storeKeySecret({
+  await apiAccessKeyRepository.save(record);
+  await apiAccessKeySecretRepository.store({
     ...record,
     secret
   });
@@ -344,12 +371,12 @@ export async function createApiKey(
   };
 }
 
-export function revokeApiKey(
+export async function revokeApiKey(
   keyId: string,
   context: ApiKeyRequestContext
-): ApiKeyRecord {
-  const { homeId } = requireHomeManager(context);
-  const existing = requireKey(keyId);
+): Promise<ApiKeyRecord> {
+  const { homeId } = await requireHomeManager(context);
+  const existing = await requireKey(keyId);
 
   if (existing.homeId !== homeId) {
     throw new ApiAccessModuleError(403, "API key does not belong to the current HOME");
@@ -366,7 +393,7 @@ export function revokeApiKey(
     updatedAt: new Date().toISOString()
   };
 
-  return apiAccessRepository.saveKey(updated);
+  return apiAccessKeyRepository.save(updated);
 }
 
 export async function getPublicDeviceState(
@@ -414,13 +441,15 @@ export async function executePublicDeviceCommand(
 }
 
 export const apiAccessTesting = {
-  reset() {
-    apiAccessRepository.reset();
+  async reset() {
+    await apiAccessPackageRepository.reset();
+    await apiAccessKeyRepository.reset();
+    await apiAccessKeySecretRepository.reset();
   },
-  snapshot(): PublicApiModuleState {
+  async snapshot(): Promise<PublicApiModuleState> {
     return {
-      packages: listApiPackages(),
-      keys: apiAccessRepository.listKeys()
+      packages: await listApiPackages(),
+      keys: await apiAccessKeyRepository.list()
     };
   }
 };

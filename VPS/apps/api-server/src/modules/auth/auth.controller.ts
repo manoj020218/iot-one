@@ -56,7 +56,7 @@ function readProviderPayload(body: unknown): ProviderAuthPayload | null {
   return token ? { token } : null;
 }
 
-export function emailSignupController(request: Request, response: Response) {
+export async function emailSignupController(request: Request, response: Response) {
   const payload = readEmailSignupPayload(request.body);
 
   if (!payload) {
@@ -65,11 +65,11 @@ export function emailSignupController(request: Request, response: Response) {
   }
 
   response.status(201).json({
-    data: signupWithEmail(payload)
+    data: await signupWithEmail(payload)
   });
 }
 
-export function emailLoginController(request: Request, response: Response) {
+export async function emailLoginController(request: Request, response: Response) {
   const payload = readEmailLoginPayload(request.body);
 
   if (!payload) {
@@ -78,11 +78,11 @@ export function emailLoginController(request: Request, response: Response) {
   }
 
   response.status(200).json({
-    data: loginWithEmail(payload)
+    data: await loginWithEmail(payload)
   });
 }
 
-export function googleLoginController(request: Request, response: Response) {
+export async function googleLoginController(request: Request, response: Response) {
   const payload = readProviderPayload(request.body);
 
   if (!payload) {
@@ -91,11 +91,11 @@ export function googleLoginController(request: Request, response: Response) {
   }
 
   response.status(200).json({
-    data: loginWithProvider(payload, "google")
+    data: await loginWithProvider(payload, "google")
   });
 }
 
-export function facebookLoginController(request: Request, response: Response) {
+export async function facebookLoginController(request: Request, response: Response) {
   const payload = readProviderPayload(request.body);
 
   if (!payload) {
@@ -104,7 +104,7 @@ export function facebookLoginController(request: Request, response: Response) {
   }
 
   response.status(200).json({
-    data: loginWithProvider(payload, "facebook")
+    data: await loginWithProvider(payload, "facebook")
   });
 }
 

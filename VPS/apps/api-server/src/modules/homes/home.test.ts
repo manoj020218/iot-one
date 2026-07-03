@@ -17,8 +17,8 @@ const invitedUserHeaders = {
 };
 
 describe("home routes", () => {
-  beforeEach(() => {
-    homeTesting.reset();
+  beforeEach(async () => {
+    await homeTesting.reset();
   });
 
   it("lists the default HOME for the current user", async () => {

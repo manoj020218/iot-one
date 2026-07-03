@@ -20,9 +20,9 @@ function createTokenPair(userId: string): TokenPair {
   };
 }
 
-function createSession(seed: AuthProviderSessionSeed): AuthSession {
+async function createSession(seed: AuthProviderSessionSeed): Promise<AuthSession> {
   const userId = createUserId(seed.email);
-  const homes = syncUserHomes({
+  const homes = await syncUserHomes({
     userId,
     name: seed.name,
     email: seed.email
@@ -42,7 +42,7 @@ function createSession(seed: AuthProviderSessionSeed): AuthSession {
   };
 }
 
-export function signupWithEmail(payload: EmailSignupPayload): AuthSession {
+export function signupWithEmail(payload: EmailSignupPayload): Promise<AuthSession> {
   return createSession({
     email: payload.email,
     name: payload.name,
@@ -50,7 +50,7 @@ export function signupWithEmail(payload: EmailSignupPayload): AuthSession {
   });
 }
 
-export function loginWithEmail(payload: EmailLoginPayload): AuthSession {
+export function loginWithEmail(payload: EmailLoginPayload): Promise<AuthSession> {
   return createSession({
     email: payload.email,
     name: payload.email.split("@")[0] ?? "Jenix User",
@@ -61,7 +61,7 @@ export function loginWithEmail(payload: EmailLoginPayload): AuthSession {
 export function loginWithProvider(
   payload: ProviderAuthPayload,
   provider: AuthProvider
-): AuthSession {
+): Promise<AuthSession> {
   const tokenSeed = payload.token.trim() || provider;
 
   return createSession({

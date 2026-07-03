@@ -5,8 +5,8 @@ import { createApp } from "../../app";
 import { provisioningTesting } from "./provisioning.service";
 
 describe("provisioning routes", () => {
-  beforeEach(() => {
-    provisioningTesting.reset();
+  beforeEach(async () => {
+    await provisioningTesting.reset();
   });
 
   it("creates a provisioning intent and returns its status", async () => {

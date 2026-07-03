@@ -81,7 +81,7 @@ function createFallbackUserProfile(userId: string): HomeUserProfile {
 
 function createProfileSeed(
   userId: string,
-  context: HomeRequestContext
+  context: Pick<HomeRequestContext, "userName" | "userEmail">
 ): { userId: string; name?: string; email?: string } {
   return {
     userId,
@@ -150,13 +150,13 @@ function compareShareCodes(
   return right.createdAt.localeCompare(left.createdAt);
 }
 
-function findStoredDefaultHome(ownerUserId: string): StoredHomeRecord | undefined {
-  return homeRepository
-    .list()
-    .find((home) => home.ownerUserId === ownerUserId && home.isDefault);
+async function findStoredDefaultHome(
+  ownerUserId: string
+): Promise<StoredHomeRecord | undefined> {
+  return homeRepository.findDefaultByOwner(ownerUserId);
 }
 
-function writeAudit(
+async function writeAudit(
   homeId: string,
   actorId: string,
   action: string,
@@ -175,15 +175,15 @@ function writeAudit(
     ...optionalProp("metadata", metadata)
   };
 
-  homeAuditRepository.append(entry);
+  await homeAuditRepository.append(entry);
 }
 
-function upsertUserProfile(input: {
+async function upsertUserProfile(input: {
   userId: string;
   name?: string;
   email?: string;
-}): HomeUserProfile {
-  const existing = homeUserProfileRepository.get(input.userId);
+}): Promise<HomeUserProfile> {
+  const existing = await homeUserProfileRepository.get(input.userId);
   const fallback = createFallbackUserProfile(input.userId);
 
   return homeUserProfileRepository.save({
@@ -194,13 +194,15 @@ function upsertUserProfile(input: {
   });
 }
 
-function ensureDefaultHomeAccess(profile: HomeUserProfile): StoredHomeRecord {
-  const existingDefaultHome = findStoredDefaultHome(profile.userId);
+async function ensureDefaultHomeAccess(
+  profile: HomeUserProfile
+): Promise<StoredHomeRecord> {
+  const existingDefaultHome = await findStoredDefaultHome(profile.userId);
 
   if (existingDefaultHome) {
-    if (!homeMemberRepository.find(existingDefaultHome.homeId, profile.userId)) {
+    if (!(await homeMemberRepository.find(existingDefaultHome.homeId, profile.userId))) {
       const timestamp = new Date().toISOString();
-      homeMemberRepository.save({
+      await homeMemberRepository.save({
         membershipId: createMembershipId(),
         homeId: existingDefaultHome.homeId,
         userId: profile.userId,
@@ -217,8 +219,8 @@ function ensureDefaultHomeAccess(profile: HomeUserProfile): StoredHomeRecord {
 
   const defaultHome = createDefaultHome(profile.userId);
   const { role: _role, ...storedDefaultHome } = defaultHome;
-  homeRepository.save(storedDefaultHome);
-  homeMemberRepository.save({
+  await homeRepository.save(storedDefaultHome);
+  await homeMemberRepository.save({
     membershipId: createMembershipId(),
     homeId: storedDefaultHome.homeId,
     userId: profile.userId,
@@ -228,13 +230,13 @@ function ensureDefaultHomeAccess(profile: HomeUserProfile): StoredHomeRecord {
     joinedAt: storedDefaultHome.createdAt,
     updatedAt: storedDefaultHome.updatedAt
   });
-  writeAudit(storedDefaultHome.homeId, profile.userId, "home.created_default");
+  await writeAudit(storedDefaultHome.homeId, profile.userId, "home.created_default");
 
   return storedDefaultHome;
 }
 
-function requireHome(homeId: string): StoredHomeRecord {
-  const home = homeRepository.get(homeId);
+async function requireHome(homeId: string): Promise<StoredHomeRecord> {
+  const home = await homeRepository.get(homeId);
 
   if (!home) {
     throw new HomeModuleError(404, `HOME not found: ${homeId}`);
@@ -243,11 +245,11 @@ function requireHome(homeId: string): StoredHomeRecord {
   return home;
 }
 
-function requireMembership(
+async function requireMembership(
   homeId: string,
   userId: string
-): HomeMemberRecord {
-  const membership = homeMemberRepository.find(homeId, userId);
+): Promise<HomeMemberRecord> {
+  const membership = await homeMemberRepository.find(homeId, userId);
 
   if (!membership) {
     throw new HomeModuleError(403, "HOME access denied");
@@ -268,11 +270,10 @@ function requireMembershipManager(membership: HomeMemberRecord) {
   }
 }
 
-function getActiveShareCodes(homeId: string): HomeShareCodeRecord[] {
+async function getActiveShareCodes(homeId: string): Promise<HomeShareCodeRecord[]> {
   const now = new Date();
 
-  return homeShareCodeRepository
-    .listByHome(homeId)
+  return (await homeShareCodeRepository.listByHome(homeId))
     .filter(
       (shareCode) =>
         !shareCode.redeemedAt && new Date(shareCode.expiresAt).getTime() > now.getTime()
@@ -284,63 +285,90 @@ function normalizeShareCodeExpiresInHours(expiresInHours = 24): number {
   return Math.min(Math.max(Math.trunc(expiresInHours), 1), 24 * 14);
 }
 
-function listHomesForUserId(userId: string): HomeRecord[] {
-  const profile = upsertUserProfile({ userId });
-  ensureDefaultHomeAccess(profile);
+async function listHomesForUserId(userId: string): Promise<HomeRecord[]> {
+  const profile = await upsertUserProfile({ userId });
+  await ensureDefaultHomeAccess(profile);
 
-  return homeMemberRepository
-    .listByUser(userId)
-    .map((membership) => {
-      const home = requireHome(membership.homeId);
+  const memberships = await homeMemberRepository.listByUser(userId);
+  const homes = await Promise.all(
+    memberships.map(async (membership) => {
+      const home = await requireHome(membership.homeId);
       return mapHomeForRole(home, membership.role);
     })
-    .sort(compareHomeRecords);
+  );
+
+  return homes.sort(compareHomeRecords);
 }
 
-export function syncUserHomes(input: {
+export async function syncUserHomes(input: {
   userId: string;
   name?: string;
   email?: string;
-}): HomeRecord[] {
-  const profile = upsertUserProfile(input);
-  ensureDefaultHomeAccess(profile);
+}): Promise<HomeRecord[]> {
+  const profile = await upsertUserProfile(input);
+  await ensureDefaultHomeAccess(profile);
   return listHomesForUserId(profile.userId);
 }
 
-export function listHomes(context: HomeRequestContext): HomeRecord[] {
+export async function resolveHomeAccessContext<
+  T extends {
+    userId?: string;
+    homeId?: string;
+    userName?: string;
+    userEmail?: string;
+  }
+>(context: T): Promise<T & { homeRole?: HomeAccessRole }> {
+  if (!context.userId || !context.homeId) {
+    return context;
+  }
+
+  await syncUserHomes(createProfileSeed(context.userId, context));
+  const membership = await homeMemberRepository.find(context.homeId, context.userId);
+
+  if (!membership) {
+    throw new HomeModuleError(403, "HOME access denied");
+  }
+
+  return {
+    ...context,
+    homeRole: membership.role
+  };
+}
+
+export async function listHomes(context: HomeRequestContext): Promise<HomeRecord[]> {
   return syncUserHomes(createProfileSeed(requireUserId(context), context));
 }
 
-export function listHomeMembers(
+export async function listHomeMembers(
   homeId: string,
   context: HomeRequestContext
-): HomeMemberRecord[] {
+): Promise<HomeMemberRecord[]> {
   const userId = requireUserId(context);
-  syncUserHomes(createProfileSeed(userId, context));
-  requireMembership(homeId, userId);
+  await syncUserHomes(createProfileSeed(userId, context));
+  await requireMembership(homeId, userId);
 
-  return homeMemberRepository.listByHome(homeId).sort(compareHomeMembers);
+  return (await homeMemberRepository.listByHome(homeId)).sort(compareHomeMembers);
 }
 
-export function listHomeShareCodes(
+export async function listHomeShareCodes(
   homeId: string,
   context: HomeRequestContext
-): HomeShareCodeRecord[] {
+): Promise<HomeShareCodeRecord[]> {
   const userId = requireUserId(context);
-  syncUserHomes(createProfileSeed(userId, context));
-  requireShareCodeManager(requireMembership(homeId, userId));
+  await syncUserHomes(createProfileSeed(userId, context));
+  requireShareCodeManager(await requireMembership(homeId, userId));
 
   return getActiveShareCodes(homeId);
 }
 
-export function createHomeShareCode(
+export async function createHomeShareCode(
   homeId: string,
   payload: CreateHomeShareCodePayload,
   context: HomeRequestContext
-): HomeShareCodeRecord {
+): Promise<HomeShareCodeRecord> {
   const userId = requireUserId(context);
-  syncUserHomes(createProfileSeed(userId, context));
-  const membership = requireMembership(homeId, userId);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const membership = await requireMembership(homeId, userId);
 
   requireShareCodeManager(membership);
 
@@ -351,7 +379,7 @@ export function createHomeShareCode(
     );
   }
 
-  requireHome(homeId);
+  await requireHome(homeId);
 
   const now = new Date();
   const expiresAt = new Date(
@@ -368,8 +396,8 @@ export function createHomeShareCode(
     updatedAt: now.toISOString()
   };
 
-  homeShareCodeRepository.save(shareCode);
-  writeAudit(homeId, userId, "home.share_code.created", {
+  await homeShareCodeRepository.save(shareCode);
+  await writeAudit(homeId, userId, "home.share_code.created", {
     role: shareCode.role,
     expiresAt: shareCode.expiresAt
   });
@@ -377,15 +405,15 @@ export function createHomeShareCode(
   return shareCode;
 }
 
-export function redeemHomeShareCode(
+export async function redeemHomeShareCode(
   payload: RedeemHomeShareCodePayload,
   context: HomeRequestContext
-): HomeRedeemResponse {
+): Promise<HomeRedeemResponse> {
   const userId = requireUserId(context);
-  const profile = upsertUserProfile(createProfileSeed(userId, context));
-  ensureDefaultHomeAccess(profile);
+  const profile = await upsertUserProfile(createProfileSeed(userId, context));
+  await ensureDefaultHomeAccess(profile);
 
-  const shareCode = homeShareCodeRepository.getByCode(payload.code);
+  const shareCode = await homeShareCodeRepository.getByCode(payload.code);
 
   if (!shareCode) {
     throw new HomeModuleError(404, "Share code not found");
@@ -399,14 +427,14 @@ export function redeemHomeShareCode(
     throw new HomeModuleError(410, "Share code has expired");
   }
 
-  const home = requireHome(shareCode.homeId);
+  const home = await requireHome(shareCode.homeId);
 
-  if (homeMemberRepository.find(home.homeId, userId)) {
+  if (await homeMemberRepository.find(home.homeId, userId)) {
     throw new HomeModuleError(409, "User already has access to this HOME");
   }
 
   const now = new Date().toISOString();
-  homeMemberRepository.save({
+  await homeMemberRepository.save({
     membershipId: createMembershipId(),
     homeId: home.homeId,
     userId,
@@ -417,33 +445,33 @@ export function redeemHomeShareCode(
     updatedAt: now,
     invitedByUserId: shareCode.createdByUserId
   });
-  homeShareCodeRepository.save({
+  await homeShareCodeRepository.save({
     ...shareCode,
     redeemedAt: now,
     redeemedByUserId: userId,
     updatedAt: now
   });
-  writeAudit(home.homeId, userId, "home.share_code.redeemed", {
+  await writeAudit(home.homeId, userId, "home.share_code.redeemed", {
     role: shareCode.role,
     code: shareCode.code
   });
 
   return {
     home: mapHomeForRole(home, shareCode.role),
-    homes: listHomesForUserId(userId)
+    homes: await listHomesForUserId(userId)
   };
 }
 
-export function updateHomeMemberRole(
+export async function updateHomeMemberRole(
   homeId: string,
   targetUserId: string,
   payload: UpdateHomeMemberRolePayload,
   context: HomeRequestContext
-): HomeMemberRecord[] {
+): Promise<HomeMemberRecord[]> {
   const userId = requireUserId(context);
-  syncUserHomes(createProfileSeed(userId, context));
-  const actorMembership = requireMembership(homeId, userId);
-  const targetMembership = requireMembership(homeId, targetUserId);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const actorMembership = await requireMembership(homeId, userId);
+  const targetMembership = await requireMembership(homeId, targetUserId);
 
   requireMembershipManager(actorMembership);
 
@@ -461,12 +489,12 @@ export function updateHomeMemberRole(
     );
   }
 
-  homeMemberRepository.save({
+  await homeMemberRepository.save({
     ...targetMembership,
     role: payload.role,
     updatedAt: new Date().toISOString()
   });
-  writeAudit(homeId, userId, "home.member.role_updated", {
+  await writeAudit(homeId, userId, "home.member.role_updated", {
     targetUserId,
     role: payload.role
   });
@@ -474,15 +502,15 @@ export function updateHomeMemberRole(
   return listHomeMembers(homeId, context);
 }
 
-export function revokeHomeMember(
+export async function revokeHomeMember(
   homeId: string,
   targetUserId: string,
   context: HomeRequestContext
-): HomeMemberRecord[] {
+): Promise<HomeMemberRecord[]> {
   const userId = requireUserId(context);
-  syncUserHomes(createProfileSeed(userId, context));
-  const actorMembership = requireMembership(homeId, userId);
-  const targetMembership = requireMembership(homeId, targetUserId);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const actorMembership = await requireMembership(homeId, userId);
+  const targetMembership = await requireMembership(homeId, targetUserId);
 
   requireMembershipManager(actorMembership);
 
@@ -499,8 +527,8 @@ export function revokeHomeMember(
     );
   }
 
-  homeMemberRepository.remove(homeId, targetMembership.membershipId);
-  writeAudit(homeId, userId, "home.member.revoked", {
+  await homeMemberRepository.remove(homeId, targetMembership.membershipId);
+  await writeAudit(homeId, userId, "home.member.revoked", {
     targetUserId
   });
 
@@ -508,11 +536,11 @@ export function revokeHomeMember(
 }
 
 export const homeTesting = {
-  reset() {
-    homeRepository.reset();
-    homeMemberRepository.reset();
-    homeShareCodeRepository.reset();
-    homeUserProfileRepository.reset();
-    homeAuditRepository.reset();
+  async reset() {
+    await homeRepository.reset();
+    await homeMemberRepository.reset();
+    await homeShareCodeRepository.reset();
+    await homeUserProfileRepository.reset();
+    await homeAuditRepository.reset();
   }
 };

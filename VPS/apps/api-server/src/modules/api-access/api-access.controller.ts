@@ -31,24 +31,13 @@ function readHeaderValue(value: string | string[] | undefined): string | undefin
   return value?.trim() || undefined;
 }
 
-function parseHomeRole(value: string | undefined): ApiKeyRequestContext["homeRole"] {
-  return value === "owner" ||
-    value === "admin" ||
-    value === "member" ||
-    value === "viewer"
-    ? value
-    : undefined;
-}
-
 function readApiKeyContext(request: Request): ApiKeyRequestContext {
   const userId = readHeaderValue(request.header("x-user-id"));
   const homeId = readHeaderValue(request.header("x-home-id"));
-  const homeRole = parseHomeRole(readHeaderValue(request.header("x-home-role")));
 
   return {
     ...(userId ? { userId } : {}),
-    ...(homeId ? { homeId } : {}),
-    ...(homeRole ? { homeRole } : {})
+    ...(homeId ? { homeId } : {})
   };
 }
 
@@ -95,24 +84,24 @@ function requireActor(
   return actor;
 }
 
-export function listApiPackagesController(request: Request, response: Response) {
+export async function listApiPackagesController(request: Request, response: Response) {
   if (!requireActor(request, response)) {
     return;
   }
 
   response.status(200).json({
-    data: listApiPackages()
+    data: await listApiPackages()
   });
 }
 
-export function getApiPackageController(request: Request, response: Response) {
+export async function getApiPackageController(request: Request, response: Response) {
   if (!requireActor(request, response)) {
     return;
   }
 
   try {
     response.status(200).json({
-      data: getApiPackage(request.params.packageId ?? "")
+      data: await getApiPackage(request.params.packageId ?? "")
     });
   } catch (error) {
     sendError(response, error);
@@ -144,10 +133,10 @@ export async function createApiPackageController(request: Request, response: Res
   }
 }
 
-export function listApiKeysController(request: Request, response: Response) {
+export async function listApiKeysController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: listApiKeys(readApiKeyContext(request))
+      data: await listApiKeys(readApiKeyContext(request))
     });
   } catch (error) {
     sendError(response, error);
@@ -173,10 +162,10 @@ export async function createApiKeyController(request: Request, response: Respons
   }
 }
 
-export function revokeApiKeyController(request: Request, response: Response) {
+export async function revokeApiKeyController(request: Request, response: Response) {
   try {
     response.status(200).json({
-      data: revokeApiKey(request.params.keyId ?? "", readApiKeyContext(request))
+      data: await revokeApiKey(request.params.keyId ?? "", readApiKeyContext(request))
     });
   } catch (error) {
     sendError(response, error);

@@ -50,33 +50,33 @@ function sendError(response: Response, error: unknown) {
 }
 
 export function listHomesController(request: Request, response: Response) {
-  try {
-    response.status(200).json({
-      data: listHomes(readContext(request))
+  listHomes(readContext(request))
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function listHomeMembersController(request: Request, response: Response) {
-  try {
-    response.status(200).json({
-      data: listHomeMembers(request.params.homeId ?? "", readContext(request))
+  listHomeMembers(request.params.homeId ?? "", readContext(request))
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function listHomeShareCodesController(request: Request, response: Response) {
-  try {
-    response.status(200).json({
-      data: listHomeShareCodes(request.params.homeId ?? "", readContext(request))
+  listHomeShareCodes(request.params.homeId ?? "", readContext(request))
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function createHomeShareCodeController(request: Request, response: Response) {
@@ -89,13 +89,13 @@ export function createHomeShareCodeController(request: Request, response: Respon
     return;
   }
 
-  try {
-    response.status(201).json({
-      data: createHomeShareCode(request.params.homeId ?? "", payload, readContext(request))
+  createHomeShareCode(request.params.homeId ?? "", payload, readContext(request))
+    .then((data) => {
+      response.status(201).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function redeemHomeShareCodeController(request: Request, response: Response) {
@@ -108,13 +108,13 @@ export function redeemHomeShareCodeController(request: Request, response: Respon
     return;
   }
 
-  try {
-    response.status(200).json({
-      data: redeemHomeShareCode(payload, readContext(request))
+  redeemHomeShareCode(payload, readContext(request))
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function updateHomeMemberRoleController(request: Request, response: Response) {
@@ -127,30 +127,30 @@ export function updateHomeMemberRoleController(request: Request, response: Respo
     return;
   }
 
-  try {
-    response.status(200).json({
-      data: updateHomeMemberRole(
-        request.params.homeId ?? "",
-        request.params.userId ?? "",
-        payload,
-        readContext(request)
-      )
+  updateHomeMemberRole(
+    request.params.homeId ?? "",
+    request.params.userId ?? "",
+    payload,
+    readContext(request)
+  )
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }
 
 export function revokeHomeMemberController(request: Request, response: Response) {
-  try {
-    response.status(200).json({
-      data: revokeHomeMember(
-        request.params.homeId ?? "",
-        request.params.userId ?? "",
-        readContext(request)
-      )
+  revokeHomeMember(
+    request.params.homeId ?? "",
+    request.params.userId ?? "",
+    readContext(request)
+  )
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
     });
-  } catch (error) {
-    sendError(response, error);
-  }
 }

@@ -13,113 +13,263 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-const homeStore = new Map<string, StoredHomeRecord>();
-const homeMemberStore = new Map<string, HomeMemberRecord[]>();
-const homeShareCodeStore = new Map<string, HomeShareCodeRecord[]>();
-const homeUserProfileStore = new Map<string, HomeUserProfile>();
-const homeAuditStore = new Map<string, HomeAuditEntry[]>();
+export interface HomeRepository {
+  get(homeId: string): Promise<StoredHomeRecord | undefined>;
+  list(): Promise<StoredHomeRecord[]>;
+  findDefaultByOwner(ownerUserId: string): Promise<StoredHomeRecord | undefined>;
+  save(record: StoredHomeRecord): Promise<StoredHomeRecord>;
+  reset(): Promise<void>;
+}
 
-export const homeRepository = {
-  get(homeId: string) {
-    const record = homeStore.get(homeId);
-    return record ? clone(record) : undefined;
+export interface HomeMemberRepository {
+  listByHome(homeId: string): Promise<HomeMemberRecord[]>;
+  listByUser(userId: string): Promise<HomeMemberRecord[]>;
+  find(homeId: string, userId: string): Promise<HomeMemberRecord | undefined>;
+  save(record: HomeMemberRecord): Promise<HomeMemberRecord>;
+  remove(homeId: string, membershipId: string): Promise<void>;
+  reset(): Promise<void>;
+}
+
+export interface HomeShareCodeRepository {
+  listByHome(homeId: string): Promise<HomeShareCodeRecord[]>;
+  getByCode(code: string): Promise<HomeShareCodeRecord | undefined>;
+  save(record: HomeShareCodeRecord): Promise<HomeShareCodeRecord>;
+  reset(): Promise<void>;
+}
+
+export interface HomeUserProfileRepository {
+  get(userId: string): Promise<HomeUserProfile | undefined>;
+  save(record: HomeUserProfile): Promise<HomeUserProfile>;
+  reset(): Promise<void>;
+}
+
+export interface HomeAuditRepository {
+  listByHome(homeId: string): Promise<HomeAuditEntry[]>;
+  append(record: HomeAuditEntry): Promise<void>;
+  reset(): Promise<void>;
+}
+
+export interface HomePersistenceStore {
+  homes: HomeRepository;
+  members: HomeMemberRepository;
+  shareCodes: HomeShareCodeRepository;
+  userProfiles: HomeUserProfileRepository;
+  audits: HomeAuditRepository;
+}
+
+function createInMemoryHomePersistenceStore(): HomePersistenceStore {
+  const homeStore = new Map<string, StoredHomeRecord>();
+  const homeMemberStore = new Map<string, HomeMemberRecord[]>();
+  const homeShareCodeStore = new Map<string, HomeShareCodeRecord[]>();
+  const homeUserProfileStore = new Map<string, HomeUserProfile>();
+  const homeAuditStore = new Map<string, HomeAuditEntry[]>();
+
+  const homes: HomeRepository = {
+    async get(homeId) {
+      const record = homeStore.get(homeId);
+      return record ? clone(record) : undefined;
+    },
+    async list() {
+      return Array.from(homeStore.values()).map(clone);
+    },
+    async findDefaultByOwner(ownerUserId) {
+      const record = Array.from(homeStore.values()).find(
+        (home) => home.ownerUserId === ownerUserId && home.isDefault
+      );
+      return record ? clone(record) : undefined;
+    },
+    async save(record) {
+      homeStore.set(record.homeId, clone(record));
+      return clone(record);
+    },
+    async reset() {
+      homeStore.clear();
+    }
+  };
+
+  const members: HomeMemberRepository = {
+    async listByHome(homeId) {
+      return clone(homeMemberStore.get(homeId) ?? []);
+    },
+    async listByUser(userId) {
+      return Array.from(homeMemberStore.values())
+        .flatMap((records) => records.filter((record) => record.userId === userId))
+        .map(clone);
+    },
+    async find(homeId, userId) {
+      return (await members.listByHome(homeId)).find((member) => member.userId === userId);
+    },
+    async save(record) {
+      const existingMembers = await members.listByHome(record.homeId);
+      const nextMembers = existingMembers.some(
+        (member) => member.membershipId === record.membershipId
+      )
+        ? existingMembers.map((member) =>
+            member.membershipId === record.membershipId ? clone(record) : member
+          )
+        : [...existingMembers, clone(record)];
+
+      homeMemberStore.set(record.homeId, nextMembers);
+      return clone(record);
+    },
+    async remove(homeId, membershipId) {
+      const nextMembers = (await members.listByHome(homeId)).filter(
+        (member) => member.membershipId !== membershipId
+      );
+      homeMemberStore.set(homeId, nextMembers);
+    },
+    async reset() {
+      homeMemberStore.clear();
+    }
+  };
+
+  const shareCodes: HomeShareCodeRepository = {
+    async listByHome(homeId) {
+      return clone(homeShareCodeStore.get(homeId) ?? []);
+    },
+    async getByCode(code) {
+      return Array.from(homeShareCodeStore.values())
+        .flatMap((records) => records)
+        .find((record) => record.code === code.trim().toUpperCase());
+    },
+    async save(record) {
+      const existingShareCodes = await shareCodes.listByHome(record.homeId);
+      const nextShareCodes = existingShareCodes.some(
+        (shareCode) => shareCode.shareCodeId === record.shareCodeId
+      )
+        ? existingShareCodes.map((shareCode) =>
+            shareCode.shareCodeId === record.shareCodeId ? clone(record) : shareCode
+          )
+        : [...existingShareCodes, clone(record)];
+
+      homeShareCodeStore.set(record.homeId, nextShareCodes);
+      return clone(record);
+    },
+    async reset() {
+      homeShareCodeStore.clear();
+    }
+  };
+
+  const userProfiles: HomeUserProfileRepository = {
+    async get(userId) {
+      const record = homeUserProfileStore.get(userId);
+      return record ? clone(record) : undefined;
+    },
+    async save(record) {
+      homeUserProfileStore.set(record.userId, clone(record));
+      return clone(record);
+    },
+    async reset() {
+      homeUserProfileStore.clear();
+    }
+  };
+
+  const audits: HomeAuditRepository = {
+    async listByHome(homeId) {
+      return clone(homeAuditStore.get(homeId) ?? []);
+    },
+    async append(record) {
+      const existingEntries = await audits.listByHome(record.homeId);
+      homeAuditStore.set(record.homeId, [...existingEntries, clone(record)]);
+    },
+    async reset() {
+      homeAuditStore.clear();
+    }
+  };
+
+  return {
+    homes,
+    members,
+    shareCodes,
+    userProfiles,
+    audits
+  };
+}
+
+let activeHomePersistenceStore = createInMemoryHomePersistenceStore();
+
+export function useHomePersistenceStore(store: HomePersistenceStore) {
+  activeHomePersistenceStore = store;
+}
+
+export function resetHomePersistenceStore() {
+  activeHomePersistenceStore = createInMemoryHomePersistenceStore();
+}
+
+export const homeRepository: HomeRepository = {
+  get(homeId) {
+    return activeHomePersistenceStore.homes.get(homeId);
   },
   list() {
-    return Array.from(homeStore.values()).map(clone);
+    return activeHomePersistenceStore.homes.list();
   },
-  save(record: StoredHomeRecord) {
-    homeStore.set(record.homeId, clone(record));
-    return clone(record);
+  findDefaultByOwner(ownerUserId) {
+    return activeHomePersistenceStore.homes.findDefaultByOwner(ownerUserId);
+  },
+  save(record) {
+    return activeHomePersistenceStore.homes.save(record);
   },
   reset() {
-    homeStore.clear();
+    return activeHomePersistenceStore.homes.reset();
   }
 };
 
-export const homeMemberRepository = {
-  listByHome(homeId: string) {
-    return clone(homeMemberStore.get(homeId) ?? []);
+export const homeMemberRepository: HomeMemberRepository = {
+  listByHome(homeId) {
+    return activeHomePersistenceStore.members.listByHome(homeId);
   },
-  listByUser(userId: string) {
-    return Array.from(homeMemberStore.values())
-      .flatMap((members) => members.filter((member) => member.userId === userId))
-      .map(clone);
+  listByUser(userId) {
+    return activeHomePersistenceStore.members.listByUser(userId);
   },
-  find(homeId: string, userId: string) {
-    return this.listByHome(homeId).find((member) => member.userId === userId);
+  find(homeId, userId) {
+    return activeHomePersistenceStore.members.find(homeId, userId);
   },
-  save(record: HomeMemberRecord) {
-    const members = this.listByHome(record.homeId);
-    const nextMembers = members.some((member) => member.membershipId === record.membershipId)
-      ? members.map((member) =>
-          member.membershipId === record.membershipId ? clone(record) : member
-        )
-      : [...members, clone(record)];
-
-    homeMemberStore.set(record.homeId, nextMembers);
-    return clone(record);
+  save(record) {
+    return activeHomePersistenceStore.members.save(record);
   },
-  remove(homeId: string, membershipId: string) {
-    const nextMembers = this.listByHome(homeId).filter(
-      (member) => member.membershipId !== membershipId
-    );
-    homeMemberStore.set(homeId, nextMembers);
+  remove(homeId, membershipId) {
+    return activeHomePersistenceStore.members.remove(homeId, membershipId);
   },
   reset() {
-    homeMemberStore.clear();
+    return activeHomePersistenceStore.members.reset();
   }
 };
 
-export const homeShareCodeRepository = {
-  listByHome(homeId: string) {
-    return clone(homeShareCodeStore.get(homeId) ?? []);
+export const homeShareCodeRepository: HomeShareCodeRepository = {
+  listByHome(homeId) {
+    return activeHomePersistenceStore.shareCodes.listByHome(homeId);
   },
-  getByCode(code: string) {
-    return Array.from(homeShareCodeStore.values())
-      .flatMap((shareCodes) => shareCodes)
-      .find((shareCode) => shareCode.code === code.trim().toUpperCase());
+  getByCode(code) {
+    return activeHomePersistenceStore.shareCodes.getByCode(code);
   },
-  save(record: HomeShareCodeRecord) {
-    const shareCodes = this.listByHome(record.homeId);
-    const nextShareCodes = shareCodes.some(
-      (shareCode) => shareCode.shareCodeId === record.shareCodeId
-    )
-      ? shareCodes.map((shareCode) =>
-          shareCode.shareCodeId === record.shareCodeId ? clone(record) : shareCode
-        )
-      : [...shareCodes, clone(record)];
-
-    homeShareCodeStore.set(record.homeId, nextShareCodes);
-    return clone(record);
+  save(record) {
+    return activeHomePersistenceStore.shareCodes.save(record);
   },
   reset() {
-    homeShareCodeStore.clear();
+    return activeHomePersistenceStore.shareCodes.reset();
   }
 };
 
-export const homeUserProfileRepository = {
-  get(userId: string) {
-    const record = homeUserProfileStore.get(userId);
-    return record ? clone(record) : undefined;
+export const homeUserProfileRepository: HomeUserProfileRepository = {
+  get(userId) {
+    return activeHomePersistenceStore.userProfiles.get(userId);
   },
-  save(record: HomeUserProfile) {
-    homeUserProfileStore.set(record.userId, clone(record));
-    return clone(record);
+  save(record) {
+    return activeHomePersistenceStore.userProfiles.save(record);
   },
   reset() {
-    homeUserProfileStore.clear();
+    return activeHomePersistenceStore.userProfiles.reset();
   }
 };
 
-export const homeAuditRepository = {
-  listByHome(homeId: string) {
-    return clone(homeAuditStore.get(homeId) ?? []);
+export const homeAuditRepository: HomeAuditRepository = {
+  listByHome(homeId) {
+    return activeHomePersistenceStore.audits.listByHome(homeId);
   },
-  append(record: HomeAuditEntry) {
-    const entries = this.listByHome(record.homeId);
-    homeAuditStore.set(record.homeId, [...entries, clone(record)]);
+  append(record) {
+    return activeHomePersistenceStore.audits.append(record);
   },
   reset() {
-    homeAuditStore.clear();
+    return activeHomePersistenceStore.audits.reset();
   }
 };

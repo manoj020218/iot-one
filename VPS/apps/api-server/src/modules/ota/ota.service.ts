@@ -60,8 +60,8 @@ function toReleaseSummary(record: OtaReleaseRecord): OtaReleaseSummary {
   };
 }
 
-function requireRelease(releaseId: string): OtaReleaseRecord {
-  const record = otaRepository.get(normalizeReleaseId(releaseId));
+async function requireRelease(releaseId: string): Promise<OtaReleaseRecord> {
+  const record = await otaRepository.get(normalizeReleaseId(releaseId));
 
   if (!record) {
     throw new OtaModuleError(404, `OTA release not found: ${normalizeReleaseId(releaseId)}`);

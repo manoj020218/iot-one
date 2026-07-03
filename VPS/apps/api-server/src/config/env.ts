@@ -5,6 +5,10 @@ export interface AppConfig {
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
+  homePersistenceMode: "memory" | "mongodb";
+  provisioningPersistenceMode: "memory" | "mongodb";
+  otaPersistenceMode: "memory" | "mongodb";
+  apiAccessPersistenceMode: "memory" | "mongodb";
   scenePersistenceMode: "memory" | "mongodb";
   sceneSchedulerEnabled: boolean;
   sceneSchedulerCoordinationMode: "local" | "mongodb-lock";
@@ -92,6 +96,11 @@ export function readAppConfig(): AppConfig {
     30_000,
     "SCENE_SCHEDULER_INTERVAL_MS"
   );
+  const homePersistenceMode = parsePersistenceMode(
+    process.env.HOME_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "HOME_PERSISTENCE_MODE"
+  );
   const pidPersistenceMode = parsePersistenceMode(
     process.env.PID_PERSISTENCE_MODE,
     Boolean(mongodbUri),
@@ -101,6 +110,21 @@ export function readAppConfig(): AppConfig {
     process.env.DEVICE_PERSISTENCE_MODE,
     Boolean(mongodbUri),
     "DEVICE_PERSISTENCE_MODE"
+  );
+  const provisioningPersistenceMode = parsePersistenceMode(
+    process.env.PROVISIONING_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "PROVISIONING_PERSISTENCE_MODE"
+  );
+  const otaPersistenceMode = parsePersistenceMode(
+    process.env.OTA_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "OTA_PERSISTENCE_MODE"
+  );
+  const apiAccessPersistenceMode = parsePersistenceMode(
+    process.env.API_ACCESS_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "API_ACCESS_PERSISTENCE_MODE"
   );
   const scenePersistenceMode = parsePersistenceMode(
     process.env.SCENE_PERSISTENCE_MODE,
@@ -123,6 +147,10 @@ export function readAppConfig(): AppConfig {
     throw new Error(`Invalid PORT value: ${rawPort}`);
   }
 
+  if (homePersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("HOME_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
   if (scenePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("SCENE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -133,6 +161,18 @@ export function readAppConfig(): AppConfig {
 
   if (devicePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (provisioningPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("PROVISIONING_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (otaPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("OTA_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (apiAccessPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("API_ACCESS_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
   if (sceneSchedulerCoordinationMode === "mongodb-lock" && !mongodbUri) {
@@ -149,8 +189,12 @@ export function readAppConfig(): AppConfig {
       process.env.MATTER_RUNTIME_ENABLED,
       false
     ),
+    homePersistenceMode,
     pidPersistenceMode,
     devicePersistenceMode,
+    provisioningPersistenceMode,
+    otaPersistenceMode,
+    apiAccessPersistenceMode,
     scenePersistenceMode,
     sceneSchedulerEnabled: parseBooleanEnv(
       process.env.SCENE_SCHEDULER_ENABLED,

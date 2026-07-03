@@ -18,8 +18,8 @@ function getInitialProvisioningStatus(
   return method === "ble" ? "BLE_CONNECTED" : "WIFI_SENT";
 }
 
-function requireIntent(provisioningId: string): ProvisioningIntentRecord {
-  const record = provisioningRepository.get(provisioningId);
+async function requireIntent(provisioningId: string): Promise<ProvisioningIntentRecord> {
+  const record = await provisioningRepository.get(provisioningId);
 
   if (!record) {
     throw new ProvisioningModuleError(404, `Provisioning intent not found: ${provisioningId}`);
@@ -30,7 +30,7 @@ function requireIntent(provisioningId: string): ProvisioningIntentRecord {
 
 export function registerProvisioningIntent(
   payload: RegisterProvisioningIntentPayload
-): ProvisioningIntentRecord {
+): Promise<ProvisioningIntentRecord> {
   const timestamp = new Date().toISOString();
   const record: ProvisioningIntentRecord = {
     provisioningId: createProvisioningId(),
@@ -49,28 +49,29 @@ export function registerProvisioningIntent(
 export function completeProvisioning(
   provisioningId: string,
   payload: CompleteProvisioningPayload
-): ProvisioningIntentRecord {
-  const existing = requireIntent(provisioningId);
-  const nextStatus: ProvisioningStatus = payload.status ?? "SUCCESS";
-  const updated: ProvisioningIntentRecord = {
-    ...existing,
-    deviceId: payload.deviceId.trim().toUpperCase(),
-    updatedAt: new Date().toISOString(),
-    status: nextStatus,
-    ...(payload.pid ? { pid: payload.pid.trim().toUpperCase() } : {})
-  };
+): Promise<ProvisioningIntentRecord> {
+  return requireIntent(provisioningId).then((existing) => {
+    const nextStatus: ProvisioningStatus = payload.status ?? "SUCCESS";
+    const updated: ProvisioningIntentRecord = {
+      ...existing,
+      deviceId: payload.deviceId.trim().toUpperCase(),
+      updatedAt: new Date().toISOString(),
+      status: nextStatus,
+      ...(payload.pid ? { pid: payload.pid.trim().toUpperCase() } : {})
+    };
 
-  return provisioningRepository.save(updated);
+    return provisioningRepository.save(updated);
+  });
 }
 
 export function getProvisioningStatus(
   provisioningId: string
-): ProvisioningIntentRecord {
+): Promise<ProvisioningIntentRecord> {
   return requireIntent(provisioningId);
 }
 
 export const provisioningTesting = {
   reset() {
-    provisioningRepository.reset();
+    return provisioningRepository.reset();
   }
 };

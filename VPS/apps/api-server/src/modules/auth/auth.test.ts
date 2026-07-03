@@ -5,8 +5,8 @@ import { createApp } from "../../app";
 import { homeTesting } from "../homes/home.service";
 
 describe("auth routes", () => {
-  beforeEach(() => {
-    homeTesting.reset();
+  beforeEach(async () => {
+    await homeTesting.reset();
   });
 
   it("creates a default HOME during email signup", async () => {

@@ -5,10 +5,18 @@ import type { Db } from "mongodb";
 import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
+import { useApiAccessPersistenceStore } from "./modules/api-access/api-access.model";
+import { createMongoApiAccessPersistenceStore } from "./modules/api-access/api-access.mongo-store";
 import { useDeviceRepository } from "./modules/devices/device.model";
 import { createMongoDeviceRepository } from "./modules/devices/device.mongo-store";
+import { useHomePersistenceStore } from "./modules/homes/home.model";
+import { createMongoHomePersistenceStore } from "./modules/homes/home.mongo-store";
+import { useOtaRepository } from "./modules/ota/ota.model";
+import { createMongoOtaRepository } from "./modules/ota/ota.mongo-store";
 import { usePidPersistenceStore } from "./modules/pid/pid.model";
 import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
+import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
+import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
 import { createMongoScenePersistenceStore } from "./modules/scenes/scene.mongo-store";
 import {
@@ -23,12 +31,25 @@ async function bootstrap() {
   let database: Db | null = null;
 
   if (
+    config.homePersistenceMode === "mongodb" ||
     config.pidPersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
+    config.provisioningPersistenceMode === "mongodb" ||
+    config.otaPersistenceMode === "mongodb" ||
+    config.apiAccessPersistenceMode === "mongodb" ||
     config.scenePersistenceMode === "mongodb" ||
     config.sceneSchedulerCoordinationMode === "mongodb-lock"
   ) {
     database = await getMongoDb(config.mongodbUri!);
+  }
+
+  if (config.homePersistenceMode === "mongodb") {
+    useHomePersistenceStore(
+      await createMongoHomePersistenceStore(database!)
+    );
+    console.log("[api-server] home persistence driver: mongodb");
+  } else {
+    console.log("[api-server] home persistence driver: memory");
   }
 
   if (config.pidPersistenceMode === "mongodb") {
@@ -47,6 +68,33 @@ async function bootstrap() {
     console.log("[api-server] device persistence driver: mongodb");
   } else {
     console.log("[api-server] device persistence driver: memory");
+  }
+
+  if (config.provisioningPersistenceMode === "mongodb") {
+    useProvisioningRepository(
+      await createMongoProvisioningRepository(database!)
+    );
+    console.log("[api-server] provisioning persistence driver: mongodb");
+  } else {
+    console.log("[api-server] provisioning persistence driver: memory");
+  }
+
+  if (config.otaPersistenceMode === "mongodb") {
+    useOtaRepository(
+      await createMongoOtaRepository(database!)
+    );
+    console.log("[api-server] ota persistence driver: mongodb");
+  } else {
+    console.log("[api-server] ota persistence driver: memory");
+  }
+
+  if (config.apiAccessPersistenceMode === "mongodb") {
+    useApiAccessPersistenceStore(
+      await createMongoApiAccessPersistenceStore(database!)
+    );
+    console.log("[api-server] api access persistence driver: mongodb");
+  } else {
+    console.log("[api-server] api access persistence driver: memory");
   }
 
   if (config.scenePersistenceMode === "mongodb") {
