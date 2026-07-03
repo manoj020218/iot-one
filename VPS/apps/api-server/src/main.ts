@@ -28,6 +28,7 @@ import {
 } from "./modules/scenes/scene.scheduler.coordinator";
 import { createMongoSceneSchedulerLeaseStore } from "./modules/scenes/scene.scheduler.mongo-store";
 import { createSceneRuntimeScheduler } from "./modules/scenes/scene.scheduler";
+import { createSceneRuntimeEvaluationWorker } from "./modules/scenes/scene.runtime-worker";
 
 async function bootstrap() {
   const config = readAppConfig();
@@ -149,6 +150,17 @@ async function bootstrap() {
         logger: (message) => console.log(message)
       })
     : null;
+  const sceneRuntimeWorker = config.sceneRuntimeWorkerEnabled
+    ? createSceneRuntimeEvaluationWorker({
+        workerId:
+          config.sceneSchedulerInstanceId ??
+          `${hostname()}:${process.pid.toString()}:scene-runtime-worker`,
+        intervalMs: config.sceneRuntimeWorkerIntervalMs,
+        batchSize: config.sceneRuntimeWorkerBatchSize,
+        visibilityTimeoutMs: config.sceneRuntimeWorkerVisibilityTimeoutMs,
+        logger: (message) => console.log(message)
+      })
+    : null;
 
   const server = app.listen(config.port, () => {
     console.log(
@@ -174,11 +186,19 @@ async function bootstrap() {
         `[api-server] scene action worker enabled with ${config.sceneActionWorkerIntervalMs}ms interval`
       );
     }
+
+    if (sceneRuntimeWorker) {
+      sceneRuntimeWorker.start();
+      console.log(
+        `[api-server] scene runtime worker enabled with ${config.sceneRuntimeWorkerIntervalMs}ms interval`
+      );
+    }
   });
 
   async function shutdown(signal: string) {
     console.log(`[api-server] received ${signal}, shutting down`);
     sceneRuntimeScheduler?.stop();
+    sceneRuntimeWorker?.stop();
     sceneActionWorker?.stop();
     server.close(async () => {
       await closeMongoClient();

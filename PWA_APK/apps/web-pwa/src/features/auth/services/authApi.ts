@@ -127,3 +127,53 @@ export async function logoutSession(session: AuthSession | null): Promise<void> 
     return;
   }
 }
+
+export type AuthSessionRefreshResult =
+  | {
+      status: "success";
+      tokens: TokenPair;
+    }
+  | {
+      status: "unauthorized";
+    }
+  | {
+      status: "unavailable";
+    };
+
+export async function refreshAuthSession(
+  session: AuthSession
+): Promise<AuthSessionRefreshResult> {
+  try {
+    const response = await fetch(`${authEndpoint}/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        refreshToken: session.tokens.refreshToken
+      })
+    });
+
+    if (response.status === 401) {
+      return {
+        status: "unauthorized"
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        status: "unavailable"
+      };
+    }
+
+    const payload = (await response.json()) as { data: TokenPair };
+    return {
+      status: "success",
+      tokens: payload.data
+    };
+  } catch {
+    return {
+      status: "unavailable"
+    };
+  }
+}

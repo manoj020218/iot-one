@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createScene } from "./scene.service";
+import { createScene, sceneTesting } from "./scene.service";
 import { createSceneRuntimeScheduler } from "./scene.scheduler";
-import { sceneTesting } from "./scene.service";
+import { createSceneRuntimeEvaluationWorker } from "./scene.runtime-worker";
 
 const ownerContext = {
   userId: "user-scene-owner",
@@ -27,7 +27,7 @@ describe("scene runtime scheduler", () => {
     await sceneTesting.reset();
   });
 
-  it("evaluates scheduled scenes for active homes and dedupes the same window", async () => {
+  it("queues scheduled scene evaluations for active homes and lets the worker dedupe the same window", async () => {
     const scene = await createScene(
       {
         name: "Morning Tank Sync",
@@ -59,16 +59,29 @@ describe("scene runtime scheduler", () => {
       now: () => new Date("2026-07-02T03:45:00.000Z"),
       logger: () => undefined
     });
+    const worker = createSceneRuntimeEvaluationWorker({
+      workerId: "scene-runtime-worker-test",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined
+    });
 
     const firstRun = await scheduler.runOnce();
     expect(firstRun.evaluatedHomeCount).toBe(1);
-    expect(firstRun.runCount).toBe(1);
-    expect(firstRun.matchedRunCount).toBe(1);
+    expect(firstRun.enqueuedJobCount).toBe(1);
+    expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(0);
+
+    const firstWorkerRun = await worker.runOnce("2026-07-02T03:45:05.000Z");
+    expect(firstWorkerRun.runCount).toBe(1);
     expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
 
     const secondRun = await scheduler.runOnce();
     expect(secondRun.evaluatedHomeCount).toBe(1);
-    expect(secondRun.runCount).toBe(0);
+    expect(secondRun.enqueuedJobCount).toBe(1);
+
+    const secondWorkerRun = await worker.runOnce("2026-07-02T03:45:10.000Z");
+    expect(secondWorkerRun.runCount).toBe(0);
     expect(await sceneTesting.listRunHistory(scene.sceneId)).toHaveLength(1);
   });
 
@@ -92,7 +105,7 @@ describe("scene runtime scheduler", () => {
     const secondRun = await scheduler.runOnce("2026-07-02T03:45:00.000Z");
 
     expect(secondRun.skippedReason).toBe("local_overlap");
-    expect(secondRun.runCount).toBe(0);
+    expect(secondRun.enqueuedJobCount).toBe(0);
 
     release.resolve();
 

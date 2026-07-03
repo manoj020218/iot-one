@@ -20,6 +20,10 @@ export interface AppConfig {
   sceneActionWorkerIntervalMs: number;
   sceneActionWorkerBatchSize: number;
   sceneActionWorkerVisibilityTimeoutMs: number;
+  sceneRuntimeWorkerEnabled: boolean;
+  sceneRuntimeWorkerIntervalMs: number;
+  sceneRuntimeWorkerBatchSize: number;
+  sceneRuntimeWorkerVisibilityTimeoutMs: number;
 }
 
 function parseBooleanEnv(
@@ -165,6 +169,21 @@ export function readAppConfig(): AppConfig {
     Math.max(sceneActionWorkerIntervalMs * 3, 30_000),
     "SCENE_ACTION_WORKER_VISIBILITY_TIMEOUT_MS"
   );
+  const sceneRuntimeWorkerIntervalMs = parsePositiveIntegerEnv(
+    process.env.SCENE_RUNTIME_WORKER_INTERVAL_MS,
+    5_000,
+    "SCENE_RUNTIME_WORKER_INTERVAL_MS"
+  );
+  const sceneRuntimeWorkerBatchSize = parsePositiveIntegerEnv(
+    process.env.SCENE_RUNTIME_WORKER_BATCH_SIZE,
+    25,
+    "SCENE_RUNTIME_WORKER_BATCH_SIZE"
+  );
+  const sceneRuntimeWorkerVisibilityTimeoutMs = parsePositiveIntegerEnv(
+    process.env.SCENE_RUNTIME_WORKER_VISIBILITY_TIMEOUT_MS,
+    Math.max(sceneRuntimeWorkerIntervalMs * 3, 30_000),
+    "SCENE_RUNTIME_WORKER_VISIBILITY_TIMEOUT_MS"
+  );
   const sceneSchedulerInstanceId =
     process.env.SCENE_SCHEDULER_INSTANCE_ID?.trim() || undefined;
 
@@ -240,6 +259,13 @@ export function readAppConfig(): AppConfig {
     ),
     sceneActionWorkerIntervalMs,
     sceneActionWorkerBatchSize,
-    sceneActionWorkerVisibilityTimeoutMs
+    sceneActionWorkerVisibilityTimeoutMs,
+    sceneRuntimeWorkerEnabled: parseBooleanEnv(
+      process.env.SCENE_RUNTIME_WORKER_ENABLED,
+      true
+    ),
+    sceneRuntimeWorkerIntervalMs,
+    sceneRuntimeWorkerBatchSize,
+    sceneRuntimeWorkerVisibilityTimeoutMs
   };
 }

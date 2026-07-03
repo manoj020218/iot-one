@@ -8,7 +8,7 @@ import { getDeviceFirmwarePlan as resolveDeviceFirmwarePlan, resolveOtaReleaseFo
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
-import { evaluateScenesByTelemetry } from "../scenes/scene.service";
+import { enqueueSceneEvaluationByTelemetry } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
 import type {
   DeviceFirmwarePlanResult,
@@ -256,7 +256,7 @@ export async function ingestDeviceTelemetry(
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
   const savedDevice = await deviceRepository.save(updatedDevice);
-  const sceneRuntime = await evaluateScenesByTelemetry(
+  const sceneRuntimeQueue = await enqueueSceneEvaluationByTelemetry(
     {
       deviceId: savedDevice.deviceId,
       telemetry: payload.telemetry,
@@ -269,7 +269,7 @@ export async function ingestDeviceTelemetry(
 
   return {
     device: savedDevice,
-    sceneRuntime
+    sceneRuntimeQueue
   };
 }
 

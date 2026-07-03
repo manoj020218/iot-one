@@ -8,7 +8,7 @@ import type {
   SceneTelemetrySnapshot
 } from "@jenix/shared";
 
-import type { SceneRuntimeBatchResponse } from "../scenes/scene.types";
+import type { SceneRuntimeQueueResponse } from "../scenes/scene.types";
 
 export interface DeviceRequestContext {
   userId?: string;
@@ -43,7 +43,7 @@ export interface DeviceTelemetryIngestPayload {
 
 export interface DeviceTelemetryIngestResponse {
   device: DeviceRecord;
-  sceneRuntime: SceneRuntimeBatchResponse;
+  sceneRuntimeQueue: SceneRuntimeQueueResponse;
 }
 
 export type DeviceFirmwareRequestResponse = DeviceFirmwareRequestResult;

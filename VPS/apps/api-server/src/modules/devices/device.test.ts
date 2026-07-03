@@ -8,6 +8,8 @@ import { deviceTesting } from "./device.service";
 import { homeTesting } from "../homes/home.service";
 import { otaTesting } from "../ota/ota.service";
 import { pidTesting } from "../pid/pid.service";
+import { createSceneRuntimeEvaluationWorker } from "../scenes/scene.runtime-worker";
+import { sceneTesting } from "../scenes/scene.service";
 import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 
 const developerHeaders = {
@@ -82,6 +84,7 @@ describe("device routes", () => {
     await deviceTesting.reset();
     await pidTesting.reset();
     await otaTesting.reset();
+    await sceneTesting.reset();
   });
 
   it("registers a device against an existing PID", async () => {
@@ -308,7 +311,7 @@ describe("device routes", () => {
     expect(response.body.data.recommendedChannel).toBe("stable");
   });
 
-  it("ingests telemetry and triggers matching device-threshold scenes", async () => {
+  it("ingests telemetry and queues matching device-threshold scene evaluation", async () => {
     await createPid();
     const ownerSession = await createAuthenticatedSession({
       name: "Device Owner",
@@ -366,7 +369,18 @@ describe("device routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.device.lastSeenAt).toBe("2026-07-02T06:00:00.000Z");
     expect(response.body.data.device.mqttStatus).toBe("online");
-    expect(response.body.data.sceneRuntime.matchedRunCount).toBe(1);
-    expect(response.body.data.sceneRuntime.runs[0].scene.lastRunStatus).toBe("success");
+    expect(response.body.data.sceneRuntimeQueue.acceptedCount).toBe(1);
+
+    const worker = createSceneRuntimeEvaluationWorker({
+      workerId: "scene-runtime-worker-test",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined
+    });
+
+    const workerResult = await worker.runOnce("2026-07-02T06:00:05.000Z");
+    expect(workerResult.matchedRunCount).toBe(1);
+    expect(workerResult.runCount).toBe(1);
   });
 });

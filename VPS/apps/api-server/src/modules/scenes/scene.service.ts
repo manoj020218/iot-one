@@ -16,6 +16,7 @@ import { HomeModuleError } from "../homes/home.types";
 import {
   sceneActionDispatchRepository,
   sceneAuditRepository,
+  sceneEvaluationJobRepository,
   sceneRepository,
   sceneRunHistoryRepository
 } from "./scene.model";
@@ -26,11 +27,15 @@ import type {
   ScheduleRuntimePayload,
   SceneActionInput,
   SceneAuditEntry,
+  SceneEvaluationJob,
   SceneConditionInput,
   ScenePatchPayload,
   SceneRequestContext,
   SceneRunHistoryEntry,
+  SceneRuntimeQueueJobReceipt,
+  SceneRuntimeQueueResponse,
   SceneRunResponse,
+  SceneQueuedRuntimeSource,
   SceneRuntimeBatchResponse,
   SceneRuntimeSource,
   SceneTriggerInput,
@@ -64,6 +69,10 @@ function createRunId(): string {
 
 function createDispatchJobId(): string {
   return createNestedId("dispatch");
+}
+
+function createEvaluationJobId(): string {
+  return createNestedId("runtime");
 }
 
 function optionalProp<K extends string, V>(
@@ -302,6 +311,43 @@ function createDispatchJobs(
     attemptCount: 0,
     status: "queued"
   }));
+}
+
+function createRuntimeQueueResponse(
+  jobs: SceneEvaluationJob[]
+): SceneRuntimeQueueResponse {
+  return {
+    acceptedCount: jobs.length,
+    jobs: jobs.map(
+      (job): SceneRuntimeQueueJobReceipt => ({
+        jobId: job.jobId,
+        source: job.source,
+        homeId: job.homeId,
+        status: "queued",
+        queuedAt: job.requestedAt
+      })
+    )
+  };
+}
+
+function createEvaluationJob(input: {
+  source: SceneQueuedRuntimeSource;
+  homeId: string;
+  occurredAt: string;
+  deviceId?: string;
+  telemetry?: SceneTelemetrySnapshot;
+}): SceneEvaluationJob {
+  return {
+    jobId: createEvaluationJobId(),
+    source: input.source,
+    homeId: input.homeId,
+    requestedAt: new Date().toISOString(),
+    occurredAt: input.occurredAt,
+    ...(input.deviceId ? { deviceId: input.deviceId } : {}),
+    ...(input.telemetry ? { telemetry: input.telemetry } : {}),
+    attemptCount: 0,
+    status: "queued"
+  };
 }
 
 async function executeSceneRuntime(
@@ -656,6 +702,27 @@ export async function evaluateScenesByTelemetry(
   );
 }
 
+export async function enqueueSceneEvaluationByTelemetry(
+  payload: TelemetryRuntimePayload,
+  context: SceneRequestContext
+): Promise<SceneRuntimeQueueResponse> {
+  const resolvedContext = await resolveContext(context);
+  const homeId = requireHomeId(resolvedContext);
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+  const jobs = [
+    createEvaluationJob({
+      source: "device_threshold",
+      homeId,
+      occurredAt,
+      deviceId: payload.deviceId,
+      telemetry: payload.telemetry
+    })
+  ];
+
+  await sceneEvaluationJobRepository.enqueue(jobs);
+  return createRuntimeQueueResponse(jobs);
+}
+
 export async function evaluateScheduledScenes(
   payload: ScheduleRuntimePayload,
   context: SceneRequestContext
@@ -699,12 +766,32 @@ export async function evaluateScheduledScenes(
   );
 }
 
+export async function enqueueScheduledSceneEvaluation(
+  payload: ScheduleRuntimePayload,
+  context: SceneRequestContext
+): Promise<SceneRuntimeQueueResponse> {
+  const resolvedContext = await resolveContext(context);
+  const homeId = requireHomeId(resolvedContext);
+  const occurredAt = payload.occurredAt ?? new Date().toISOString();
+  const jobs = [
+    createEvaluationJob({
+      source: "schedule",
+      homeId,
+      occurredAt
+    })
+  ];
+
+  await sceneEvaluationJobRepository.enqueue(jobs);
+  return createRuntimeQueueResponse(jobs);
+}
+
 export const sceneTesting = {
   async reset() {
     await sceneRepository.reset();
     await sceneAuditRepository.reset();
     await sceneRunHistoryRepository.reset();
     await sceneActionDispatchRepository.reset();
+    await sceneEvaluationJobRepository.reset();
   },
   listAudit(sceneId: string) {
     return sceneAuditRepository.list(sceneId);
@@ -714,5 +801,8 @@ export const sceneTesting = {
   },
   listActionDispatches(sceneId: string) {
     return sceneActionDispatchRepository.listByScene(sceneId);
+  },
+  listEvaluationJobs(homeId: string) {
+    return sceneEvaluationJobRepository.listByHome(homeId);
   }
 };

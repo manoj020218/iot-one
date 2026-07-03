@@ -75,6 +75,7 @@ export interface SceneRunResponse extends SceneRunResult {
 }
 
 export type SceneRuntimeSource = "manual" | "device_threshold" | "schedule";
+export type SceneQueuedRuntimeSource = "device_threshold" | "schedule";
 
 export interface SceneRunHistoryEntry extends SceneRunResult {
   runId: string;
@@ -108,6 +109,43 @@ export interface SceneActionDispatchJob {
   completedAt?: string;
   failedAt?: string;
   lastError?: string;
+}
+
+export type SceneEvaluationJobStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export interface SceneEvaluationJob {
+  jobId: string;
+  source: SceneQueuedRuntimeSource;
+  homeId: string;
+  requestedAt: string;
+  occurredAt: string;
+  deviceId?: string;
+  telemetry?: SceneTelemetrySnapshot;
+  attemptCount: number;
+  status: SceneEvaluationJobStatus;
+  processingWorkerId?: string;
+  processingStartedAt?: string;
+  visibleAfter?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
+}
+
+export interface SceneRuntimeQueueJobReceipt {
+  jobId: string;
+  source: SceneQueuedRuntimeSource;
+  homeId: string;
+  status: "queued";
+  queuedAt: string;
+}
+
+export interface SceneRuntimeQueueResponse {
+  acceptedCount: number;
+  jobs: SceneRuntimeQueueJobReceipt[];
 }
 
 export interface SceneRuntimeBatchResponse {

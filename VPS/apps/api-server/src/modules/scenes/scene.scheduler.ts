@@ -1,5 +1,5 @@
 import {
-  evaluateScheduledScenes,
+  enqueueScheduledSceneEvaluation,
   listActiveSceneHomeIds
 } from "./scene.service";
 import {
@@ -17,8 +17,7 @@ export interface SceneRuntimeSchedulerOptions {
 
 export interface SceneRuntimeSchedulerTickResult {
   evaluatedHomeCount: number;
-  matchedRunCount: number;
-  runCount: number;
+  enqueuedJobCount: number;
   skippedReason?: "coordination_lock" | "local_overlap";
 }
 
@@ -50,12 +49,11 @@ export class SceneRuntimeScheduler {
     const homeIds = await this.getHomeIds();
     const result: SceneRuntimeSchedulerTickResult = {
       evaluatedHomeCount: 0,
-      matchedRunCount: 0,
-      runCount: 0
+      enqueuedJobCount: 0
     };
 
     for (const homeId of homeIds) {
-      const batch = await evaluateScheduledScenes(
+      const batch = await enqueueScheduledSceneEvaluation(
         { occurredAt },
         {
           homeId
@@ -63,13 +61,12 @@ export class SceneRuntimeScheduler {
       );
 
       result.evaluatedHomeCount += 1;
-      result.matchedRunCount += batch.matchedRunCount;
-      result.runCount += batch.runs.length;
+      result.enqueuedJobCount += batch.acceptedCount;
     }
 
-    if (result.runCount > 0) {
+    if (result.enqueuedJobCount > 0) {
       this.logger?.(
-        `[scene-scheduler] evaluated ${result.evaluatedHomeCount} home(s), executed ${result.runCount} run(s), matched ${result.matchedRunCount} scene(s)`
+        `[scene-scheduler] evaluated ${result.evaluatedHomeCount} home(s) and queued ${result.enqueuedJobCount} runtime job(s)`
       );
     }
 
@@ -83,8 +80,7 @@ export class SceneRuntimeScheduler {
       this.logger?.("[scene-scheduler] skipped tick because the previous tick is still running");
       return {
         evaluatedHomeCount: 0,
-        matchedRunCount: 0,
-        runCount: 0,
+        enqueuedJobCount: 0,
         skippedReason: "local_overlap"
       };
     }
@@ -102,16 +98,14 @@ export class SceneRuntimeScheduler {
         );
         return {
           evaluatedHomeCount: 0,
-          matchedRunCount: 0,
-          runCount: 0,
+          enqueuedJobCount: 0,
           skippedReason: "coordination_lock"
         };
       }
 
       return coordinated.value ?? {
         evaluatedHomeCount: 0,
-        matchedRunCount: 0,
-        runCount: 0
+        enqueuedJobCount: 0
       };
     } finally {
       this.tickInProgress = false;
