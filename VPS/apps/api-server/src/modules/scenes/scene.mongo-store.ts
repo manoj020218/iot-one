@@ -250,6 +250,13 @@ export async function createMongoScenePersistenceStore(
       }
     },
     dispatches: {
+      async get(jobId) {
+        return (
+          await sceneActionDispatchCollection.findOne({
+            jobId
+          })
+        ) ?? undefined;
+      },
       async listByScene(sceneId) {
         return sceneActionDispatchCollection
           .find({ sceneId })

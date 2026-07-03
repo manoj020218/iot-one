@@ -2,6 +2,7 @@ import type {
   DeviceFirmwareRequestInput,
   DeviceFirmwarePlanResponse,
   DeviceFirmwareRequestResult,
+  DeviceFirmwareRolloutRecord,
   DeviceRecord,
   HomeAccessRole,
   RegisterDeviceInput,
@@ -48,6 +49,7 @@ export interface DeviceTelemetryIngestResponse {
 
 export type DeviceFirmwareRequestResponse = DeviceFirmwareRequestResult;
 export type DeviceFirmwarePlanResult = DeviceFirmwarePlanResponse;
+export type DeviceFirmwareRolloutResult = DeviceFirmwareRolloutRecord;
 
 export class DeviceModuleError extends Error {
   constructor(

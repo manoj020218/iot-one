@@ -1,6 +1,7 @@
 import type {
   HomeAccessRole,
   SceneAction,
+  SceneActionDispatchRecord as SharedSceneActionDispatchRecord,
   SceneCondition,
   SceneRecord,
   SceneRunResult,
@@ -87,32 +88,9 @@ export interface SceneRunHistoryEntry extends SceneRunResult {
   dedupeKey?: string;
 }
 
-export type SceneActionDispatchStatus =
-  | "queued"
-  | "processing"
-  | "dispatched"
-  | "completed"
-  | "failed";
+export type SceneActionDispatchStatus = SharedSceneActionDispatchRecord["status"];
 
-export interface SceneActionDispatchJob {
-  jobId: string;
-  runId: string;
-  sceneId: string;
-  homeId: string;
-  source: SceneRuntimeSource;
-  action: SceneAction;
-  requestedAt: string;
-  attemptCount: number;
-  status: SceneActionDispatchStatus;
-  processingWorkerId?: string;
-  processingStartedAt?: string;
-  visibleAfter?: string;
-  dispatchedAt?: string;
-  acknowledgedAt?: string;
-  completedAt?: string;
-  failedAt?: string;
-  lastError?: string;
-}
+export type SceneActionDispatchJob = SharedSceneActionDispatchRecord;
 
 export type SceneEvaluationJobStatus =
   | "queued"

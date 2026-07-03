@@ -286,6 +286,52 @@ export async function queueOtaDeliveryForDevice(
   );
 }
 
+function createReplayOtaDeliveryJob(
+  job: OtaDeliveryJob,
+  device: DeviceRecord,
+  requestedBy: string,
+  requestedAt: string
+): OtaDeliveryJob {
+  return {
+    requestId: createDeliveryRequestId(),
+    deviceId: device.deviceId,
+    homeId: device.homeId,
+    pid: job.pid,
+    channel: job.channel,
+    targetVersion: job.targetVersion,
+    artifactUrl: job.artifactUrl,
+    checksum: job.checksum,
+    requestedAt,
+    requestedBy,
+    ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {}),
+    attemptCount: 0,
+    status: "queued",
+    replayedFromRequestId: job.requestId
+  };
+}
+
+export async function replayFailedOtaDeliveryJob(
+  job: OtaDeliveryJob,
+  device: DeviceRecord,
+  requestedBy: string,
+  requestedAt = new Date().toISOString()
+): Promise<OtaDeliveryJob> {
+  if (job.status !== "failed") {
+    throw new OtaModuleError(
+      409,
+      `Only failed OTA delivery jobs can be replayed: ${job.requestId}`
+    );
+  }
+
+  if (normalizeDeviceId(job.deviceId) !== normalizeDeviceId(device.deviceId)) {
+    throw new OtaModuleError(409, "OTA delivery job does not belong to this device");
+  }
+
+  return otaDeliveryJobRepository.enqueue(
+    createReplayOtaDeliveryJob(job, device, requestedBy, requestedAt)
+  );
+}
+
 export async function acknowledgeOtaDeliverySuccess(
   requestId: string,
   acknowledgedAt: string,

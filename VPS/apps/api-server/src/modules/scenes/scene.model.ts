@@ -38,6 +38,7 @@ export interface ClaimSceneActionDispatchJobsInput {
 }
 
 export interface SceneActionDispatchRepository {
+  get(jobId: string): Promise<SceneActionDispatchJob | undefined>;
   listByScene(sceneId: string): Promise<SceneActionDispatchJob[]>;
   listByRun(runId: string): Promise<SceneActionDispatchJob[]>;
   enqueue(entries: SceneActionDispatchJob[]): Promise<void>;
@@ -148,6 +149,10 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
   };
 
   const dispatches: SceneActionDispatchRepository = {
+    async get(jobId) {
+      const record = sceneActionDispatchStore.get(jobId);
+      return record ? clone(record) : undefined;
+    },
     async listByScene(sceneId) {
       return Array.from(sceneActionDispatchStore.values())
         .filter((entry) => entry.sceneId === sceneId)
@@ -424,6 +429,9 @@ export const sceneRunHistoryRepository: SceneRunHistoryRepository = {
 };
 
 export const sceneActionDispatchRepository: SceneActionDispatchRepository = {
+  get(jobId) {
+    return activeScenePersistenceStore.dispatches.get(jobId);
+  },
   listByScene(sceneId) {
     return activeScenePersistenceStore.dispatches.listByScene(sceneId);
   },

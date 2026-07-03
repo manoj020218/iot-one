@@ -9,9 +9,11 @@ import {
   evaluateScheduledScenes,
   evaluateScenesByTelemetry,
   getScene,
+  listSceneDispatches,
   listSceneRunHistory,
   listScenes,
   patchScene,
+  replaySceneDispatch,
   runSceneManually
 } from "./scene.service";
 import { SceneModuleError } from "./scene.types";
@@ -80,6 +82,19 @@ export async function listSceneRunHistoryController(
   }
 }
 
+export async function listSceneDispatchesController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(200).json({
+      data: await listSceneDispatches(request.params.sceneId ?? "", readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
 export async function createSceneController(request: Request, response: Response) {
   const payload = parseCreateScenePayload(request.body);
 
@@ -133,6 +148,23 @@ export async function runSceneController(request: Request, response: Response) {
       data: await runSceneManually(
         request.params.sceneId ?? "",
         payload,
+        readContext(request)
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function replaySceneDispatchController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(201).json({
+      data: await replaySceneDispatch(
+        request.params.sceneId ?? "",
+        request.params.jobId ?? "",
         readContext(request)
       )
     });

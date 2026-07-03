@@ -189,4 +189,45 @@ describe("DeviceDetailPage", () => {
       screen.getByRole("button", { name: "Start Matter Commissioning" })
     ).toBeDisabled();
   });
+
+  it("renders firmware rollout history including replay affordance for failed jobs", async () => {
+    deviceManagementApiTesting.seedDemoDevices(ownerSession.user.userId, ownerHome.homeId, [
+      createDeviceRecord({
+        deviceId: "JNX-TG-A7F9",
+        pid: foundationPidBlueprint.pid,
+        homeId: ownerHome.homeId,
+        ownerUserId: ownerSession.user.userId,
+        displayName: "Replay Tank",
+        firmwareVersion: "0.9.0"
+      })
+    ]);
+    deviceManagementApiTesting.seedDemoRollouts("JNX-TG-A7F9", [
+      {
+        requestId: "ota-local-failed",
+        deviceId: "JNX-TG-A7F9",
+        homeId: ownerHome.homeId,
+        pid: foundationPidBlueprint.pid,
+        channel: "stable",
+        targetVersion: "1.0.0",
+        artifactUrl: "demo://ota/1.0.0",
+        checksum: "demo-checksum-1.0.0",
+        requestedAt: "2026-07-03T14:00:00.000Z",
+        requestedBy: ownerSession.user.userId,
+        currentVersion: "0.9.0",
+        attemptCount: 1,
+        status: "failed",
+        failedAt: "2026-07-03T14:01:00.000Z",
+        lastError: "Checksum mismatch"
+      }
+    ]);
+
+    renderDeviceRoute(ownerSession);
+
+    expect(await screen.findByText("Firmware Rollout History")).toBeInTheDocument();
+    expect(screen.getByText(/ota-local-failed/)).toBeInTheDocument();
+    expect(screen.getByText("Checksum mismatch")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Replay Failed Rollout" })
+    ).toBeInTheDocument();
+  });
 });

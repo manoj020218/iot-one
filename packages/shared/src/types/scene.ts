@@ -83,3 +83,31 @@ export interface SceneRunResult {
   executedActions: string[];
   blockedReason?: string;
 }
+
+export type SceneActionDispatchStatus =
+  | "queued"
+  | "processing"
+  | "dispatched"
+  | "completed"
+  | "failed";
+
+export interface SceneActionDispatchRecord {
+  jobId: string;
+  runId: string;
+  sceneId: string;
+  homeId: string;
+  source: "manual" | "device_threshold" | "schedule";
+  action: SceneAction;
+  requestedAt: string;
+  attemptCount: number;
+  status: SceneActionDispatchStatus;
+  processingWorkerId?: string;
+  processingStartedAt?: string;
+  visibleAfter?: string;
+  dispatchedAt?: string;
+  acknowledgedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
+  replayedFromJobId?: string;
+}

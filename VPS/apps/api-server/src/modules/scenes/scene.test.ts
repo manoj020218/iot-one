@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../app";
 import { authTesting } from "../auth/auth.service";
 import { homeTesting } from "../homes/home.service";
+import { createSceneActionDispatchWorker } from "./scene.action-worker";
 import { sceneTesting } from "./scene.service";
 import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 
@@ -433,5 +434,111 @@ describe("scene routes", () => {
     expect(historyResponse.body.data).toHaveLength(1);
     expect(historyResponse.body.data[0].source).toBe("device_threshold");
     expect(historyResponse.body.data[0].matchedConditions).toBe(true);
+  });
+
+  it("lists scene dispatch jobs after a failed worker delivery", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Dispatch Owner",
+      email: "dispatch-owner@example.com"
+    });
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Dispatch History Scene",
+        status: "active",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [
+          {
+            type: "notification",
+            message: "Dispatch history"
+          }
+        ]
+      });
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    await request(createApp())
+      .post(`/api/v1/scenes/${sceneId}/run`)
+      .set(createAuthHeaders(ownerSession))
+      .send({});
+
+    const worker = createSceneActionDispatchWorker({
+      workerId: "dispatch-history-worker",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined,
+      dispatch: async () => {
+        throw new Error("dispatcher offline");
+      }
+    });
+
+    await worker.runOnce("2026-07-03T14:00:00.000Z");
+
+    const dispatchResponse = await request(createApp())
+      .get(`/api/v1/scenes/${sceneId}/dispatches`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(dispatchResponse.status).toBe(200);
+    expect(dispatchResponse.body.data).toHaveLength(1);
+    expect(dispatchResponse.body.data[0].status).toBe("failed");
+    expect(dispatchResponse.body.data[0].lastError).toContain("dispatcher offline");
+  });
+
+  it("replays a failed scene dispatch job as a new queued delivery", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Replay Scene Owner",
+      email: "replay-scene-owner@example.com"
+    });
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Replay Scene Dispatch",
+        status: "active",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [
+          {
+            type: "notification",
+            message: "Replay me"
+          }
+        ]
+      });
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    await request(createApp())
+      .post(`/api/v1/scenes/${sceneId}/run`)
+      .set(createAuthHeaders(ownerSession))
+      .send({});
+
+    const worker = createSceneActionDispatchWorker({
+      workerId: "dispatch-replay-worker",
+      intervalMs: 1_000,
+      batchSize: 10,
+      visibilityTimeoutMs: 30_000,
+      logger: () => undefined,
+      dispatch: async () => {
+        throw new Error("temporary broker failure");
+      }
+    });
+
+    await worker.runOnce("2026-07-03T14:05:00.000Z");
+    const [failedJob] = await sceneTesting.listActionDispatches(sceneId);
+    expect(failedJob?.status).toBe("failed");
+
+    const replayResponse = await request(createApp())
+      .post(`/api/v1/scenes/${sceneId}/dispatches/${encodeURIComponent(failedJob!.jobId)}/replay`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(replayResponse.status).toBe(201);
+    expect(replayResponse.body.data.status).toBe("queued");
+    expect(replayResponse.body.data.replayedFromJobId).toBe(failedJob?.jobId);
+
+    const dispatches = await sceneTesting.listActionDispatches(sceneId);
+    expect(dispatches).toHaveLength(2);
+    expect(dispatches[1]?.status).toBe("queued");
+    expect(dispatches[1]?.replayedFromJobId).toBe(failedJob?.jobId);
   });
 });

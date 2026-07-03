@@ -9,6 +9,7 @@ import {
   type DeviceFirmwareChannel,
   type DeviceFirmwarePlanResponse,
   type DeviceFirmwareRequestResult,
+  type DeviceFirmwareRolloutRecord,
   type DeviceRecord,
   type HomeAccessRole,
   type MatterBridgeState,
@@ -62,6 +63,7 @@ export interface RequestFirmwareUpdateInput {
 }
 
 export type DevicePidProfile = CreatePidInput;
+export type DeviceFirmwareRollout = DeviceFirmwareRolloutRecord;
 
 const deviceEndpoint = "/api/v1/devices";
 const matterEndpoint = "/api/v1/matter/devices";
@@ -78,6 +80,7 @@ const demoMatterRuntime = new Map<
     lastBridgeSyncAt?: string;
   }
 >();
+const demoFirmwareRollouts = new Map<string, DeviceFirmwareRollout[]>();
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -85,6 +88,10 @@ function clone<T>(value: T): T {
 
 function normalizeDeviceId(deviceId: string): string {
   return deviceId.trim().toUpperCase();
+}
+
+function createRequestId(): string {
+  return `ota-local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function optionalProp<K extends string, V>(
@@ -132,6 +139,30 @@ function getPidIconText(pid: string): string {
 
 function canManageMatter(role: HomeAccessRole): boolean {
   return role === "owner" || role === "admin";
+}
+
+function getDemoRolloutStore(deviceId: string) {
+  return demoFirmwareRollouts.get(normalizeDeviceId(deviceId)) ?? [];
+}
+
+function setDemoRolloutStore(deviceId: string, rollouts: DeviceFirmwareRollout[]) {
+  demoFirmwareRollouts.set(
+    normalizeDeviceId(deviceId),
+    rollouts.map((rollout) => clone(rollout))
+  );
+}
+
+function listDemoFirmwareRollouts(deviceId: string): DeviceFirmwareRollout[] {
+  return [...getDemoRolloutStore(deviceId)]
+    .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt))
+    .map((rollout) => clone(rollout));
+}
+
+function appendDemoFirmwareRollout(rollout: DeviceFirmwareRollout) {
+  setDemoRolloutStore(rollout.deviceId, [
+    ...getDemoRolloutStore(rollout.deviceId),
+    clone(rollout)
+  ]);
 }
 
 function getDemoMatterRuntime(deviceId: string) {
@@ -527,6 +558,28 @@ export async function requestFirmwareUpdate(
       channel,
       input.targetVersion
     );
+    const requestId = createRequestId();
+    const requestedAt = new Date().toISOString();
+    const status =
+      device.firmwareVersion === targetVersion ? "up_to_date" : "queued";
+
+    if (status === "queued") {
+      appendDemoFirmwareRollout({
+        requestId,
+        deviceId: device.deviceId,
+        homeId: device.homeId,
+        pid: device.pid,
+        channel,
+        targetVersion,
+        artifactUrl: `demo://ota/${encodeURIComponent(targetVersion)}`,
+        checksum: `demo-checksum-${targetVersion}`,
+        requestedAt,
+        requestedBy: session.user.userId,
+        ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {}),
+        attemptCount: 0,
+        status: "queued"
+      });
+    }
 
     return {
       deviceId: device.deviceId,
@@ -534,10 +587,94 @@ export async function requestFirmwareUpdate(
       channel,
       targetVersion,
       ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {}),
-      status:
-        device.firmwareVersion === targetVersion ? "up_to_date" : "queued",
-      requestedAt: new Date().toISOString()
+      status,
+      requestedAt,
+      ...(status === "queued"
+        ? {
+            requestId,
+            deliveryState: "queued" as const
+          }
+        : {})
     };
+  }
+}
+
+export async function listDeviceFirmwareRollouts(
+  session: AuthSession,
+  deviceId: string
+): Promise<DeviceFirmwareRollout[]> {
+  const currentHome = getCurrentHome(session);
+
+  try {
+    return await fetchJson<DeviceFirmwareRollout[]>(
+      `${deviceEndpoint}/${encodeURIComponent(deviceId)}/firmware/rollouts`,
+      {
+        method: "GET",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch {
+    return listDemoFirmwareRollouts(deviceId);
+  }
+}
+
+export async function replayFirmwareRollout(
+  session: AuthSession,
+  deviceId: string,
+  requestId: string
+): Promise<DeviceFirmwareRollout> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  if (homeRole === "viewer") {
+    throw new Error("Viewer access cannot replay firmware rollouts.");
+  }
+
+  try {
+    return await fetchJson<DeviceFirmwareRollout>(
+      `${deviceEndpoint}/${encodeURIComponent(deviceId)}/firmware/rollouts/${encodeURIComponent(requestId)}/replay`,
+      {
+        method: "POST",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch {
+    const device = getDemoDevice(session, deviceId);
+    const existing = getDemoRolloutStore(deviceId).find(
+      (rollout) => rollout.requestId === requestId
+    );
+
+    if (!existing) {
+      throw new Error(`Firmware rollout not found: ${requestId}`);
+    }
+
+    if (existing.status !== "failed") {
+      throw new Error(`Only failed firmware rollouts can be replayed: ${requestId}`);
+    }
+
+    const replayedRollout: DeviceFirmwareRollout = {
+      requestId: createRequestId(),
+      deviceId: device.deviceId,
+      homeId: device.homeId,
+      pid: existing.pid,
+      channel: existing.channel,
+      targetVersion: existing.targetVersion,
+      artifactUrl: existing.artifactUrl,
+      checksum: existing.checksum,
+      requestedAt: new Date().toISOString(),
+      requestedBy: session.user.userId,
+      ...(device.firmwareVersion ? { currentVersion: device.firmwareVersion } : {}),
+      attemptCount: 0,
+      status: "queued",
+      replayedFromRequestId: existing.requestId
+    };
+
+    appendDemoFirmwareRollout(replayedRollout);
+    return replayedRollout;
   }
 }
 
@@ -689,6 +826,7 @@ export const deviceManagementApiTesting = {
     resetDemoDevices();
     demoPidProfiles.clear();
     demoMatterRuntime.clear();
+    demoFirmwareRollouts.clear();
     demoPidProfiles.set(
       foundationPidBlueprint.pid,
       structuredClone(foundationPidBlueprint)
@@ -699,5 +837,8 @@ export const deviceManagementApiTesting = {
   },
   seedPidProfile(profile: DevicePidProfile) {
     demoPidProfiles.set(profile.pid.trim().toUpperCase(), clone(profile));
+  },
+  seedDemoRollouts(deviceId: string, rollouts: DeviceFirmwareRollout[]) {
+    setDemoRolloutStore(deviceId, rollouts);
   }
 };

@@ -10,16 +10,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/hooks/useAuth";
 import { DeviceFirmwarePanel } from "./components/DeviceFirmwarePanel";
 import { DeviceMatterPanel } from "./components/DeviceMatterPanel";
+import { DeviceRolloutHistoryPanel } from "./components/DeviceRolloutHistoryPanel";
 import { PidDynamicPageRenderer } from "./components/PidDynamicPageRenderer";
 import {
   getMatterStatus,
   getDevicePidProfile,
   getResolvedFirmwarePlan,
   getManagedDevice,
+  listDeviceFirmwareRollouts,
+  replayFirmwareRollout,
   requestMatterBridgeSync,
   requestMatterCommissioning,
   requestFirmwareUpdate,
   type DeviceFirmwarePlan,
+  type DeviceFirmwareRollout,
   type DevicePidProfile
 } from "./services/deviceManagementApi";
 import type { MatterDeviceStatus } from "@jenix/shared";
@@ -31,6 +35,7 @@ export function DeviceDetailPage() {
   const [device, setDevice] = useState<DeviceRecord | null>(null);
   const [pidProfile, setPidProfile] = useState<DevicePidProfile | null>(null);
   const [firmwarePlan, setFirmwarePlan] = useState<DeviceFirmwarePlan | null>(null);
+  const [rollouts, setRollouts] = useState<DeviceFirmwareRollout[]>([]);
   const [matterStatus, setMatterStatus] = useState<MatterDeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +44,26 @@ export function DeviceDetailPage() {
     throw new Error("DeviceDetailPage requires an authenticated session");
   }
 
+  const activeSession = session;
+
   const currentHome = getSelectedHome(
-    ensureDefaultHome(session.homes, session.user.userId),
-    session.user.userId,
-    session.activeHomeId
+    ensureDefaultHome(activeSession.homes, activeSession.user.userId),
+    activeSession.user.userId,
+    activeSession.activeHomeId
   );
+
+  async function refreshFirmwareDeliveryState(
+    record: DeviceRecord,
+    profile: DevicePidProfile
+  ) {
+    const [plan, nextRollouts] = await Promise.all([
+      getResolvedFirmwarePlan(activeSession, record, profile),
+      listDeviceFirmwareRollouts(activeSession, record.deviceId)
+    ]);
+
+    setFirmwarePlan(plan);
+    setRollouts(nextRollouts);
+  }
 
   useEffect(() => {
     if (!deviceId) {
@@ -54,20 +74,22 @@ export function DeviceDetailPage() {
 
     let active = true;
 
-      setLoading(true);
+    setLoading(true);
     setError(null);
-    void getManagedDevice(session, deviceId)
+    void getManagedDevice(activeSession, deviceId)
       .then(async (record) => {
         const profile = await getDevicePidProfile(record.pid);
-        const [plan, matter] = await Promise.all([
-          getResolvedFirmwarePlan(session, record, profile),
-          getMatterStatus(session, record, profile)
+        const [plan, matter, firmwareRollouts] = await Promise.all([
+          getResolvedFirmwarePlan(activeSession, record, profile),
+          getMatterStatus(activeSession, record, profile),
+          listDeviceFirmwareRollouts(activeSession, record.deviceId)
         ]);
 
         if (active) {
           setDevice(record);
           setPidProfile(profile);
           setFirmwarePlan(plan);
+          setRollouts(firmwareRollouts);
           setMatterStatus(matter);
         }
       })
@@ -89,7 +111,7 @@ export function DeviceDetailPage() {
     return () => {
       active = false;
     };
-  }, [deviceId, session]);
+  }, [activeSession, deviceId]);
 
   return (
     <AppShell
@@ -177,21 +199,53 @@ export function DeviceDetailPage() {
           </section>
           <DeviceFirmwarePanel
             plan={firmwarePlan}
-            onRequest={(input) =>
-              requestFirmwareUpdate(session, device.deviceId, input)
-            }
+            onRequest={async (input) => {
+              const result = await requestFirmwareUpdate(
+                activeSession,
+                device.deviceId,
+                input
+              );
+              await refreshFirmwareDeliveryState(device, pidProfile);
+              return result;
+            }}
+          />
+          <DeviceRolloutHistoryPanel
+            rollouts={rollouts}
+            canReplay={currentHome.role !== "viewer"}
+            onReplay={async (requestId) => {
+              const replayed = await replayFirmwareRollout(
+                activeSession,
+                device.deviceId,
+                requestId
+              );
+              await refreshFirmwareDeliveryState(device, pidProfile);
+              return replayed;
+            }}
+            onRefresh={() => refreshFirmwareDeliveryState(device, pidProfile)}
           />
           <DeviceMatterPanel
             status={matterStatus}
             homeRole={currentHome.role}
             onCommission={async () => {
-              const result = await requestMatterCommissioning(session, device, pidProfile);
-              setMatterStatus(await getMatterStatus(session, device, pidProfile));
+              const result = await requestMatterCommissioning(
+                activeSession,
+                device,
+                pidProfile
+              );
+              setMatterStatus(
+                await getMatterStatus(activeSession, device, pidProfile)
+              );
               return result;
             }}
             onBridgeSync={async () => {
-              const result = await requestMatterBridgeSync(session, device, pidProfile);
-              setMatterStatus(await getMatterStatus(session, device, pidProfile));
+              const result = await requestMatterBridgeSync(
+                activeSession,
+                device,
+                pidProfile
+              );
+              setMatterStatus(
+                await getMatterStatus(activeSession, device, pidProfile)
+              );
               return result;
             }}
           />

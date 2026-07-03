@@ -1,4 +1,9 @@
-import type { DeviceFirmwarePlanResponse, DeviceRecord, OtaReleaseRecord } from "@jenix/shared";
+import type {
+  DeviceFirmwarePlanResponse,
+  DeviceFirmwareRolloutRecord,
+  DeviceRecord,
+  OtaReleaseRecord
+} from "@jenix/shared";
 
 export interface OtaActorContext {
   actorId: string;
@@ -59,22 +64,10 @@ export interface OtaDeliveryRequest {
   currentVersion?: string;
 }
 
-export type OtaDeliveryJobStatus =
-  | "queued"
-  | "processing"
-  | "dispatched"
-  | "completed"
-  | "failed";
+export type OtaDeliveryJobStatus = DeviceFirmwareRolloutRecord["status"];
 
-export interface OtaDeliveryJob extends OtaDeliveryRequest {
-  attemptCount: number;
-  status: OtaDeliveryJobStatus;
-  processingWorkerId?: string;
-  processingStartedAt?: string;
-  visibleAfter?: string;
-  dispatchedAt?: string;
-  acknowledgedAt?: string;
-  completedAt?: string;
-  failedAt?: string;
-  lastError?: string;
+export interface OtaDeliveryJob
+  extends Omit<DeviceFirmwareRolloutRecord, "channel">,
+    Omit<OtaDeliveryRequest, "channel"> {
+  channel: OtaReleaseRecord["channel"];
 }

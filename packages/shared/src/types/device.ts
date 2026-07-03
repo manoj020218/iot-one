@@ -5,11 +5,16 @@ export type DeviceLocalStatus = "available" | "unavailable" | "unknown";
 export type DeviceFirmwareChannel = "stable" | "beta";
 
 export type DeviceFirmwareRequestStatus = "queued" | "up_to_date";
-export type DeviceFirmwareDeliveryState =
+export type DeviceFirmwareRolloutStatus =
   | "queued"
+  | "processing"
   | "dispatched"
   | "completed"
   | "failed";
+export type DeviceFirmwareDeliveryState = Exclude<
+  DeviceFirmwareRolloutStatus,
+  "processing"
+>;
 
 export interface DeviceRecord {
   deviceId: string;
@@ -54,4 +59,29 @@ export interface DeviceFirmwareRequestResult {
   requestedAt: string;
   requestId?: string;
   deliveryState?: DeviceFirmwareDeliveryState;
+}
+
+export interface DeviceFirmwareRolloutRecord {
+  requestId: string;
+  deviceId: string;
+  homeId: string;
+  pid: string;
+  channel: DeviceFirmwareChannel;
+  targetVersion: string;
+  artifactUrl: string;
+  checksum: string;
+  requestedAt: string;
+  requestedBy: string;
+  currentVersion?: string;
+  attemptCount: number;
+  status: DeviceFirmwareRolloutStatus;
+  processingWorkerId?: string;
+  processingStartedAt?: string;
+  visibleAfter?: string;
+  dispatchedAt?: string;
+  acknowledgedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
+  replayedFromRequestId?: string;
 }

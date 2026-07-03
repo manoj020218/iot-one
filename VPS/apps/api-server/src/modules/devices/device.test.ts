@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
-import { handleRuntimeTelemetryIngressMessage } from "../../infrastructure/mqtt/runtime.handlers";
+import {
+  handleRuntimeOtaAckMessage,
+  handleRuntimeTelemetryIngressMessage
+} from "../../infrastructure/mqtt/runtime.handlers";
 import { authTesting } from "../auth/auth.service";
 import { deviceTesting } from "./device.service";
 import { homeTesting } from "../homes/home.service";
@@ -251,6 +254,94 @@ describe("device routes", () => {
     expect(queuedJobs).toHaveLength(1);
     expect(queuedJobs[0]?.targetVersion).toBe("1.1.1");
     expect(queuedJobs[0]?.status).toBe("queued");
+  });
+
+  it("lists firmware rollout history for an accessible device", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Rollout Owner",
+      email: "rollout-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await createOtaRelease({
+      releaseId: "TANK-HW10-STABLE-113",
+      version: "1.1.3"
+    });
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f6c",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
+      firmwareVersion: "0.9.0"
+    });
+
+    const requestResponse = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F6C/firmware/request")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        channel: "stable",
+        targetVersion: "1.1.3"
+      });
+
+    const listResponse = await request(createApp())
+      .get("/api/v1/devices/JNX-TG-A7F6C/firmware/rollouts")
+      .set(createAuthHeaders(ownerSession));
+
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.data).toHaveLength(1);
+    expect(listResponse.body.data[0].requestId).toBe(requestResponse.body.data.requestId);
+    expect(listResponse.body.data[0].status).toBe("queued");
+  });
+
+  it("replays a failed firmware rollout as a new queued delivery job", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Replay Owner",
+      email: "replay-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await createOtaRelease({
+      releaseId: "TANK-HW10-STABLE-114",
+      version: "1.1.4"
+    });
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-a7f6d",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId,
+      firmwareVersion: "0.9.0"
+    });
+
+    const requestResponse = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-A7F6D/firmware/request")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        channel: "stable",
+        targetVersion: "1.1.4"
+      });
+    const failedRequestId = requestResponse.body.data.requestId as string;
+
+    await handleRuntimeOtaAckMessage({
+      requestId: failedRequestId,
+      deviceId: "JNX-TG-A7F6D",
+      acknowledgedAt: "2026-07-03T13:10:00.000Z",
+      status: "failed",
+      errorMessage: "Checksum mismatch"
+    });
+
+    const replayResponse = await request(createApp())
+      .post(`/api/v1/devices/JNX-TG-A7F6D/firmware/rollouts/${encodeURIComponent(failedRequestId)}/replay`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(replayResponse.status).toBe(201);
+    expect(replayResponse.body.data.status).toBe("queued");
+    expect(replayResponse.body.data.replayedFromRequestId).toBe(failedRequestId);
+
+    const rolloutHistory = await otaTesting.listDeliveryJobs("JNX-TG-A7F6D");
+    expect(rolloutHistory).toHaveLength(2);
+    expect(rolloutHistory[0]?.status).toBe("failed");
+    expect(rolloutHistory[1]?.status).toBe("queued");
+    expect(rolloutHistory[1]?.replayedFromRequestId).toBe(failedRequestId);
   });
 
   it("rejects firmware requests from a viewer role", async () => {

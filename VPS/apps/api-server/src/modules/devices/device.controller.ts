@@ -7,9 +7,11 @@ import {
 import {
   getDevice,
   getDeviceFirmwarePlan,
+  listDeviceFirmwareRollouts,
   ingestDeviceTelemetry,
   listDevices,
   patchDevice,
+  replayDeviceFirmwareRollout,
   requestDeviceFirmwareUpdate,
   registerDevice,
   renameDevice
@@ -161,6 +163,39 @@ export async function requestDeviceFirmwareUpdateController(
       data: await requestDeviceFirmwareUpdate(
         request.params.deviceId ?? "",
         payload,
+        readContext(request)
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function listDeviceFirmwareRolloutsController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(200).json({
+      data: await listDeviceFirmwareRollouts(
+        request.params.deviceId ?? "",
+        readContext(request)
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function replayDeviceFirmwareRolloutController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(201).json({
+      data: await replayDeviceFirmwareRollout(
+        request.params.deviceId ?? "",
+        request.params.requestId ?? "",
         readContext(request)
       )
     });

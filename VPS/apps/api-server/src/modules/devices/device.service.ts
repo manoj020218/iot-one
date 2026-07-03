@@ -9,8 +9,11 @@ import type { RuntimeTelemetryIngressMessage } from "../../infrastructure/mqtt/r
 import {
   getDeviceFirmwarePlan as resolveDeviceFirmwarePlan,
   queueOtaDeliveryForDevice,
+  replayFailedOtaDeliveryJob,
   resolveOtaReleaseForDevice
 } from "../ota/ota.service";
+import { otaDeliveryJobRepository } from "../ota/ota.model";
+import { OtaModuleError } from "../ota/ota.types";
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
@@ -25,6 +28,7 @@ import type {
   DevicePatchPayload,
   DeviceFirmwareRequestPayload,
   DeviceFirmwareRequestResponse,
+  DeviceFirmwareRolloutResult,
   DeviceRequestContext,
   DeviceTelemetryIngestPayload,
   DeviceTelemetryIngestResponse,
@@ -74,6 +78,12 @@ function ensureAccess(
   }
 
   return device;
+}
+
+function sortNewestFirst<T extends { requestedAt: string }>(records: T[]): T[] {
+  return [...records].sort((left, right) =>
+    right.requestedAt.localeCompare(left.requestedAt)
+  );
 }
 
 export async function listDevices(
@@ -252,6 +262,55 @@ export async function requestDeviceFirmwareUpdate(
         }
       : {})
   };
+}
+
+export async function listDeviceFirmwareRollouts(
+  deviceId: string,
+  context: DeviceRequestContext
+): Promise<DeviceFirmwareRolloutResult[]> {
+  const existing = ensureAccess(
+    await requireDevice(deviceId),
+    await resolveContext(context)
+  );
+
+  return sortNewestFirst(await otaDeliveryJobRepository.listByDevice(existing.deviceId));
+}
+
+export async function replayDeviceFirmwareRollout(
+  deviceId: string,
+  requestId: string,
+  context: DeviceRequestContext
+): Promise<DeviceFirmwareRolloutResult> {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot replay firmware rollouts");
+  }
+
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
+  const job = await otaDeliveryJobRepository.get(requestId.trim());
+
+  if (!job || job.deviceId !== existing.deviceId) {
+    throw new DeviceModuleError(404, `Firmware rollout not found: ${requestId.trim()}`);
+  }
+
+  try {
+    return await replayFailedOtaDeliveryJob(
+      job,
+      existing,
+      resolvedContext.userId ?? existing.ownerUserId
+    );
+  } catch (error) {
+    if (error instanceof DeviceModuleError) {
+      throw error;
+    }
+
+    if (error instanceof HomeModuleError || error instanceof OtaModuleError) {
+      throw new DeviceModuleError(error.statusCode, error.message);
+    }
+
+    throw error;
+  }
 }
 
 export async function renameDevice(

@@ -313,6 +313,30 @@ function createDispatchJobs(
   }));
 }
 
+function createReplayDispatchJob(
+  job: SceneActionDispatchJob,
+  requestedAt: string
+): SceneActionDispatchJob {
+  return {
+    jobId: createDispatchJobId(),
+    runId: job.runId,
+    sceneId: job.sceneId,
+    homeId: job.homeId,
+    source: job.source,
+    action: job.action,
+    requestedAt,
+    attemptCount: 0,
+    status: "queued",
+    replayedFromJobId: job.jobId
+  };
+}
+
+function sortNewestDispatchFirst<T extends { requestedAt: string }>(records: T[]): T[] {
+  return [...records].sort((left, right) =>
+    right.requestedAt.localeCompare(left.requestedAt)
+  );
+}
+
 export function createSceneRuntimeQueueResponse(
   jobs: SceneEvaluationJob[]
 ): SceneRuntimeQueueResponse {
@@ -608,6 +632,16 @@ export async function listSceneRunHistory(
   return sceneRunHistoryRepository.list(scene.sceneId);
 }
 
+export async function listSceneDispatches(
+  sceneId: string,
+  context: SceneRequestContext
+): Promise<SceneActionDispatchJob[]> {
+  const scene = assertAccess(await requireScene(sceneId), await resolveContext(context));
+  return sortNewestDispatchFirst(
+    await sceneActionDispatchRepository.listByScene(scene.sceneId)
+  );
+}
+
 export async function createScene(
   payload: CreateScenePayload,
   context: SceneRequestContext
@@ -709,6 +743,40 @@ export async function runSceneManually(
   }
 
   return result;
+}
+
+export async function replaySceneDispatch(
+  sceneId: string,
+  jobId: string,
+  context: SceneRequestContext
+): Promise<SceneActionDispatchJob> {
+  const resolvedContext = await resolveContext(context);
+  const actorId = requireActorId(resolvedContext);
+  const scene = assertAccess(await requireScene(sceneId), resolvedContext, "write");
+  const job = await sceneActionDispatchRepository.get(jobId);
+
+  if (!job || job.sceneId !== scene.sceneId) {
+    throw new SceneModuleError(404, `Scene dispatch job not found: ${jobId}`);
+  }
+
+  if (job.status !== "failed") {
+    throw new SceneModuleError(
+      409,
+      `Only failed scene dispatch jobs can be replayed: ${jobId}`
+    );
+  }
+
+  assertRestrictedActionPermission([job.action], resolvedContext.homeRole);
+
+  const replayJob = createReplayDispatchJob(job, new Date().toISOString());
+  await sceneActionDispatchRepository.enqueue([replayJob]);
+  await writeAudit(scene.sceneId, actorId, "scene.dispatch.replayed", {
+    jobId: job.jobId,
+    replayJobId: replayJob.jobId,
+    runId: job.runId
+  });
+
+  return replayJob;
 }
 
 export async function evaluateScenesByTelemetry(
