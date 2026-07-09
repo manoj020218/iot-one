@@ -2,6 +2,10 @@
 
 Jenix IoT Platform is a PNPM monorepo for the Jenix One PWA, Android APK shell, VPS-side API services, and shared PID-driven platform packages.
 
+## Integration Guide
+
+- Device developer handoff: [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md)
+
 ## Workspace Layout
 
 ```text

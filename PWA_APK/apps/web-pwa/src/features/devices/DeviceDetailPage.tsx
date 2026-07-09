@@ -1,5 +1,8 @@
 import { AppShell, StatusPill } from "@jenix/ui";
 import {
+  type DeviceUiCommandRequest,
+  type DeviceUiRuntimeState,
+  type HomeUiBootstrapResponse,
   ensureDefaultHome,
   getCurrentHome as getSelectedHome,
   type DeviceRecord
@@ -12,6 +15,10 @@ import { DeviceFirmwarePanel } from "./components/DeviceFirmwarePanel";
 import { DeviceMatterPanel } from "./components/DeviceMatterPanel";
 import { DeviceRolloutHistoryPanel } from "./components/DeviceRolloutHistoryPanel";
 import { PidDynamicPageRenderer } from "./components/PidDynamicPageRenderer";
+import {
+  dispatchDeviceUiCommand,
+  getDeviceUiRuntime
+} from "./services/devicePluginRuntimeApi";
 import {
   getMatterStatus,
   getDevicePidProfile,
@@ -26,6 +33,11 @@ import {
   type DeviceFirmwareRollout,
   type DevicePidProfile
 } from "./services/deviceManagementApi";
+import {
+  findUiBindingForDevice,
+  findUiPackageForDevice,
+  getHomeUiBootstrap
+} from "./services/uiBootstrapApi";
 import type { MatterDeviceStatus } from "@jenix/shared";
 
 export function DeviceDetailPage() {
@@ -37,6 +49,9 @@ export function DeviceDetailPage() {
   const [firmwarePlan, setFirmwarePlan] = useState<DeviceFirmwarePlan | null>(null);
   const [rollouts, setRollouts] = useState<DeviceFirmwareRollout[]>([]);
   const [matterStatus, setMatterStatus] = useState<MatterDeviceStatus | null>(null);
+  const [uiBootstrap, setUiBootstrap] = useState<HomeUiBootstrapResponse | null>(null);
+  const [runtime, setRuntime] = useState<DeviceUiRuntimeState | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +80,10 @@ export function DeviceDetailPage() {
     setRollouts(nextRollouts);
   }
 
+  async function refreshDeviceRuntime(record: DeviceRecord) {
+    setRuntime(await getDeviceUiRuntime(activeSession, record));
+  }
+
   useEffect(() => {
     if (!deviceId) {
       setError("Device route is missing a device identifier.");
@@ -76,13 +95,17 @@ export function DeviceDetailPage() {
 
     setLoading(true);
     setError(null);
+    setUiBootstrap(null);
+    setRuntime(null);
     void getManagedDevice(activeSession, deviceId)
       .then(async (record) => {
         const profile = await getDevicePidProfile(record.pid);
-        const [plan, matter, firmwareRollouts] = await Promise.all([
+        const [plan, matter, firmwareRollouts, nextBootstrap, nextRuntime] = await Promise.all([
           getResolvedFirmwarePlan(activeSession, record, profile),
           getMatterStatus(activeSession, record, profile),
-          listDeviceFirmwareRollouts(activeSession, record.deviceId)
+          listDeviceFirmwareRollouts(activeSession, record.deviceId),
+          getHomeUiBootstrap(activeSession),
+          getDeviceUiRuntime(activeSession, record)
         ]);
 
         if (active) {
@@ -91,6 +114,8 @@ export function DeviceDetailPage() {
           setFirmwarePlan(plan);
           setRollouts(firmwareRollouts);
           setMatterStatus(matter);
+          setUiBootstrap(nextBootstrap);
+          setRuntime(nextRuntime);
         }
       })
       .catch((requestError: unknown) => {
@@ -113,6 +138,11 @@ export function DeviceDetailPage() {
     };
   }, [activeSession, deviceId]);
 
+  const uiBinding =
+    device && uiBootstrap ? findUiBindingForDevice(uiBootstrap, device.deviceId) : undefined;
+  const uiPackage =
+    device && uiBootstrap ? findUiPackageForDevice(uiBootstrap, device.deviceId) : undefined;
+
   return (
     <AppShell
       eyebrow="Device Detail"
@@ -131,7 +161,7 @@ export function DeviceDetailPage() {
         <button
           className="text-button"
           type="button"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/home")}
         >
           Dashboard
         </button>
@@ -260,7 +290,31 @@ export function DeviceDetailPage() {
                 </p>
               </div>
             </div>
-            <PidDynamicPageRenderer device={device} pidProfile={pidProfile} />
+            <PidDynamicPageRenderer
+              busy={runtimeBusy}
+              device={device}
+              pidProfile={pidProfile}
+              runtime={runtime}
+              uiBinding={uiBinding}
+              uiPackage={uiPackage}
+              onRefresh={async () => {
+                setRuntimeBusy(true);
+                try {
+                  await refreshDeviceRuntime(device);
+                } finally {
+                  setRuntimeBusy(false);
+                }
+              }}
+              onCommand={async (input: DeviceUiCommandRequest) => {
+                setRuntimeBusy(true);
+                try {
+                  await dispatchDeviceUiCommand(activeSession, device, input);
+                  await refreshDeviceRuntime(device);
+                } finally {
+                  setRuntimeBusy(false);
+                }
+              }}
+            />
           </section>
         </>
       ) : null}

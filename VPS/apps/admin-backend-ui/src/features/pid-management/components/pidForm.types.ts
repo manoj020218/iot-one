@@ -4,7 +4,8 @@ import type {
   PidDashboardProfile,
   PidFirmwareProfile,
   PidHardwareProfile,
-  PidMatterProfile
+  PidMatterProfile,
+  PidUiProfile
 } from "@jenix/device-schemas";
 
 export type RootFieldUpdater = <K extends keyof CreatePidInput>(
@@ -30,6 +31,11 @@ export type MatterFieldUpdater = <K extends keyof PidMatterProfile>(
 export type ApiFieldUpdater = <K extends keyof PidApiProfile>(
   field: K,
   value: PidApiProfile[K]
+) => void;
+
+export type UiFieldUpdater = <K extends keyof PidUiProfile>(
+  field: K,
+  value: PidUiProfile[K]
 ) => void;
 
 export type DashboardFieldUpdater = <K extends keyof PidDashboardProfile>(

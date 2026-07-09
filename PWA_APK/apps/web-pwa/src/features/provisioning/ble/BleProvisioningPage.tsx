@@ -227,7 +227,7 @@ export function BleProvisioningPage() {
       {screen === "success" && summary ? (
         <ProvisioningSuccess
           onProvisionAnother={resetFlow}
-          onViewDashboard={() => navigate("/dashboard")}
+          onViewDashboard={() => navigate("/home")}
           summary={summary}
         />
       ) : null}

@@ -19,7 +19,8 @@
 - Current status: Phase 16 MQTT runtime ingress and delivery execution complete
 - Current status: Phase 17 delivery acknowledgement and OTA dispatch persistence complete
 - Current status: Phase 18 rollout status APIs and replay controls complete
-- Current phase: Phase 18 - Rollout Status and Replay Controls
+- Current status: Phase 19 scene dispatch recovery UI complete
+- Current phase: Phase 19 - Scene Dispatch Recovery UI
 
 ## Working Scope
 
@@ -477,16 +478,29 @@ Validation gates:
 - [x] Device detail rollout UI tests
 - [x] Workspace lint, typecheck, test, and build
 
+### Phase 19 - Scene Dispatch Recovery UI
+
+Status: Completed
+
+Deliverables:
+- [x] Operator-facing scene dispatch history panel on scene detail pages
+- [x] PWA replay action for failed scene dispatch jobs
+- [x] Scene dispatch refresh controls and status feedback on the scene operations surface
+- [x] Local fallback scene dispatch ledger for browser-only and test runs
+
+Validation gates:
+- [x] Scene builder dispatch history UI tests
+- [x] Web PWA lint, typecheck, test, and build
+
 ## Current Open Questions
 
 - None at the planning level. Implementation issues will be logged here only if they block the phase.
 
 ## Immediate Next Actions
 
-1. Add operator-facing UI for scene dispatch failures and replay controls so backend delivery recovery is not API-only.
-2. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
-3. Add delivery status badges and rollout summaries on dashboard and scene-management surfaces.
-4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
+1. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
+2. Add delivery status badges and rollout summaries on dashboard and scene-management surfaces.
+3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
 
 ## Decision Log
 
@@ -518,6 +532,7 @@ Validation gates:
 - 2026-07-03: Added an MQTT runtime bridge for telemetry ingress, schedule ticks, scene command delivery, and OTA request delivery so MQTT can be the main VPS runtime bus while HTTP telemetry remains a fallback path.
 - 2026-07-03: Added durable scene-command acknowledgement handling, OTA delivery job persistence, MQTT acknowledgement topics, and a dedicated OTA delivery worker so runtime delivery can retry safely beyond the request path.
 - 2026-07-03: Added rollout history and replay APIs for OTA and scene dispatch jobs, and surfaced failed firmware delivery recovery in the PWA device detail flow first.
+- 2026-07-07: Added scene-detail dispatch history, replay controls, and a local fallback ledger so scene delivery recovery is now operator-facing in the PWA without requiring API-only tooling.
 
 ## Risks and Controls
 
@@ -554,3 +569,4 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-03: Phase 16 MQTT runtime ingress and delivery execution completed with MQTT bridge bootstrap, scheduler/telemetry publish boundaries, consumer handlers, scene action MQTT delivery, firmware OTA publish support, and full workspace validation.
 - 2026-07-03: Phase 17 delivery acknowledgement and rollout persistence completed with scene-command ack tracking, retryable dispatch leases, OTA delivery jobs, a dedicated OTA worker, MQTT ack handlers, and full workspace validation.
 - 2026-07-03: Phase 18 rollout status and replay controls completed with device rollout history routes, scene dispatch history routes, replay APIs for failed jobs, device-detail rollout UI, and full workspace validation.
+- 2026-07-07: Phase 19 scene dispatch recovery UI completed with scene-detail dispatch history, failed-job replay controls, fallback dispatch persistence, and web-PWA lint, typecheck, test, and build validation.

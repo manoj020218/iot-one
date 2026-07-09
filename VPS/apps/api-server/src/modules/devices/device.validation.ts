@@ -2,6 +2,7 @@ import type {
   DeviceFirmwareRequestPayload,
   DevicePatchPayload,
   DeviceTelemetryIngestPayload,
+  DeviceUiCommandPayload,
   ParsedRegisterDevicePayload,
   RenameDevicePayload
 } from "./device.types";
@@ -237,5 +238,29 @@ export function parseDeviceTelemetryPayload(
     ...optionalProp("mqttStatus", parseConnectivityStatus(body.mqttStatus)),
     ...optionalProp("cloudStatus", parseConnectivityStatus(body.cloudStatus)),
     ...optionalProp("localStatus", parseLocalStatus(body.localStatus))
+  };
+}
+
+export function parseDeviceUiCommandPayload(
+  body: unknown
+): DeviceUiCommandPayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const command = readTrimmedString(body, "command");
+
+  if (!command) {
+    return null;
+  }
+
+  const payload = isRecord(body.payload) ? body.payload : undefined;
+  const requiresAck =
+    typeof body.requiresAck === "boolean" ? body.requiresAck : undefined;
+
+  return {
+    command,
+    ...optionalProp("payload", payload),
+    ...optionalProp("requiresAck", requiresAck)
   };
 }

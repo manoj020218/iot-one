@@ -1,16 +1,21 @@
 import {
+  createUiPackageKey,
   canAssignHomeRole,
   canCreateHomeShareCode,
   canManageHomeMembership,
   canRevokeHomeMember,
   createAuditStamp,
   createDefaultHome,
+  type HomeUiBootstrapDeviceBinding,
+  type HomeUiBootstrapPidBinding,
+  type HomeUiBootstrapResponse,
   type HomeAccessRole,
   type HomeMemberRecord,
   type HomeRecord,
   type HomeShareCodeRecord
 } from "@jenix/shared";
 
+import { deviceRepository } from "../devices/device.model";
 import {
   homeAuditRepository,
   homeMemberRepository,
@@ -29,6 +34,8 @@ import type {
   UpdateHomeMemberRolePayload
 } from "./home.types";
 import { HomeModuleError } from "./home.types";
+import { getPid } from "../pid/pid.service";
+import { resolveUiPackageArtifact } from "../ui-packages/ui-package.catalog";
 
 function createMembershipId(): string {
   return `hm-${Math.random().toString(36).slice(2, 10)}`;
@@ -300,6 +307,64 @@ async function listHomesForUserId(userId: string): Promise<HomeRecord[]> {
   return homes.sort(compareHomeRecords);
 }
 
+function mapPidBinding(input: {
+  pid: string;
+  productName: string;
+  dashboard: {
+    templateId: string;
+    dynamicPages: string[];
+    icon?: string;
+    cardLayout?: string;
+  };
+  ui: {
+    uiMode: "builtin" | "remote-package";
+    uiPackageId?: string;
+    uiPackageVersion?: string;
+  };
+}): HomeUiBootstrapPidBinding {
+  const packageKey =
+    input.ui.uiPackageId && input.ui.uiPackageVersion
+      ? createUiPackageKey(input.ui.uiPackageId, input.ui.uiPackageVersion)
+      : undefined;
+
+  return {
+    pid: input.pid,
+    productName: input.productName,
+    templateId: input.dashboard.templateId,
+    dynamicPages: [...input.dashboard.dynamicPages],
+    uiMode: input.ui.uiMode,
+    ...optionalProp("icon", input.dashboard.icon),
+    ...optionalProp("cardLayout", input.dashboard.cardLayout),
+    ...optionalProp("uiPackageId", input.ui.uiPackageId),
+    ...optionalProp("uiPackageVersion", input.ui.uiPackageVersion),
+    ...optionalProp("packageKey", packageKey)
+  };
+}
+
+function mapDeviceBinding(input: {
+  deviceId: string;
+  pid: string;
+  homeId: string;
+  displayName: string;
+  mqttStatus: "online" | "offline" | "unknown";
+  cloudStatus: "online" | "offline" | "unknown";
+  pidBinding: HomeUiBootstrapPidBinding;
+}): HomeUiBootstrapDeviceBinding {
+  return {
+    deviceId: input.deviceId,
+    pid: input.pid,
+    displayName: input.displayName,
+    homeId: input.homeId,
+    online: input.mqttStatus === "online" || input.cloudStatus === "online",
+    templateId: input.pidBinding.templateId,
+    dynamicPages: [...input.pidBinding.dynamicPages],
+    uiMode: input.pidBinding.uiMode,
+    ...optionalProp("uiPackageId", input.pidBinding.uiPackageId),
+    ...optionalProp("uiPackageVersion", input.pidBinding.uiPackageVersion),
+    ...optionalProp("packageKey", input.pidBinding.packageKey)
+  };
+}
+
 export async function syncUserHomes(input: {
   userId: string;
   name?: string;
@@ -337,6 +402,57 @@ export async function resolveHomeAccessContext<
 
 export async function listHomes(context: HomeRequestContext): Promise<HomeRecord[]> {
   return syncUserHomes(createProfileSeed(requireUserId(context), context));
+}
+
+export async function getHomeUiBootstrap(
+  homeId: string,
+  context: HomeRequestContext
+): Promise<HomeUiBootstrapResponse> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  await requireMembership(homeId, userId);
+
+  const devices = (await deviceRepository.list())
+    .filter((device) => device.homeId === homeId)
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+
+  const uniquePids = [...new Set(devices.map((device) => device.pid))];
+  const pidEntries = await Promise.all(
+    uniquePids.map(async (pid) => [pid, mapPidBinding(await getPid(pid))] as const)
+  );
+  const pidBindingMap = new Map(pidEntries);
+  const packageMap = new Map<string, ReturnType<typeof resolveUiPackageArtifact>>();
+
+  for (const binding of pidBindingMap.values()) {
+    if (!binding.uiPackageId || !binding.uiPackageVersion) {
+      continue;
+    }
+
+    const artifact = resolveUiPackageArtifact(
+      binding.uiPackageId,
+      binding.uiPackageVersion
+    );
+    if (artifact) {
+      packageMap.set(binding.packageKey!, artifact);
+    }
+  }
+
+  return {
+    homeId,
+    generatedAt: new Date().toISOString(),
+    devices: devices.map((device) =>
+      mapDeviceBinding({
+        ...device,
+        pidBinding: pidBindingMap.get(device.pid)!
+      })
+    ),
+    pidBindings: Array.from(pidBindingMap.values()).sort((left, right) =>
+      left.pid.localeCompare(right.pid)
+    ),
+    packages: Array.from(packageMap.values()).filter(
+      (item): item is NonNullable<typeof item> => Boolean(item)
+    )
+  };
 }
 
 export async function listHomeMembers(

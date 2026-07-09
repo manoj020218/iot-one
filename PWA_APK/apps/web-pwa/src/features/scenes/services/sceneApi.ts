@@ -6,6 +6,7 @@ import {
   type AuthSession,
   type HomeAccessRole,
   type SceneAction,
+  type SceneActionDispatchRecord,
   type SceneCondition,
   type SceneRecord,
   type SceneRunResult,
@@ -16,8 +17,11 @@ import {
 } from "@jenix/shared";
 
 import {
+  appendDemoSceneDispatches,
   listDemoScenes,
+  listDemoSceneDispatches,
   resetDemoScenes,
+  setDemoSceneDispatches,
   setDemoScenes,
   upsertDemoScene
 } from "./sceneDemoStore";
@@ -54,6 +58,10 @@ export interface SceneManualRunInput {
 
 export interface SceneRunResponse extends SceneRunResult {
   scene: SceneRecord;
+}
+
+function clone<T>(value: T): T {
+  return structuredClone(value);
 }
 
 function optionalProp<K extends string, V>(
@@ -98,6 +106,14 @@ function createSceneId(): string {
 
 function createNestedId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createSceneRunId(): string {
+  return `run-local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createSceneDispatchId(): string {
+  return `dispatch-local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function assertRestrictedActionPermission(
@@ -247,15 +263,36 @@ function runFallbackScene(
         condition.value
       )
     );
+  const requestedAt = new Date().toISOString();
 
   const scene: SceneRecord = {
     ...existing,
-    updatedAt: new Date().toISOString(),
-    lastRunAt: new Date().toISOString(),
+    updatedAt: requestedAt,
+    lastRunAt: requestedAt,
     lastRunStatus: matchedConditions ? "success" : "skipped"
   };
 
   upsertDemoScene(session.user.userId, currentHome.homeId, scene);
+
+  if (matchedConditions) {
+    const runId = createSceneRunId();
+    appendDemoSceneDispatches(
+      scene.sceneId,
+      scene.actions.map((action) => ({
+        jobId: createSceneDispatchId(),
+        runId,
+        sceneId: scene.sceneId,
+        homeId: scene.homeId,
+        source: "manual",
+        action: clone(action),
+        requestedAt,
+        attemptCount: 1,
+        status: "completed",
+        dispatchedAt: requestedAt,
+        completedAt: requestedAt
+      }))
+    );
+  }
 
   return {
     sceneId: scene.sceneId,
@@ -379,12 +416,89 @@ export async function runSceneManually(
   }
 }
 
+export async function listSceneDispatches(
+  session: AuthSession,
+  sceneId: string
+): Promise<SceneActionDispatchRecord[]> {
+  const currentHome = getCurrentHome(session);
+
+  try {
+    return await fetchJson<SceneActionDispatchRecord[]>(
+      `${sceneEndpoint}/${encodeURIComponent(sceneId)}/dispatches`,
+      {
+        method: "GET",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch {
+    return listDemoSceneDispatches(sceneId);
+  }
+}
+
+export async function replaySceneDispatch(
+  session: AuthSession,
+  sceneId: string,
+  jobId: string
+): Promise<SceneActionDispatchRecord> {
+  const currentHome = getCurrentHome(session);
+  const homeRole = getHomeRole(session);
+
+  if (homeRole === "viewer") {
+    throw new Error("Viewer access cannot replay scene dispatches.");
+  }
+
+  try {
+    return await fetchJson<SceneActionDispatchRecord>(
+      `${sceneEndpoint}/${encodeURIComponent(sceneId)}/dispatches/${encodeURIComponent(jobId)}/replay`,
+      {
+        method: "POST",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch {
+    const existing = listDemoSceneDispatches(sceneId).find((dispatch) => dispatch.jobId === jobId);
+
+    if (!existing) {
+      throw new Error(`Scene dispatch job not found: ${jobId}`);
+    }
+
+    if (existing.status !== "failed") {
+      throw new Error(`Only failed scene dispatch jobs can be replayed: ${jobId}`);
+    }
+
+    assertRestrictedActionPermission([existing.action], homeRole);
+
+    const replayedDispatch: SceneActionDispatchRecord = {
+      jobId: createSceneDispatchId(),
+      runId: existing.runId,
+      sceneId: existing.sceneId,
+      homeId: existing.homeId,
+      source: existing.source,
+      action: clone(existing.action),
+      requestedAt: new Date().toISOString(),
+      attemptCount: 0,
+      status: "queued",
+      replayedFromJobId: existing.jobId
+    };
+
+    appendDemoSceneDispatches(sceneId, [replayedDispatch]);
+    return replayedDispatch;
+  }
+}
+
 export const sceneApiTesting = {
   reset() {
     resetDemoScenes();
   },
   seedDemoScenes(userId: string, homeId: string, scenes: SceneRecord[]) {
     setDemoScenes(userId, homeId, scenes);
+  },
+  seedDemoDispatches(sceneId: string, dispatches: SceneActionDispatchRecord[]) {
+    setDemoSceneDispatches(sceneId, dispatches);
   },
   createDemoScene(input: {
     sceneId: string;
@@ -420,6 +534,44 @@ export const sceneApiTesting = {
       updatedAt: timestamp,
       lastRunStatus: input.lastRunStatus ?? "idle",
       ...optionalProp("schedule", input.schedule)
+    };
+  },
+  createDemoDispatch(input: {
+    jobId: string;
+    sceneId: string;
+    homeId: string;
+    runId?: string;
+    source?: SceneActionDispatchRecord["source"];
+    action?: SceneActionInput;
+    status?: SceneActionDispatchRecord["status"];
+    requestedAt?: string;
+    attemptCount?: number;
+    lastError?: string;
+    replayedFromJobId?: string;
+  }): SceneActionDispatchRecord {
+    const requestedAt = input.requestedAt ?? new Date("2026-07-03T14:00:00.000Z").toISOString();
+    const status = input.status ?? "completed";
+
+    return {
+      jobId: input.jobId,
+      runId: input.runId ?? "run-local-seeded",
+      sceneId: input.sceneId,
+      homeId: input.homeId,
+      source: input.source ?? "manual",
+      action: toActionRecord(
+        input.action ?? {
+          type: "notification",
+          message: "Seeded dispatch"
+        }
+      ),
+      requestedAt,
+      attemptCount: input.attemptCount ?? (status === "queued" ? 0 : 1),
+      status,
+      ...(status !== "queued" ? { dispatchedAt: requestedAt } : {}),
+      ...(status === "completed" ? { completedAt: requestedAt } : {}),
+      ...(status === "failed" ? { failedAt: requestedAt } : {}),
+      ...optionalProp("lastError", input.lastError),
+      ...optionalProp("replayedFromJobId", input.replayedFromJobId)
     };
   }
 };

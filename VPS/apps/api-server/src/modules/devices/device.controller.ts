@@ -5,8 +5,10 @@ import {
   requireAuthenticatedRequestUser
 } from "../../infrastructure/http/request-auth";
 import {
+  dispatchDeviceUiCommand,
   getDevice,
   getDeviceFirmwarePlan,
+  getDeviceUiRuntime,
   listDeviceFirmwareRollouts,
   ingestDeviceTelemetry,
   listDevices,
@@ -21,6 +23,7 @@ import {
   parseDevicePatchPayload,
   parseDeviceFirmwareRequestPayload,
   parseDeviceTelemetryPayload,
+  parseDeviceUiCommandPayload,
   parseRegisterDevicePayload,
   parseRenamePayload
 } from "./device.validation";
@@ -62,6 +65,19 @@ export async function getDeviceController(request: Request, response: Response) 
   try {
     response.status(200).json({
       data: await getDevice(request.params.deviceId ?? "", readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function getDeviceUiRuntimeController(
+  request: Request,
+  response: Response
+) {
+  try {
+    response.status(200).json({
+      data: await getDeviceUiRuntime(request.params.deviceId ?? "", readContext(request))
     });
   } catch (error) {
     sendError(response, error);
@@ -161,6 +177,32 @@ export async function requestDeviceFirmwareUpdateController(
   try {
     response.status(200).json({
       data: await requestDeviceFirmwareUpdate(
+        request.params.deviceId ?? "",
+        payload,
+        readContext(request)
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function dispatchDeviceUiCommandController(
+  request: Request,
+  response: Response
+) {
+  const payload = parseDeviceUiCommandPayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid device command payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(202).json({
+      data: await dispatchDeviceUiCommand(
         request.params.deviceId ?? "",
         payload,
         readContext(request)

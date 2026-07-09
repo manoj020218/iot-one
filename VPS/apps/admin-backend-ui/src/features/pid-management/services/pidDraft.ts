@@ -88,6 +88,16 @@ export function validatePidDraft(draft: CreatePidInput): string[] {
     errors.push("Dashboard template ID is required.");
   }
 
+  if (draft.ui.uiMode === "remote-package") {
+    if (!draft.ui.uiPackageId?.trim()) {
+      errors.push("UI package ID is required for remote-package mode.");
+    }
+
+    if (!draft.ui.uiPackageVersion?.trim()) {
+      errors.push("UI package version is required for remote-package mode.");
+    }
+  }
+
   if (draft.matter.enabled && draft.matter.mode === "NONE") {
     errors.push("Matter mode cannot be NONE when Matter is enabled.");
   }

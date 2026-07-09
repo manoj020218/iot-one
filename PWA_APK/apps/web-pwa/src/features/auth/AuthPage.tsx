@@ -1,5 +1,6 @@
 import { platformIdentity } from "@jenix/shared";
 import { AppShell, StatusPill } from "@jenix/ui";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "./hooks/useAuth";
@@ -11,15 +12,16 @@ import { SignupForm } from "./components/SignupForm";
 export function AuthPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleProviderLogin(provider: "google" | "facebook") {
     await auth.loginWithProvider(provider);
-    navigate("/dashboard");
+    navigate("/home");
   }
 
   async function handleEmailLogin(payload: { email: string; password: string }) {
     await auth.loginWithEmail(payload);
-    navigate("/dashboard");
+    navigate("/home");
   }
 
   async function handleSignup(payload: {
@@ -28,7 +30,7 @@ export function AuthPage() {
     password: string;
   }) {
     await auth.signupWithEmail(payload);
-    navigate("/dashboard");
+    navigate("/home");
   }
 
   return (
@@ -48,10 +50,19 @@ export function AuthPage() {
           <div className="meta-links">
             <a href="/terms">Terms</a>
             <a href="/privacy">Privacy</a>
-            <button type="button" className="text-button">
+            <button
+              type="button"
+              className="text-button"
+              onClick={() =>
+                setNotice(
+                  "Sign in with Google or Facebook to recover access instantly. For email accounts, reset help is on the way — contact support@iotsoft.in meanwhile."
+                )
+              }
+            >
               Forgot password
             </button>
           </div>
+          {notice ? <p className="provisioning-note">{notice}</p> : null}
         </article>
         <EmailLoginForm onSubmit={handleEmailLogin} />
         <SignupForm onSubmit={handleSignup} />

@@ -37,7 +37,7 @@ export function AppUpdatePage() {
         <button
           className="text-button"
           type="button"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/home")}
         >
           Dashboard
         </button>

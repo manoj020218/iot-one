@@ -69,6 +69,14 @@ export interface PidApiProfile {
   mqttBridgeSupport?: boolean;
 }
 
+export type PidUiMode = "builtin" | "remote-package";
+
+export interface PidUiProfile {
+  uiMode: PidUiMode;
+  uiPackageId?: string;
+  uiPackageVersion?: string;
+}
+
 export interface PidDashboardProfile {
   templateId: string;
   dynamicPages: string[];
@@ -85,6 +93,7 @@ export interface CreatePidInput extends PidIdentity {
   firmware: PidFirmwareProfile;
   matter: PidMatterProfile;
   api: PidApiProfile;
+  ui: PidUiProfile;
   dashboard: PidDashboardProfile;
 }
 
@@ -135,6 +144,11 @@ export const foundationPidBlueprint: CreatePidInput = {
     enabled: false,
     sellable: false,
     allowedScopes: []
+  },
+  ui: {
+    uiMode: "remote-package",
+    uiPackageId: "tank-guard-mobile",
+    uiPackageVersion: "1.0.0"
   },
   dashboard: {
     templateId: "tank-guard-default",

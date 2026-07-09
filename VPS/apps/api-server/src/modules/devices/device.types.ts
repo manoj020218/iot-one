@@ -1,4 +1,7 @@
 import type {
+  DeviceUiCommandAckRecord,
+  DeviceUiCommandRequest,
+  DeviceUiRuntimeState,
   DeviceFirmwareRequestInput,
   DeviceFirmwarePlanResponse,
   DeviceFirmwareRequestResult,
@@ -50,6 +53,9 @@ export interface DeviceTelemetryIngestResponse {
 export type DeviceFirmwareRequestResponse = DeviceFirmwareRequestResult;
 export type DeviceFirmwarePlanResult = DeviceFirmwarePlanResponse;
 export type DeviceFirmwareRolloutResult = DeviceFirmwareRolloutRecord;
+export type DeviceUiRuntimeResult = DeviceUiRuntimeState;
+export type DeviceUiCommandPayload = DeviceUiCommandRequest;
+export type DeviceUiCommandResult = DeviceUiCommandAckRecord;
 
 export class DeviceModuleError extends Error {
   constructor(

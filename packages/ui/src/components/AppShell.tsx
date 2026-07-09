@@ -32,7 +32,7 @@ export function AppShell({
       >
         <span
           style={{
-            color: "#0f766e",
+            color: "#12b8ff",
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: "0.12em",
@@ -54,8 +54,9 @@ export function AppShell({
             <h1
               style={{
                 margin: 0,
-                fontSize: "clamp(2rem, 4vw, 3.25rem)",
-                lineHeight: 1.05
+                fontSize: "clamp(1.6rem, 4vw, 2.4rem)",
+                lineHeight: 1.1,
+                letterSpacing: "-0.5px"
               }}
             >
               {title}
@@ -63,7 +64,7 @@ export function AppShell({
             <p
               style={{
                 margin: 0,
-                color: "#475569",
+                color: "#8a97ad",
                 maxWidth: 640,
                 lineHeight: 1.6
               }}

@@ -6,6 +6,7 @@ import { PidFirmwareForm } from "./PidFirmwareForm";
 import { PidHardwareForm } from "./PidHardwareForm";
 import { PidIdentityForm } from "./PidIdentityForm";
 import { PidMatterMappingForm } from "./PidMatterMappingForm";
+import { PidUiPackageForm } from "./PidUiPackageForm";
 import { ValidationSummary } from "./ValidationSummary";
 
 export interface PidEditorFormProps {
@@ -98,6 +99,19 @@ export function PidEditorForm({
     }));
   };
 
+  const updateUi = <K extends keyof CreatePidInput["ui"]>(
+    field: K,
+    value: CreatePidInput["ui"][K]
+  ) => {
+    onDraftChange((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
+        [field]: value
+      }
+    }));
+  };
+
   return (
     <form
       className="editor-stack"
@@ -115,6 +129,7 @@ export function PidEditorForm({
       />
       <PidMatterMappingForm matter={draft.matter} updateMatter={updateMatter} />
       <PidApiPackageForm api={draft.api} updateApi={updateApi} />
+      <PidUiPackageForm ui={draft.ui} updateUi={updateUi} />
       <PidDashboardTemplateForm
         dashboard={draft.dashboard}
         updateDashboard={updateDashboard}

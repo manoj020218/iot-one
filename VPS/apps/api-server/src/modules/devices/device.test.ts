@@ -612,4 +612,95 @@ describe("device routes", () => {
     expect(workerResult.matchedRunCount).toBe(1);
     expect(workerResult.runCount).toBe(1);
   });
+
+  it("returns the latest UI runtime snapshot for an accessible device", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "UI Runtime Owner",
+      email: "ui-runtime-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-ui01",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+
+    await request(createApp())
+      .post("/api/v1/devices/JNX-TG-UI01/telemetry")
+      .send({
+        telemetry: {
+          tankLevelPct: 67,
+          tankLevelMm: 710,
+          wifiRssi: -63,
+          alarmState: "normal",
+          sensorStatus: "ready"
+        }
+      });
+
+    const response = await request(createApp())
+      .get("/api/v1/devices/JNX-TG-UI01/ui-runtime")
+      .set(createAuthHeaders(ownerSession, { homeId }));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.telemetrySnapshot.telemetry.tankLevelPct).toBe(67);
+    expect(response.body.data.telemetrySnapshot.history).toEqual([67]);
+  });
+
+  it("stores desired UI settings and queues a device command for the runtime surface", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "UI Command Owner",
+      email: "ui-command-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    const publishedCommands: string[] = [];
+
+    useRuntimeMqttBridge({
+      async publishTelemetryIngress() {},
+      async publishScheduleTick() {},
+      async publishDeviceCommand(message) {
+        publishedCommands.push(message.command);
+      },
+      async publishNotification() {},
+      async publishOtaRequest() {}
+    });
+
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-ui02",
+      pid: "JNX-TG-C3-501",
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+
+    const commandResponse = await request(createApp())
+      .post("/api/v1/devices/JNX-TG-UI02/commands")
+      .set(createAuthHeaders(ownerSession, { homeId }))
+      .send({
+        command: "apply_settings",
+        requiresAck: true,
+        payload: {
+          settings: {
+            config: {
+              capacityLitres: 1500,
+              wifiTxPowerDbm: 11
+            }
+          }
+        }
+      });
+
+    expect(commandResponse.status).toBe(202);
+    expect(commandResponse.body.data.status).toBe("queued");
+    expect(publishedCommands).toEqual(["apply_settings"]);
+
+    const runtimeResponse = await request(createApp())
+      .get("/api/v1/devices/JNX-TG-UI02/ui-runtime")
+      .set(createAuthHeaders(ownerSession, { homeId }));
+
+    expect(runtimeResponse.status).toBe(200);
+    expect(runtimeResponse.body.data.settings.config.capacityLitres).toBe(1500);
+    expect(runtimeResponse.body.data.settings.config.wifiTxPowerDbm).toBe(11);
+  });
 });

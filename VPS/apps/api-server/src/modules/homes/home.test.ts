@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { authTesting } from "../auth/auth.service";
+import { deviceTesting } from "../devices/device.service";
 import { homeTesting } from "./home.service";
+import { pidTesting } from "../pid/pid.service";
 import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
+import { foundationPidBlueprint } from "@jenix/device-schemas";
 
 describe("home routes", () => {
   beforeEach(async () => {
     await authTesting.reset();
     await homeTesting.reset();
+    await deviceTesting.reset();
+    await pidTesting.reset();
   });
 
   it("lists the default HOME for the current user", async () => {
@@ -153,5 +158,46 @@ describe("home routes", () => {
 
     expect(blockedResponse.status).toBe(403);
     expect(blockedResponse.body.error).toContain("owner/admin");
+  });
+
+  it("returns a deduped UI bootstrap for a HOME", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    await request(createApp())
+      .post("/api/v1/admin/pids")
+      .set({
+        "x-role": "JENIX_DEVELOPER",
+        "x-actor-id": "home-ui-bootstrap-test"
+      })
+      .send({
+        ...foundationPidBlueprint,
+        pid: "JNX-TG-C3-901",
+        status: "beta",
+        firmware: {
+          ...foundationPidBlueprint.firmware,
+          stableVersion: "1.0.0"
+        }
+      });
+
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-uib-1",
+      pid: "JNX-TG-C3-901",
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+
+    const response = await request(createApp())
+      .get(`/api/v1/homes/${encodeURIComponent(homeId)}/ui-bootstrap`)
+      .set(createAuthHeaders(ownerSession, { homeId }));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.homeId).toBe(homeId);
+    expect(response.body.data.devices).toHaveLength(1);
+    expect(response.body.data.pidBindings[0].uiPackageId).toBe("tank-guard-mobile");
+    expect(response.body.data.packages[0].packageId).toBe("tank-guard-mobile");
   });
 });

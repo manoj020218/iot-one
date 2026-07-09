@@ -33,7 +33,7 @@ export function SceneListPage() {
         <div className="top-bar-meta">
           <button
             className="text-button"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/home")}
             type="button"
           >
             Back to Dashboard

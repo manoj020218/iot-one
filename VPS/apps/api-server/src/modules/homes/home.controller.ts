@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { requireAuthenticatedRequestUser } from "../../infrastructure/http/request-auth";
 import {
   createHomeShareCode,
+  getHomeUiBootstrap,
   listHomeMembers,
   listHomes,
   listHomeShareCodes,
@@ -52,6 +53,16 @@ export function listHomesController(request: Request, response: Response) {
 
 export function listHomeMembersController(request: Request, response: Response) {
   listHomeMembers(request.params.homeId ?? "", readContext(request))
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
+    });
+}
+
+export function getHomeUiBootstrapController(request: Request, response: Response) {
+  getHomeUiBootstrap(request.params.homeId ?? "", readContext(request))
     .then((data) => {
       response.status(200).json({ data });
     })

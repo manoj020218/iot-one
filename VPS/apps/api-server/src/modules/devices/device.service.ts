@@ -1,6 +1,8 @@
 import {
   createDeviceRecord,
   renameDeviceRecord,
+  type DeviceUiCommandAckRecord,
+  type DeviceUiRuntimeState,
   type DeviceRecord
 } from "@jenix/shared";
 
@@ -23,6 +25,7 @@ import {
   prepareTelemetrySceneEvaluationJob
 } from "../scenes/scene.service";
 import { deviceRepository } from "./device.model";
+import { deviceUiRuntimeStore } from "./device-ui-runtime.model";
 import type {
   DeviceFirmwarePlanResult,
   DevicePatchPayload,
@@ -32,6 +35,9 @@ import type {
   DeviceRequestContext,
   DeviceTelemetryIngestPayload,
   DeviceTelemetryIngestResponse,
+  DeviceUiCommandPayload,
+  DeviceUiCommandResult,
+  DeviceUiRuntimeResult,
   ParsedRegisterDevicePayload,
   RenameDevicePayload
 } from "./device.types";
@@ -84,6 +90,27 @@ function sortNewestFirst<T extends { requestedAt: string }>(records: T[]): T[] {
   return [...records].sort((left, right) =>
     right.requestedAt.localeCompare(left.requestedAt)
   );
+}
+
+function createCommandId(): string {
+  return `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function createEmptyUiRuntime(device: DeviceRecord): DeviceUiRuntimeState {
+  return {
+    deviceId: device.deviceId,
+    pid: device.pid,
+    telemetrySnapshot: {
+      deviceId: device.deviceId,
+      pid: device.pid,
+      occurredAt: device.lastSeenAt ?? device.updatedAt,
+      telemetry: {}
+    }
+  };
 }
 
 export async function listDevices(
@@ -342,7 +369,14 @@ export async function applyDeviceTelemetryState(
     ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
   };
-  return deviceRepository.save(updatedDevice);
+  const savedDevice = await deviceRepository.save(updatedDevice);
+  await deviceUiRuntimeStore.saveTelemetry({
+    deviceId: savedDevice.deviceId,
+    pid: savedDevice.pid,
+    occurredAt,
+    telemetry: payload.telemetry
+  });
+  return savedDevice;
 }
 
 function createRuntimeTelemetryIngressMessage(
@@ -393,8 +427,70 @@ export async function ingestDeviceTelemetry(
   };
 }
 
+export async function getDeviceUiRuntime(
+  deviceId: string,
+  context: DeviceRequestContext
+): Promise<DeviceUiRuntimeResult> {
+  const existing = ensureAccess(
+    await requireDevice(deviceId),
+    await resolveContext(context)
+  );
+
+  return (
+    (await deviceUiRuntimeStore.get(existing.deviceId)) ?? createEmptyUiRuntime(existing)
+  );
+}
+
+export async function dispatchDeviceUiCommand(
+  deviceId: string,
+  payload: DeviceUiCommandPayload,
+  context: DeviceRequestContext
+): Promise<DeviceUiCommandResult> {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot send device commands");
+  }
+
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
+  const queuedAt = new Date().toISOString();
+  const result: DeviceUiCommandAckRecord = {
+    commandId: createCommandId(),
+    deviceId: existing.deviceId,
+    status: "queued",
+    queuedAt,
+    ...(payload.payload ? { payload: payload.payload } : {})
+  };
+  const settings = payload.payload?.settings;
+
+  if (isRecord(settings)) {
+    await deviceUiRuntimeStore.saveSettings(existing.deviceId, settings, existing.pid);
+  }
+
+  await deviceUiRuntimeStore.saveLastCommand(existing.deviceId, result, existing.pid);
+
+  const bridge = getRuntimeMqttBridge();
+
+  if (bridge) {
+    await bridge.publishDeviceCommand({
+      deliveryId: result.commandId,
+      runId: `ui-${result.commandId}`,
+      sceneId: `ui:${payload.command}`,
+      homeId: existing.homeId,
+      source: "manual",
+      requestedAt: queuedAt,
+      deviceId: existing.deviceId,
+      command: payload.command as "refresh",
+      ...(payload.payload ? { payload: payload.payload } : {})
+    });
+  }
+
+  return result;
+}
+
 export const deviceTesting = {
-  reset() {
-    return deviceRepository.reset();
+  async reset() {
+    await deviceRepository.reset();
+    await deviceUiRuntimeStore.reset();
   }
 };

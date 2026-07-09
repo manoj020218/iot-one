@@ -1,8 +1,8 @@
 # Jenix IoT Platform Progress
 
 ## Current Phase
-- Phase name: Phase 18 - Rollout Status and Replay Controls
-- Started: 2026-07-03
+- Phase name: Phase 19 - Scene Dispatch Recovery UI
+- Started: 2026-07-07
 - Status: Completed
 
 ## Completed
@@ -83,6 +83,7 @@
 - [x] Scene dispatch replay API
 - [x] Device detail rollout history UI
 - [x] Failed rollout replay UI
+- [x] Scene dispatch recovery UI
 - [x] Scene action dispatch queue
 - [x] Scene action worker isolation
 - [x] Unit tests
@@ -164,6 +165,9 @@
 - Date: 2026-07-03
   Decision: Surface Phase 18 rollout visibility first on the PWA device-detail page, while exposing scene-dispatch replay through backend APIs before adding a larger operator UI.
   Reason: Firmware rollout status is immediately user-visible and tied to a single device, while scene dispatch recovery can safely start as an authenticated recovery API without blocking the next frontend phase.
+- 2026-07-07:
+  Decision: Put Phase 19 dispatch recovery directly on the scene builder/detail surface and back it with a local fallback dispatch ledger instead of waiting for a separate operations console.
+  Reason: Operators already open individual scenes to inspect actions and run manual tests, so adding delivery recovery there keeps the workflow coherent while preserving browser-only and test-mode usability.
 
 ## Known Issues
 - Issue: `pnpm.ps1` is blocked by local PowerShell execution policy.
@@ -181,9 +185,9 @@
 - Issue: Provisioning intent storage is still in-memory on the API side with a frontend fallback store when the API is unavailable.
   Impact: Cloud registration intent tracking works for development and tests, but not yet with durable operational history.
   Fix plan: Persist provisioning intents and status transitions in MongoDB and attach them to device lifecycle audit history.
-- Issue: Failed scene dispatch jobs now have replay APIs, but there is still no operator-facing UI for browsing and recovering those failures.
-  Impact: Recovery exists for scene delivery jobs, but it still requires API tooling or direct operator knowledge of scene IDs and job IDs.
-  Fix plan: Add scene dispatch history and replay controls to a scene-management or admin operations surface.
+- Issue: Scene dispatch recovery is available per scene, but there is still no aggregate failure view across the scene catalog or dashboard.
+  Impact: Operators can recover known failed deliveries, but broader monitoring still requires opening individual scenes one at a time.
+  Fix plan: Add scene and dashboard failure badges plus filtered delivery summaries across scene-management surfaces.
 - Issue: Device rollout status is visible on device detail pages, but there is no aggregate failure view or dashboard summary for rollout health across many devices.
   Impact: Single-device recovery is now practical, but larger HOME and fleet monitoring still requires drilling into each device page.
   Fix plan: Add rollout-status badges, counts, and filtered failure views to dashboard and operations pages.
@@ -195,10 +199,9 @@
   Fix plan: Add a protected fetch wrapper that performs one refresh-and-retry cycle for 401 responses on user-facing API calls.
 
 ## Next Tasks
-1. Add operator-facing UI for scene dispatch failures and replay controls.
-2. Add rollout summaries and failure badges to dashboard and device-management views.
-3. Add a protected fetch wrapper with refresh-and-retry behavior for 401 race conditions.
-4. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
+1. Add rollout summaries and failure badges to dashboard, device-management, and scene-management views.
+2. Add a protected fetch wrapper with refresh-and-retry behavior for 401 race conditions.
+3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows once the device/runtime integration layer is ready.
 
 ## Log
 - 2026-07-01: Read `codex.md`, confirmed folder mapping, and created the initial project tracker.
@@ -227,3 +230,4 @@
 - 2026-07-03: Completed Phase 16 with an MQTT runtime bridge, MQTT-first telemetry and schedule ingestion, scene-command and OTA MQTT delivery publishing, and full workspace validation.
 - 2026-07-03: Completed Phase 17 with scene-command acknowledgement persistence, retryable dispatch leases, dedicated OTA delivery jobs and worker bootstrapping, MQTT OTA acknowledgement handling, and full workspace validation.
 - 2026-07-03: Completed Phase 18 with device rollout history APIs, scene dispatch recovery APIs, failed-job replay controls, device-detail rollout UI, and full workspace validation.
+- 2026-07-07: Completed Phase 19 with scene-detail dispatch history, failed scene-delivery replay controls, fallback dispatch persistence, and web-PWA lint, typecheck, test, and build validation.

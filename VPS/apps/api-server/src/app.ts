@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 
 import { requireAuthenticatedUser } from "./infrastructure/http/request-auth";
+import { requireAdminApiKey } from "./infrastructure/http/require-admin";
 import {
   adminApiPackageRouter,
   apiKeyRouter,
@@ -29,9 +30,11 @@ export function createApp(): Express {
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/public", publicApiRouter);
   app.use("/api/v1/pids", publicPidRouter);
-  app.use("/api/v1/admin/api-packages", adminApiPackageRouter);
-  app.use("/api/v1/admin/ota", otaRouter);
-  app.use("/api/v1/admin/pids", pidRouter);
+  // SEC-01 — admin surface is gated by a shared secret (x-admin-key) on top of
+  // the x-role developer check the controllers already perform.
+  app.use("/api/v1/admin/api-packages", requireAdminApiKey, adminApiPackageRouter);
+  app.use("/api/v1/admin/ota", requireAdminApiKey, otaRouter);
+  app.use("/api/v1/admin/pids", requireAdminApiKey, pidRouter);
   app.use("/api/v1/provisioning", requireAuthenticatedUser, provisioningRouter);
   app.use("/api/v1/scenes", requireAuthenticatedUser, sceneRouter);
   app.use("/api/v1", healthRouter);

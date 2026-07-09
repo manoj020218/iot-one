@@ -1,10 +1,25 @@
-import type { DeviceRecord } from "@jenix/shared";
+import type {
+  DeviceRecord,
+  DeviceUiCommandRequest,
+  DeviceUiRuntimeState,
+  HomeUiBootstrapDeviceBinding,
+  HomeUiBootstrapPackageRecord
+} from "@jenix/shared";
+import { useEffect, useState } from "react";
 
+import { resolveDevicePackageComponent } from "../plugins/devicePackageRegistry";
+import type { DevicePackageComponent } from "../plugins/devicePackage.types";
 import type { DevicePidProfile } from "../services/deviceManagementApi";
 
 export interface PidDynamicPageRendererProps {
   device: DeviceRecord;
   pidProfile: DevicePidProfile;
+  uiBinding: HomeUiBootstrapDeviceBinding | undefined;
+  uiPackage: HomeUiBootstrapPackageRecord | undefined;
+  runtime: DeviceUiRuntimeState | null | undefined;
+  busy?: boolean | undefined;
+  onRefresh: () => Promise<void>;
+  onCommand: (input: DeviceUiCommandRequest) => Promise<void>;
 }
 
 function renderKnownDynamicPage(pageId: string, device: DeviceRecord) {
@@ -71,12 +86,93 @@ function renderKnownDynamicPage(pageId: string, device: DeviceRecord) {
 
 export function PidDynamicPageRenderer({
   device,
-  pidProfile
+  pidProfile,
+  uiBinding,
+  uiPackage,
+  runtime,
+  busy,
+  onRefresh,
+  onCommand
 }: PidDynamicPageRendererProps) {
+  const [RemoteComponent, setRemoteComponent] = useState<DevicePackageComponent | null>(
+    null
+  );
+  const [remoteError, setRemoteError] = useState<string | null>(null);
   const pageIds =
     pidProfile.dashboard.dynamicPages.length > 0
       ? pidProfile.dashboard.dynamicPages
       : ["overview"];
+
+  useEffect(() => {
+    if (uiBinding?.uiMode !== "remote-package" || !uiPackage) {
+      setRemoteComponent(null);
+      setRemoteError(null);
+      return;
+    }
+
+    let active = true;
+
+    setRemoteError(null);
+    void resolveDevicePackageComponent(uiPackage)
+      .then((component) => {
+        if (active) {
+          setRemoteComponent(() => component);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setRemoteError(error instanceof Error ? error.message : "Failed to load UI package");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [uiBinding?.uiMode, uiPackage]);
+
+  if (uiBinding?.uiMode === "remote-package") {
+    if (!uiPackage) {
+      return (
+        <section className="content-grid">
+          <article className="scene-card">
+            <p className="scene-card-kicker">PID Dynamic Page</p>
+            <h3>UI Package Missing</h3>
+            <p className="hint-text">
+              The device is bound to remote-package mode, but no package artifact was
+              resolved from HOME bootstrap.
+            </p>
+          </article>
+        </section>
+      );
+    }
+
+    if (remoteError) {
+      return (
+        <section className="content-grid">
+          <article className="scene-card">
+            <p className="scene-card-kicker">PID Dynamic Page</p>
+            <h3>Package Load Failed</h3>
+            <p className="hint-text">{remoteError}</p>
+          </article>
+        </section>
+      );
+    }
+
+    if (!RemoteComponent || !runtime) {
+      return <section className="panel">Loading device package...</section>;
+    }
+
+    return (
+      <RemoteComponent
+        busy={busy}
+        device={device}
+        pidProfile={pidProfile}
+        runtime={runtime}
+        onRefresh={onRefresh}
+        onCommand={onCommand}
+      />
+    );
+  }
 
   return (
     <section className="content-grid">

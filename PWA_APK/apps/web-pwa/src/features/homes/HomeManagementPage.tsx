@@ -192,7 +192,7 @@ export function HomeManagementPage() {
           <h2>{currentHome.name}</h2>
         </div>
         <div className="top-bar-meta">
-          <button className="text-button" type="button" onClick={() => navigate("/dashboard")}>
+          <button className="text-button" type="button" onClick={() => navigate("/home")}>
             Dashboard
           </button>
           <button className="text-button" type="button" onClick={logout}>

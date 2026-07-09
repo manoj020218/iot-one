@@ -1,4 +1,5 @@
 import { applyDeviceTelemetryState } from "../../modules/devices/device.service";
+import { deviceUiRuntimeStore } from "../../modules/devices/device-ui-runtime.model";
 import { acknowledgeOtaDeliveryFailure, acknowledgeOtaDeliverySuccess } from "../../modules/ota/ota.service";
 import {
   enqueuePreparedSceneEvaluationJobs
@@ -35,6 +36,16 @@ export async function handleRuntimeScheduleTickMessage(
 export async function handleRuntimeDeviceCommandAckMessage(
   message: RuntimeDeviceCommandAckMessage
 ): Promise<void> {
+  await deviceUiRuntimeStore.saveLastCommand(message.deviceId, {
+    commandId: message.deliveryId,
+    deviceId: message.deviceId,
+    status: message.status,
+    queuedAt: message.acknowledgedAt,
+    acknowledgedAt: message.acknowledgedAt,
+    ...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
+    ...(message.payload ? { payload: message.payload } : {})
+  });
+
   if (message.status === "completed") {
     await sceneActionDispatchRepository.complete(
       message.deliveryId,

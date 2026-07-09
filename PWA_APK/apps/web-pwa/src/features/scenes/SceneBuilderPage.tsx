@@ -1,4 +1,4 @@
-import type { SceneTelemetrySnapshot } from "@jenix/shared";
+import type { SceneActionDispatchRecord, SceneTelemetrySnapshot } from "@jenix/shared";
 import { AppShell, StatusPill } from "@jenix/ui";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,6 +11,7 @@ import {
 } from "../dashboard/services/dashboardApi";
 import { SceneActionEditor } from "./components/SceneActionEditor";
 import { SceneConditionEditor } from "./components/SceneConditionEditor";
+import { SceneDispatchHistoryPanel } from "./components/SceneDispatchHistoryPanel";
 import { SceneScheduleEditor } from "./components/SceneScheduleEditor";
 import { SceneStatusBadge } from "./components/SceneStatusBadge";
 import {
@@ -20,6 +21,8 @@ import {
 import {
   createScene,
   getScene,
+  listSceneDispatches,
+  replaySceneDispatch,
   runSceneManually,
   updateScene
 } from "./services/sceneApi";
@@ -86,6 +89,7 @@ export function SceneBuilderPage() {
   const isCreateMode = !sceneId;
   const [draft, setDraft] = useState<SceneBuilderDraft>(() => createInitialSceneDraft());
   const [deviceOptions, setDeviceOptions] = useState<SceneDeviceOption[]>([]);
+  const [dispatches, setDispatches] = useState<SceneActionDispatchRecord[]>([]);
   const [loading, setLoading] = useState(!isCreateMode);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +108,10 @@ export function SceneBuilderPage() {
   const currentHome = getCurrentHome(authSession);
   const hasScheduleTrigger = draft.triggers.some((trigger) => trigger.type === "schedule");
 
+  async function refreshSceneDispatchState(targetSceneId: string) {
+    setDispatches(await listSceneDispatches(authSession, targetSceneId));
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -112,9 +120,10 @@ export function SceneBuilderPage() {
       setError(null);
 
       try {
-        const [devices, scene] = await Promise.all([
+        const [devices, scene, sceneDispatches] = await Promise.all([
           getDashboardDevices(authSession),
-          sceneId ? getScene(authSession, sceneId) : Promise.resolve(null)
+          sceneId ? getScene(authSession, sceneId) : Promise.resolve(null),
+          sceneId ? listSceneDispatches(authSession, sceneId) : Promise.resolve([])
         ]);
 
         if (cancelled) {
@@ -122,6 +131,7 @@ export function SceneBuilderPage() {
         }
 
         setDeviceOptions(buildDeviceOptions(devices));
+        setDispatches(sceneDispatches);
         if (scene) {
           setDraft(sceneRecordToDraft(scene));
         } else {
@@ -203,6 +213,7 @@ export function SceneBuilderPage() {
         optionalTelemetry(telemetry)
       );
       setDraft(sceneRecordToDraft(result.scene));
+      await refreshSceneDispatchState(sceneId);
       setRunMessage(
         result.matchedConditions
           ? `Manual run executed ${result.executedActions.length} action(s).`
@@ -408,6 +419,18 @@ export function SceneBuilderPage() {
               {runMessage ? <p className="provisioning-note">{runMessage}</p> : null}
               {runError ? <p className="inline-error">{runError}</p> : null}
             </section>
+          ) : null}
+          {!isCreateMode ? (
+            <SceneDispatchHistoryPanel
+              dispatches={dispatches}
+              canReplay={currentHome.role !== "viewer"}
+              onReplay={async (jobId) => {
+                const replayed = await replaySceneDispatch(authSession, sceneId, jobId);
+                await refreshSceneDispatchState(sceneId);
+                return replayed;
+              }}
+              onRefresh={() => refreshSceneDispatchState(sceneId)}
+            />
           ) : null}
         </>
       ) : null}

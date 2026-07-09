@@ -180,6 +180,10 @@ export async function updatePid(
           ...clone(existing.api),
           ...(patch.api ?? {})
         },
+        ui: {
+          ...clone(existing.ui),
+          ...(patch.ui ?? {})
+        },
         dashboard: {
           ...clone(existing.dashboard),
           ...(patch.dashboard ?? {})

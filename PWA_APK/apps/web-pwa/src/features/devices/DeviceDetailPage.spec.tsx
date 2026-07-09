@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { foundationPidBlueprint } from "@jenix/device-schemas";
 import {
+  createUiPackageKey,
   createDeviceRecord,
   type AuthSession,
   type HomeRecord
@@ -12,7 +13,11 @@ import {
 
 import { AuthSessionProvider } from "../../app/AuthSessionProvider";
 import { DeviceDetailPage } from "./DeviceDetailPage";
+import { devicePackageRegistryTesting } from "./plugins/devicePackageRegistry";
+import { TankGuardDynamicPage } from "./plugins/tank-guard-mobile/v1.0.0/TankGuardDynamicPage";
 import { deviceManagementApiTesting } from "./services/deviceManagementApi";
+import { devicePluginRuntimeApiTesting } from "./services/devicePluginRuntimeApi";
+import { uiBootstrapApiTesting } from "./services/uiBootstrapApi";
 
 const ownerHome: HomeRecord = {
   homeId: "home-owner",
@@ -88,6 +93,9 @@ describe("DeviceDetailPage", () => {
   beforeEach(() => {
     cleanup();
     deviceManagementApiTesting.reset();
+    devicePackageRegistryTesting.reset();
+    devicePluginRuntimeApiTesting.reset();
+    uiBootstrapApiTesting.reset();
   });
 
   it("renders a fallback panel for unsupported PID dynamic pages", async () => {
@@ -115,6 +123,119 @@ describe("DeviceDetailPage", () => {
 
     expect(await screen.findByText("Unsupported Dynamic Page")).toBeInTheDocument();
     expect(screen.getByText(/custom-water-math/)).toBeInTheDocument();
+  });
+
+  it("renders the Tank Guard package through the HOME bootstrap mapping", async () => {
+    const pid = "JNX-TG-C3-903";
+    const packageKey = createUiPackageKey("tank-guard-mobile", "1.0.0");
+
+    deviceManagementApiTesting.seedDemoDevices(ownerSession.user.userId, ownerHome.homeId, [
+      createDeviceRecord({
+        deviceId: "JNX-TG-A7F9",
+        pid,
+        homeId: ownerHome.homeId,
+        ownerUserId: ownerSession.user.userId,
+        displayName: "Roof Tank",
+        firmwareVersion: "1.0.3"
+      })
+    ]);
+    deviceManagementApiTesting.seedPidProfile({
+      ...foundationPidBlueprint,
+      pid,
+      productName: "Smart Tank Guard",
+      ui: {
+        uiMode: "remote-package",
+        uiPackageId: "tank-guard-mobile",
+        uiPackageVersion: "1.0.0"
+      },
+      dashboard: {
+        ...foundationPidBlueprint.dashboard,
+        templateId: "tank-guard-mobile-v1",
+        dynamicPages: ["tank-guard-mobile"]
+      }
+    });
+    devicePackageRegistryTesting.seedPackage("tank-guard-mobile", "1.0.0", {
+      TankGuardDynamicPage
+    });
+    uiBootstrapApiTesting.seedBootstrap(ownerHome.homeId, {
+      homeId: ownerHome.homeId,
+      generatedAt: "2026-07-09T11:40:00.000Z",
+      devices: [
+        {
+          deviceId: "JNX-TG-A7F9",
+          pid,
+          displayName: "Roof Tank",
+          homeId: ownerHome.homeId,
+          online: true,
+          templateId: "tank-guard-mobile-v1",
+          dynamicPages: ["tank-guard-mobile"],
+          uiMode: "remote-package",
+          uiPackageId: "tank-guard-mobile",
+          uiPackageVersion: "1.0.0",
+          packageKey
+        }
+      ],
+      pidBindings: [
+        {
+          pid,
+          productName: "Smart Tank Guard",
+          templateId: "tank-guard-mobile-v1",
+          dynamicPages: ["tank-guard-mobile"],
+          uiMode: "remote-package",
+          uiPackageId: "tank-guard-mobile",
+          uiPackageVersion: "1.0.0",
+          packageKey
+        }
+      ],
+      packages: [
+        {
+          packageId: "tank-guard-mobile",
+          version: "1.0.0",
+          manifestPath: "/ui-packages/tank-guard-mobile/1.0.0/manifest.json",
+          entryPath: "/ui-packages/tank-guard-mobile/1.0.0/remoteEntry.js",
+          exportName: "TankGuardDynamicPage"
+        }
+      ]
+    });
+    devicePluginRuntimeApiTesting.seedRuntime({
+      deviceId: "JNX-TG-A7F9",
+      pid,
+      telemetrySnapshot: {
+        deviceId: "JNX-TG-A7F9",
+        pid,
+        occurredAt: "2026-07-09T11:41:00.000Z",
+        telemetry: {
+          tankLevelPct: 72,
+          tankLevelMm: 740,
+          zeroLevelMm: 12,
+          wifiRssi: -61,
+          wifiSsidName: "JenixLab",
+          localIp: "192.168.1.88",
+          localUrl: "http://tankguard.local",
+          wifiTxPowerDbm: 8.5,
+          pumpRunning: true,
+          alarmState: "normal",
+          sensorStatus: "ready"
+        },
+        history: [61, 66, 72]
+      },
+      settings: {
+        config: {
+          capacityLitres: 2000,
+          wifiTxPowerDbm: 8.5,
+          zeroLevelMm: 12,
+          bottomMotorStartLevelMm: 300,
+          topMotorOffLevelMm: 900,
+          overflowMarginMm: 30
+        }
+      }
+    });
+
+    renderDeviceRoute(ownerSession);
+
+    expect(await screen.findByText("Zero and Capacity Controls")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Roof Tank", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("JenixLab")).toBeInTheDocument();
   });
 
   it("blocks firmware requests for a viewer home role", async () => {

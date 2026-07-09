@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthPage } from "../features/auth/AuthPage";
 import { useAuth } from "../features/auth/hooks/useAuth";
-import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { HomeDashboardPage } from "../features/home/HomeDashboardPage";
 import { DeviceDetailPage } from "../features/devices/DeviceDetailPage";
 import { DeviceManagementPage } from "../features/devices/DeviceManagementPage";
 import { HomeManagementPage } from "../features/homes/HomeManagementPage";
@@ -23,13 +23,14 @@ export function AppRouter() {
     <Routes>
       <Route path="/login" element={<AuthPage />} />
       <Route
-        path="/dashboard"
+        path="/home"
         element={
           <RequireAuth>
-            <DashboardPage />
+            <HomeDashboardPage />
           </RequireAuth>
         }
       />
+      <Route path="/dashboard" element={<Navigate replace to="/home" />} />
       <Route
         path="/homes"
         element={
@@ -128,7 +129,7 @@ export function AppRouter() {
       />
       <Route
         path="*"
-        element={<Navigate replace to={session ? "/dashboard" : "/login"} />}
+        element={<Navigate replace to={session ? "/home" : "/login"} />}
       />
     </Routes>
   );

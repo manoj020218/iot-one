@@ -6,7 +6,8 @@ import {
   type PidDashboardProfile,
   type PidFirmwareProfile,
   type PidHardwareProfile,
-  type PidMatterProfile
+  type PidMatterProfile,
+  type PidUiProfile
 } from "@jenix/device-schemas";
 import type { ProductStatus } from "@jenix/shared";
 
@@ -26,6 +27,8 @@ const matterCertificationStatuses: MatterCertificationStatus[] = [
   "certified",
   "not_required"
 ];
+
+const pidUiModes: PidUiProfile["uiMode"][] = ["builtin", "remote-package"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -446,6 +449,47 @@ function parseDashboardProfile(
   };
 }
 
+function parseUiProfile(
+  value: Record<string, unknown>,
+  errors: string[]
+): PidUiProfile {
+  const uiMode = readTrimmedString(value, "uiMode", "ui.uiMode", errors) ?? "builtin";
+  const uiPackageId = readTrimmedString(
+    value,
+    "uiPackageId",
+    "ui.uiPackageId",
+    errors,
+    false
+  );
+  const uiPackageVersion = readTrimmedString(
+    value,
+    "uiPackageVersion",
+    "ui.uiPackageVersion",
+    errors,
+    false
+  );
+
+  if (!pidUiModes.includes(uiMode as PidUiProfile["uiMode"])) {
+    errors.push("ui.uiMode must be a supported UI package mode");
+  }
+
+  if (uiMode === "remote-package") {
+    if (!uiPackageId) {
+      errors.push("ui.uiPackageId is required when ui.uiMode is remote-package");
+    }
+
+    if (!uiPackageVersion) {
+      errors.push("ui.uiPackageVersion is required when ui.uiMode is remote-package");
+    }
+  }
+
+  return {
+    uiMode: uiMode as PidUiProfile["uiMode"],
+    ...optionalProp("uiPackageId", uiPackageId),
+    ...optionalProp("uiPackageVersion", uiPackageVersion)
+  };
+}
+
 export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePidInput> {
   const errors: string[] = [];
 
@@ -488,6 +532,7 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
   const firmwareValue = readObject(body, "firmware", "firmware", errors);
   const matterValue = readObject(body, "matter", "matter", errors);
   const apiValue = readObject(body, "api", "api", errors);
+  const uiValue = readObject(body, "ui", "ui", errors);
   const dashboardValue = readObject(body, "dashboard", "dashboard", errors);
 
   const hardware = hardwareValue
@@ -500,11 +545,12 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
     ? parseMatterProfile(matterValue, errors)
     : undefined;
   const api = apiValue ? parseApiProfile(apiValue, errors) : undefined;
+  const ui = uiValue ? parseUiProfile(uiValue, errors) : undefined;
   const dashboard = dashboardValue
     ? parseDashboardProfile(dashboardValue, errors)
     : undefined;
 
-  if (!hardware || !firmware || !matter || !api || !dashboard) {
+  if (!hardware || !firmware || !matter || !api || !ui || !dashboard) {
     return {
       ok: false,
       errors
@@ -574,6 +620,7 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
       firmware,
       matter,
       api,
+      ui,
       dashboard,
       ...optionalProp("description", description),
       ...optionalProp("iconUrl", iconUrl),

@@ -48,7 +48,7 @@ export function ProvisioningHomePage() {
         </div>
         <button
           className="text-button"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/home")}
           type="button"
         >
           Back to Dashboard
