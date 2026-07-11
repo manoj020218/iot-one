@@ -1,5 +1,6 @@
 import type {
   HomeAccessRole,
+  HomeDashboardResponse,
   HomeRecord
 } from "@jenix/shared";
 
@@ -23,17 +24,35 @@ export interface CreateHomeShareCodePayload {
   expiresInHours?: number;
 }
 
+export interface CreateHomePayload {
+  name: string;
+  timezone?: string;
+  locationLabel?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface RedeemHomeShareCodePayload {
   code: string;
 }
+
+export interface UpdateHomePayload extends CreateHomePayload {}
 
 export interface UpdateHomeMemberRolePayload {
   role: Exclude<HomeAccessRole, "owner">;
 }
 
+export interface UpdateHomeMemberAccessPayload {
+  allowed: boolean;
+}
+
 export interface HomeRedeemResponse {
   home: HomeRecord;
   homes: HomeRecord[];
+}
+
+export interface HomeDashboardResult extends HomeDashboardResponse {
+  generatedAt: string;
 }
 
 export interface HomeAuditEntry {

@@ -14,6 +14,7 @@ import { SceneListPage } from "../features/scenes/SceneListPage";
 import { AppUpdatePage } from "../features/settings/AppUpdatePage";
 import { SettingsHomePage } from "../features/settings/SettingsHomePage";
 import { UserProfilePage } from "../features/settings/UserProfilePage";
+import { AuthenticatedAppFrame } from "./layout/AuthenticatedAppFrame";
 import { RequireAuth } from "./RequireAuth";
 
 export function AppRouter() {
@@ -23,110 +24,27 @@ export function AppRouter() {
     <Routes>
       <Route path="/login" element={<AuthPage />} />
       <Route
-        path="/home"
         element={
           <RequireAuth>
-            <HomeDashboardPage />
+            <AuthenticatedAppFrame />
           </RequireAuth>
         }
-      />
-      <Route path="/dashboard" element={<Navigate replace to="/home" />} />
-      <Route
-        path="/homes"
-        element={
-          <RequireAuth>
-            <HomeManagementPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/devices"
-        element={
-          <RequireAuth>
-            <DeviceManagementPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/devices/:deviceId"
-        element={
-          <RequireAuth>
-            <DeviceDetailPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/provisioning"
-        element={
-          <RequireAuth>
-            <ProvisioningHomePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/provisioning/ble"
-        element={
-          <RequireAuth>
-            <BleProvisioningPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/provisioning/ap"
-        element={
-          <RequireAuth>
-            <ApProvisioningPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/scenes"
-        element={
-          <RequireAuth>
-            <SceneListPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/scenes/new"
-        element={
-          <RequireAuth>
-            <SceneBuilderPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/scenes/:sceneId"
-        element={
-          <RequireAuth>
-            <SceneBuilderPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <RequireAuth>
-            <SettingsHomePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/settings/profile"
-        element={
-          <RequireAuth>
-            <UserProfilePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/settings/app"
-        element={
-          <RequireAuth>
-            <AppUpdatePage />
-          </RequireAuth>
-        }
-      />
+      >
+        <Route path="/home" element={<HomeDashboardPage />} />
+        <Route path="/dashboard" element={<Navigate replace to="/home" />} />
+        <Route path="/homes" element={<HomeManagementPage />} />
+        <Route path="/devices" element={<DeviceManagementPage />} />
+        <Route path="/devices/:deviceId" element={<DeviceDetailPage />} />
+        <Route path="/provisioning" element={<ProvisioningHomePage />} />
+        <Route path="/provisioning/ble" element={<BleProvisioningPage />} />
+        <Route path="/provisioning/ap" element={<ApProvisioningPage />} />
+        <Route path="/scenes" element={<SceneListPage />} />
+        <Route path="/scenes/new" element={<SceneBuilderPage />} />
+        <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
+        <Route path="/settings" element={<SettingsHomePage />} />
+        <Route path="/settings/profile" element={<UserProfilePage />} />
+        <Route path="/settings/app" element={<AppUpdatePage />} />
+      </Route>
       <Route
         path="*"
         element={<Navigate replace to={session ? "/home" : "/login"} />}

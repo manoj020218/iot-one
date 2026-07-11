@@ -5,17 +5,24 @@ import {
   canManageHomeMembership,
   canRevokeHomeMember,
   createAuditStamp,
+  createHomeSummaryCard,
   createDefaultHome,
+  defaultHomeTimezone,
+  formatHomeClock,
+  isHomeAccessAllowed,
   type HomeUiBootstrapDeviceBinding,
   type HomeUiBootstrapPidBinding,
   type HomeUiBootstrapResponse,
   type HomeAccessRole,
+  type HomeDashboardCard,
   type HomeMemberRecord,
   type HomeRecord,
-  type HomeShareCodeRecord
+  type HomeShareCodeRecord,
+  withDefaultHomeTimezone
 } from "@jenix/shared";
 
 import { deviceRepository } from "../devices/device.model";
+import { sceneRepository } from "../scenes/scene.model";
 import {
   homeAuditRepository,
   homeMemberRepository,
@@ -24,13 +31,17 @@ import {
   homeUserProfileRepository
 } from "./home.model";
 import type {
+  CreateHomePayload,
   CreateHomeShareCodePayload,
+  HomeDashboardResult,
   HomeAuditEntry,
   HomeRedeemResponse,
   HomeRequestContext,
   HomeUserProfile,
   RedeemHomeShareCodePayload,
   StoredHomeRecord,
+  UpdateHomePayload,
+  UpdateHomeMemberAccessPayload,
   UpdateHomeMemberRolePayload
 } from "./home.types";
 import { HomeModuleError } from "./home.types";
@@ -54,6 +65,19 @@ function createShareCodeValue(): string {
     .toString(36)
     .slice(2, 6)
     .toUpperCase()}`;
+}
+
+function createHomeId(ownerUserId: string, name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+
+  return `home-${ownerUserId}-${slug || "space"}-${Math.random()
+    .toString(36)
+    .slice(2, 6)}`;
 }
 
 function requireUserId(context: HomeRequestContext): string {
@@ -99,17 +123,23 @@ function createProfileSeed(
 
 function mapHomeForRole(
   home: StoredHomeRecord,
-  role: HomeAccessRole
+  role: HomeAccessRole,
+  allowed = true
 ): HomeRecord {
   return {
     ...home,
-    role
+    role,
+    allowed
   };
 }
 
 function compareHomeRecords(left: HomeRecord, right: HomeRecord): number {
   if (left.isDefault !== right.isDefault) {
     return left.isDefault ? -1 : 1;
+  }
+
+  if (isHomeAccessAllowed(left) !== isHomeAccessAllowed(right)) {
+    return isHomeAccessAllowed(left) ? -1 : 1;
   }
 
   return left.name.localeCompare(right.name);
@@ -125,6 +155,10 @@ function compareHomeMembers(
 
   if (left.role !== "owner" && right.role === "owner") {
     return 1;
+  }
+
+  if (isHomeAccessAllowed(left) !== isHomeAccessAllowed(right)) {
+    return isHomeAccessAllowed(left) ? -1 : 1;
   }
 
   return left.name.localeCompare(right.name);
@@ -207,6 +241,14 @@ async function ensureDefaultHomeAccess(
   const existingDefaultHome = await findStoredDefaultHome(profile.userId);
 
   if (existingDefaultHome) {
+    if (!existingDefaultHome.timezone) {
+      await homeRepository.save({
+        ...existingDefaultHome,
+        timezone: defaultHomeTimezone,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     if (!(await homeMemberRepository.find(existingDefaultHome.homeId, profile.userId))) {
       const timestamp = new Date().toISOString();
       await homeMemberRepository.save({
@@ -216,12 +258,16 @@ async function ensureDefaultHomeAccess(
         name: profile.name,
         email: profile.email,
         role: "owner",
+        allowed: true,
         joinedAt: timestamp,
         updatedAt: timestamp
       });
     }
 
-    return existingDefaultHome;
+    return {
+      ...existingDefaultHome,
+      timezone: withDefaultHomeTimezone(existingDefaultHome.timezone)
+    };
   }
 
   const defaultHome = createDefaultHome(profile.userId);
@@ -234,6 +280,7 @@ async function ensureDefaultHomeAccess(
     name: profile.name,
     email: profile.email,
     role: "owner",
+    allowed: true,
     joinedAt: storedDefaultHome.createdAt,
     updatedAt: storedDefaultHome.updatedAt
   });
@@ -262,6 +309,10 @@ async function requireMembership(
     throw new HomeModuleError(403, "HOME access denied");
   }
 
+  if (!isHomeAccessAllowed(membership)) {
+    throw new HomeModuleError(403, "HOME access is disabled for this member");
+  }
+
   return membership;
 }
 
@@ -277,15 +328,14 @@ function requireMembershipManager(membership: HomeMemberRecord) {
   }
 }
 
-async function getActiveShareCodes(homeId: string): Promise<HomeShareCodeRecord[]> {
-  const now = new Date();
+function requireHomeOwner(membership: HomeMemberRecord) {
+  if (membership.role !== "owner") {
+    throw new HomeModuleError(403, "Only the HOME owner can perform this action");
+  }
+}
 
-  return (await homeShareCodeRepository.listByHome(homeId))
-    .filter(
-      (shareCode) =>
-        !shareCode.redeemedAt && new Date(shareCode.expiresAt).getTime() > now.getTime()
-    )
-    .sort(compareShareCodes);
+async function getShareCodes(homeId: string): Promise<HomeShareCodeRecord[]> {
+  return (await homeShareCodeRepository.listByHome(homeId)).sort(compareShareCodes);
 }
 
 function normalizeShareCodeExpiresInHours(expiresInHours = 24): number {
@@ -300,7 +350,7 @@ async function listHomesForUserId(userId: string): Promise<HomeRecord[]> {
   const homes = await Promise.all(
     memberships.map(async (membership) => {
       const home = await requireHome(membership.homeId);
-      return mapHomeForRole(home, membership.role);
+      return mapHomeForRole(home, membership.role, isHomeAccessAllowed(membership));
     })
   );
 
@@ -404,6 +454,153 @@ export async function listHomes(context: HomeRequestContext): Promise<HomeRecord
   return syncUserHomes(createProfileSeed(requireUserId(context), context));
 }
 
+export async function createHome(
+  payload: CreateHomePayload,
+  context: HomeRequestContext
+): Promise<HomeRecord> {
+  const userId = requireUserId(context);
+  const profile = await upsertUserProfile(createProfileSeed(userId, context));
+  await ensureDefaultHomeAccess(profile);
+
+  const now = new Date().toISOString();
+  const record: StoredHomeRecord = {
+    homeId: createHomeId(userId, payload.name),
+    name: payload.name.trim(),
+    ownerUserId: userId,
+    isDefault: false,
+    timezone: withDefaultHomeTimezone(payload.timezone),
+    ...optionalProp("locationLabel", payload.locationLabel?.trim() || undefined),
+    ...optionalProp("latitude", payload.latitude),
+    ...optionalProp("longitude", payload.longitude),
+    createdAt: now,
+    updatedAt: now
+  };
+
+  await homeRepository.save(record);
+  await homeMemberRepository.save({
+    membershipId: createMembershipId(),
+    homeId: record.homeId,
+    userId,
+    name: profile.name,
+    email: profile.email,
+    role: "owner",
+    allowed: true,
+    joinedAt: now,
+    updatedAt: now
+  });
+  await writeAudit(record.homeId, userId, "home.created", {
+    timezone: record.timezone
+  });
+
+  return mapHomeForRole(record, "owner", true);
+}
+
+export async function updateHome(
+  homeId: string,
+  payload: UpdateHomePayload,
+  context: HomeRequestContext
+): Promise<HomeRecord> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const actorMembership = await requireMembership(homeId, userId);
+  requireMembershipManager(actorMembership);
+
+  const existing = await requireHome(homeId);
+  const updated: StoredHomeRecord = {
+    ...existing,
+    name: payload.name.trim(),
+    timezone: withDefaultHomeTimezone(payload.timezone),
+    ...optionalProp("locationLabel", payload.locationLabel?.trim() || undefined),
+    ...optionalProp("latitude", payload.latitude),
+    ...optionalProp("longitude", payload.longitude),
+    updatedAt: new Date().toISOString()
+  };
+
+  await homeRepository.save(updated);
+  await writeAudit(homeId, userId, "home.updated", {
+    timezone: updated.timezone
+  });
+
+  return mapHomeForRole(updated, actorMembership.role, true);
+}
+
+export async function deleteHome(
+  homeId: string,
+  context: HomeRequestContext
+): Promise<HomeRecord[]> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const actorMembership = await requireMembership(homeId, userId);
+  requireHomeOwner(actorMembership);
+
+  const home = await requireHome(homeId);
+  if (home.isDefault) {
+    throw new HomeModuleError(409, "The default HOME cannot be deleted");
+  }
+
+  const devices = (await deviceRepository.list()).filter((device) => device.homeId === homeId);
+  if (devices.length > 0) {
+    throw new HomeModuleError(409, "Remove all devices from this HOME before deleting it");
+  }
+
+  const scenes = (await sceneRepository.list()).filter((scene) => scene.homeId === homeId);
+  if (scenes.length > 0) {
+    throw new HomeModuleError(409, "Remove all scenes from this HOME before deleting it");
+  }
+
+  await homeShareCodeRepository.removeByHome(homeId);
+  await homeMemberRepository.removeByHome(homeId);
+  await homeAuditRepository.removeByHome(homeId);
+  await homeRepository.remove(homeId);
+
+  return listHomesForUserId(userId);
+}
+
+export async function getHomeDashboard(
+  homeId: string,
+  context: HomeRequestContext
+): Promise<HomeDashboardResult> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  await requireMembership(homeId, userId);
+  const home = await requireHome(homeId);
+  const timezone = withDefaultHomeTimezone(home.timezone);
+  const devices = (await deviceRepository.list()).filter((device) => device.homeId === homeId);
+  const onlineCount = devices.filter(
+    (device) => device.mqttStatus === "online" || device.cloudStatus === "online"
+  ).length;
+  const alertCount = devices.filter(
+    (device) => device.mqttStatus !== "online" && device.cloudStatus !== "online"
+  ).length;
+  const activeSceneCount = (await sceneRepository.list()).filter(
+    (scene) => scene.homeId === homeId && scene.status === "active"
+  ).length;
+  const localTime = formatHomeClock(new Date(), timezone);
+  const cards: HomeDashboardCard[] = [
+    createHomeSummaryCard({
+      homeId,
+      homeName: home.name,
+      deviceCount: devices.length,
+      alertCount,
+      activeSceneCount,
+      localTime
+    })
+  ];
+
+  return {
+    homeId,
+    homeName: home.name,
+    timezone,
+    localTime,
+    deviceCount: devices.length,
+    onlineCount,
+    alertCount,
+    activeSceneCount,
+    cards,
+    generatedAt: new Date().toISOString()
+  };
+}
+
 export async function getHomeUiBootstrap(
   homeId: string,
   context: HomeRequestContext
@@ -474,7 +671,7 @@ export async function listHomeShareCodes(
   await syncUserHomes(createProfileSeed(userId, context));
   requireShareCodeManager(await requireMembership(homeId, userId));
 
-  return getActiveShareCodes(homeId);
+  return getShareCodes(homeId);
 }
 
 export async function createHomeShareCode(
@@ -557,6 +754,7 @@ export async function redeemHomeShareCode(
     name: profile.name,
     email: profile.email,
     role: shareCode.role,
+    allowed: true,
     joinedAt: now,
     updatedAt: now,
     invitedByUserId: shareCode.createdByUserId
@@ -573,7 +771,7 @@ export async function redeemHomeShareCode(
   });
 
   return {
-    home: mapHomeForRole(home, shareCode.role),
+    home: mapHomeForRole(home, shareCode.role, true),
     homes: await listHomesForUserId(userId)
   };
 }
@@ -613,6 +811,49 @@ export async function updateHomeMemberRole(
   await writeAudit(homeId, userId, "home.member.role_updated", {
     targetUserId,
     role: payload.role
+  });
+
+  return listHomeMembers(homeId, context);
+}
+
+export async function updateHomeMemberAccess(
+  homeId: string,
+  targetUserId: string,
+  payload: UpdateHomeMemberAccessPayload,
+  context: HomeRequestContext
+): Promise<HomeMemberRecord[]> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const actorMembership = await requireMembership(homeId, userId);
+  const targetMembership = await homeMemberRepository.find(homeId, targetUserId);
+
+  requireMembershipManager(actorMembership);
+
+  if (!targetMembership) {
+    throw new HomeModuleError(404, "HOME member not found");
+  }
+
+  if (
+    !canRevokeHomeMember(
+      actorMembership.role,
+      targetMembership.role,
+      targetMembership.userId === actorMembership.userId
+    )
+  ) {
+    throw new HomeModuleError(
+      403,
+      `Role ${actorMembership.role} cannot update ${targetMembership.role} access`
+    );
+  }
+
+  await homeMemberRepository.save({
+    ...targetMembership,
+    allowed: payload.allowed,
+    updatedAt: new Date().toISOString()
+  });
+  await writeAudit(homeId, userId, "home.member.access_updated", {
+    targetUserId,
+    allowed: payload.allowed
   });
 
   return listHomeMembers(homeId, context);

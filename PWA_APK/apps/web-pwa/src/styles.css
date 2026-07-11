@@ -1,6 +1,8 @@
 /* Jenix One — global dark theme. Shared by every page that renders through
    AppShell (auth, settings, scenes, devices, provisioning, homes …). Matches
    the dashboard's .jx palette so the whole app is one modern dark experience. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@600;700&display=swap");
+
 :root {
   --bg: #080b11;
   --panel: #0f1521;
@@ -24,7 +26,7 @@
     radial-gradient(50vw 50vw at 0 100%, rgba(139, 92, 246, 0.12), transparent 55%),
     var(--bg);
   background-attachment: fixed;
-  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: "Manrope", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -32,7 +34,11 @@
 body { margin: 0; min-height: 100vh; }
 a { color: var(--cyan2); text-decoration: none; }
 a:hover { text-decoration: underline; }
-h1, h2, h3 { color: var(--txt); letter-spacing: -0.3px; }
+h1, h2, h3 {
+  color: var(--txt);
+  font-family: "Sora", "Manrope", sans-serif;
+  letter-spacing: -0.3px;
+}
 p { color: var(--txt); }
 
 button, input, select, textarea { font: inherit; }
@@ -336,3 +342,82 @@ button, input, select, textarea { font: inherit; }
 @media (max-width: 767px) {
   .scene-form-grid { grid-template-columns: 1fr; }
 }
+
+.app-frame { min-height: 100vh; position: relative; }
+.app-frame-body { padding-bottom: 96px; }
+
+.app-bottom-nav {
+  position: fixed; inset: auto 0 0; z-index: 60; display: flex; justify-content: space-around;
+  background: rgba(11, 15, 23, 0.94); backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line); padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+}
+.app-bottom-nav button {
+  border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10.5px;
+  font-weight: 700; min-width: 58px; padding: 4px 8px;
+}
+.app-bottom-nav button.on { color: var(--cyan); }
+.app-bottom-nav .fab { margin-top: -22px; }
+.app-bottom-nav .ring {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--grad); color: #04121a;
+  display: grid; place-items: center; box-shadow: 0 10px 26px -6px rgba(34, 227, 208, 0.6);
+}
+
+.sheet-scrim {
+  position: fixed; inset: 0; z-index: 70; border: 0; background: rgba(4, 7, 12, 0.66);
+  backdrop-filter: blur(4px); cursor: pointer;
+}
+.sheet-panel {
+  position: fixed; inset: auto 0 0; z-index: 71; background: var(--bg);
+  border-top: 1px solid var(--line2); border-top-left-radius: 24px; border-top-right-radius: 24px;
+  max-height: 90vh; overflow: auto; padding: 18px 18px 24px;
+}
+.sheet-head, .sheet-actions {
+  display: flex; align-items: center; gap: 12px; justify-content: space-between;
+}
+.sheet-head h2, .sheet-head p { margin: 0; }
+.sheet-head p { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+.sheet-close { min-height: 40px; padding-inline: 14px; }
+.sheet-body { display: grid; gap: 16px; margin-top: 18px; }
+.sheet-actions { margin-top: 18px; }
+@media (min-width: 760px) {
+  .sheet-panel {
+    inset: 0 0 0 auto; width: min(440px, 100vw); border-radius: 0;
+    border-left: 1px solid var(--line2);
+  }
+}
+
+.home-hero { display: grid; gap: 18px; margin-bottom: 18px; overflow: hidden; }
+.home-hero-head, .home-hero-copy, .home-hero-meta {
+  display: flex; align-items: center; gap: 14px; justify-content: space-between; flex-wrap: wrap;
+}
+.home-switcher {
+  align-items: start; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line2);
+  border-radius: 18px; color: var(--txt); cursor: pointer; display: inline-flex; gap: 10px;
+  padding: 14px 16px; text-align: left;
+}
+.home-switcher strong { display: block; font-size: 1rem; margin-top: 2px; }
+.home-hero-copy h2, .home-hero-copy p, .home-slide h3, .home-slide p, .home-slide strong { margin: 0; }
+.home-hero-copy p { color: var(--muted); margin-top: 8px; max-width: 560px; }
+.home-meta-pill { align-items: center; display: inline-flex; gap: 8px; }
+.home-carousel {
+  display: grid; gap: 14px; grid-auto-columns: minmax(260px, 88%); grid-auto-flow: column;
+  overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity;
+}
+.home-slide {
+  background: linear-gradient(135deg, rgba(34, 227, 208, 0.14), rgba(18, 184, 255, 0.08));
+  border: 1px solid rgba(34, 227, 208, 0.18); border-radius: 22px; display: grid; gap: 14px;
+  min-height: 180px; padding: 20px; scroll-snap-align: start;
+}
+.home-slide-top { display: flex; align-items: start; gap: 12px; justify-content: space-between; }
+.home-slide h3 { font-size: clamp(1.6rem, 6vw, 2.4rem); }
+.home-slide p { color: var(--muted); }
+
+.home-selector-list { display: grid; gap: 12px; }
+.home-selector-card {
+  align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+  color: var(--txt); cursor: pointer; display: flex; gap: 12px; justify-content: space-between;
+  padding: 16px; text-align: left;
+}
+.home-selector-card[data-active="true"] { border-color: rgba(34, 227, 208, 0.45); }
+.home-management-stack { display: grid; gap: 16px; margin-top: 16px; }

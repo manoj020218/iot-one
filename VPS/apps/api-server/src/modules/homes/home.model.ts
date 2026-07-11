@@ -18,6 +18,7 @@ export interface HomeRepository {
   list(): Promise<StoredHomeRecord[]>;
   findDefaultByOwner(ownerUserId: string): Promise<StoredHomeRecord | undefined>;
   save(record: StoredHomeRecord): Promise<StoredHomeRecord>;
+  remove(homeId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -27,6 +28,7 @@ export interface HomeMemberRepository {
   find(homeId: string, userId: string): Promise<HomeMemberRecord | undefined>;
   save(record: HomeMemberRecord): Promise<HomeMemberRecord>;
   remove(homeId: string, membershipId: string): Promise<void>;
+  removeByHome(homeId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -34,6 +36,7 @@ export interface HomeShareCodeRepository {
   listByHome(homeId: string): Promise<HomeShareCodeRecord[]>;
   getByCode(code: string): Promise<HomeShareCodeRecord | undefined>;
   save(record: HomeShareCodeRecord): Promise<HomeShareCodeRecord>;
+  removeByHome(homeId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -46,6 +49,7 @@ export interface HomeUserProfileRepository {
 export interface HomeAuditRepository {
   listByHome(homeId: string): Promise<HomeAuditEntry[]>;
   append(record: HomeAuditEntry): Promise<void>;
+  removeByHome(homeId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -81,6 +85,9 @@ function createInMemoryHomePersistenceStore(): HomePersistenceStore {
     async save(record) {
       homeStore.set(record.homeId, clone(record));
       return clone(record);
+    },
+    async remove(homeId) {
+      homeStore.delete(homeId);
     },
     async reset() {
       homeStore.clear();
@@ -118,6 +125,9 @@ function createInMemoryHomePersistenceStore(): HomePersistenceStore {
       );
       homeMemberStore.set(homeId, nextMembers);
     },
+    async removeByHome(homeId) {
+      homeMemberStore.delete(homeId);
+    },
     async reset() {
       homeMemberStore.clear();
     }
@@ -145,6 +155,9 @@ function createInMemoryHomePersistenceStore(): HomePersistenceStore {
       homeShareCodeStore.set(record.homeId, nextShareCodes);
       return clone(record);
     },
+    async removeByHome(homeId) {
+      homeShareCodeStore.delete(homeId);
+    },
     async reset() {
       homeShareCodeStore.clear();
     }
@@ -171,6 +184,9 @@ function createInMemoryHomePersistenceStore(): HomePersistenceStore {
     async append(record) {
       const existingEntries = await audits.listByHome(record.homeId);
       homeAuditStore.set(record.homeId, [...existingEntries, clone(record)]);
+    },
+    async removeByHome(homeId) {
+      homeAuditStore.delete(homeId);
     },
     async reset() {
       homeAuditStore.clear();
@@ -209,6 +225,9 @@ export const homeRepository: HomeRepository = {
   save(record) {
     return activeHomePersistenceStore.homes.save(record);
   },
+  remove(homeId) {
+    return activeHomePersistenceStore.homes.remove(homeId);
+  },
   reset() {
     return activeHomePersistenceStore.homes.reset();
   }
@@ -230,6 +249,9 @@ export const homeMemberRepository: HomeMemberRepository = {
   remove(homeId, membershipId) {
     return activeHomePersistenceStore.members.remove(homeId, membershipId);
   },
+  removeByHome(homeId) {
+    return activeHomePersistenceStore.members.removeByHome(homeId);
+  },
   reset() {
     return activeHomePersistenceStore.members.reset();
   }
@@ -244,6 +266,9 @@ export const homeShareCodeRepository: HomeShareCodeRepository = {
   },
   save(record) {
     return activeHomePersistenceStore.shareCodes.save(record);
+  },
+  removeByHome(homeId) {
+    return activeHomePersistenceStore.shareCodes.removeByHome(homeId);
   },
   reset() {
     return activeHomePersistenceStore.shareCodes.reset();
@@ -268,6 +293,9 @@ export const homeAuditRepository: HomeAuditRepository = {
   },
   append(record) {
     return activeHomePersistenceStore.audits.append(record);
+  },
+  removeByHome(homeId) {
+    return activeHomePersistenceStore.audits.removeByHome(homeId);
   },
   reset() {
     return activeHomePersistenceStore.audits.reset();

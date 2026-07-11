@@ -1,11 +1,17 @@
 import {
   canAssignHomeRole,
   canRevokeHomeMember,
+  createHomeSummaryCard,
   createDefaultHome,
+  defaultHomeTimezone,
+  formatHomeClock,
+  isHomeAccessAllowed,
   type HomeAccessRole,
+  type HomeDashboardResponse,
   type HomeMemberRecord,
   type HomeRecord,
-  type HomeShareCodeRecord
+  type HomeShareCodeRecord,
+  withDefaultHomeTimezone
 } from "@jenix/shared";
 
 type DemoHomeBase = Omit<HomeRecord, "role">;
@@ -38,6 +44,17 @@ function createShareCodeValue(): string {
     .toString(36)
     .slice(2, 6)
     .toUpperCase()}`;
+}
+
+function createHomeId(userId: string, name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+
+  return `home-${userId}-${slug || "space"}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function getFallbackProfile(userId: string): DemoUserProfile {
@@ -99,9 +116,19 @@ function ensureDefaultHome(profile: DemoUserProfile): DemoHomeBase {
         name: profile.name,
         email: profile.email,
         role: "owner",
+        allowed: true,
         joinedAt: now,
         updatedAt: now
       });
+    }
+
+    if (!existingDefaultHome.timezone) {
+      const normalizedHome = {
+        ...existingDefaultHome,
+        timezone: defaultHomeTimezone
+      };
+      homeStore.set(existingDefaultHome.homeId, clone(normalizedHome));
+      return normalizedHome;
     }
 
     return clone(existingDefaultHome);
@@ -117,6 +144,7 @@ function ensureDefaultHome(profile: DemoUserProfile): DemoHomeBase {
     name: profile.name,
     email: profile.email,
     role: "owner",
+    allowed: true,
     joinedAt: storedHome.createdAt,
     updatedAt: storedHome.updatedAt
   });
@@ -136,22 +164,23 @@ function requireMembership(
     throw new Error("HOME access denied");
   }
 
+  if (!isHomeAccessAllowed(membership)) {
+    throw new Error("HOME access is disabled for this member");
+  }
+
   return membership;
 }
 
-function mapHomeForRole(baseHome: DemoHomeBase, role: HomeAccessRole): HomeRecord {
+function mapHomeForRole(
+  baseHome: DemoHomeBase,
+  role: HomeAccessRole,
+  allowed = true
+): HomeRecord {
   return {
     ...baseHome,
-    role
+    role,
+    allowed
   };
-}
-
-function listActiveShareCodes(homeId: string): HomeShareCodeRecord[] {
-  return clone(homeShareCodeStore.get(homeId) ?? []).filter(
-    (shareCode) =>
-      !shareCode.redeemedAt &&
-      new Date(shareCode.expiresAt).getTime() > Date.now()
-  );
 }
 
 export function listDemoHomes(input: {
@@ -172,7 +201,9 @@ export function listDemoHomes(input: {
         (member) => member.userId === input.userId
       );
 
-      return membership ? mapHomeForRole(home, membership.role) : null;
+      return membership
+        ? mapHomeForRole(home, membership.role, isHomeAccessAllowed(membership))
+        : null;
     })
     .filter((home): home is HomeRecord => home !== null)
     .sort((left, right) => {
@@ -206,7 +237,136 @@ export function listDemoHomeShareCodes(homeId: string, userId: string): HomeShar
     throw new Error("Only owner/admin can create or view share codes");
   }
 
-  return listActiveShareCodes(homeId);
+  return clone(homeShareCodeStore.get(homeId) ?? []);
+}
+
+export function createDemoHome(input: {
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  name: string;
+  timezone?: string;
+  locationLabel?: string;
+  latitude?: number;
+  longitude?: number;
+}): HomeRecord {
+  const profile = upsertUserProfile({
+    userId: input.userId,
+    ...(input.userName ? { name: input.userName } : {}),
+    ...(input.userEmail ? { email: input.userEmail } : {})
+  });
+  ensureDefaultHome(profile);
+  const now = new Date().toISOString();
+  const home: DemoHomeBase = {
+    homeId: createHomeId(input.userId, input.name),
+    ownerUserId: input.userId,
+    name: input.name.trim(),
+    isDefault: false,
+    timezone: withDefaultHomeTimezone(input.timezone),
+    ...(input.locationLabel ? { locationLabel: input.locationLabel.trim() } : {}),
+    ...(input.latitude !== undefined ? { latitude: input.latitude } : {}),
+    ...(input.longitude !== undefined ? { longitude: input.longitude } : {}),
+    createdAt: now,
+    updatedAt: now
+  };
+  homeStore.set(home.homeId, clone(home));
+  saveHomeMember({
+    membershipId: createMembershipId(),
+    homeId: home.homeId,
+    userId: input.userId,
+    name: profile.name,
+    email: profile.email,
+    role: "owner",
+    allowed: true,
+    joinedAt: now,
+    updatedAt: now
+  });
+  return mapHomeForRole(home, "owner", true);
+}
+
+export function updateDemoHome(input: {
+  homeId: string;
+  userId: string;
+  name: string;
+  timezone?: string;
+  locationLabel?: string;
+  latitude?: number;
+  longitude?: number;
+}): HomeRecord {
+  const membership = requireMembership(input.homeId, input.userId);
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new Error("Only owner/admin can update HOME details");
+  }
+  const home = homeStore.get(input.homeId);
+  if (!home) {
+    throw new Error("HOME not found");
+  }
+  const updated = {
+    ...home,
+    name: input.name.trim(),
+    timezone: withDefaultHomeTimezone(input.timezone),
+    ...(input.locationLabel?.trim()
+      ? { locationLabel: input.locationLabel.trim() }
+      : {}),
+    ...(input.latitude !== undefined ? { latitude: input.latitude } : {}),
+    ...(input.longitude !== undefined ? { longitude: input.longitude } : {}),
+    updatedAt: new Date().toISOString()
+  };
+  homeStore.set(input.homeId, clone(updated));
+  return mapHomeForRole(updated, membership.role, true);
+}
+
+export function deleteDemoHome(input: {
+  homeId: string;
+  userId: string;
+}): HomeRecord[] {
+  const membership = requireMembership(input.homeId, input.userId);
+  const home = homeStore.get(input.homeId);
+  if (!home) {
+    throw new Error("HOME not found");
+  }
+  if (membership.role !== "owner") {
+    throw new Error("Only the HOME owner can perform this action");
+  }
+  if (home.isDefault) {
+    throw new Error("The default HOME cannot be deleted");
+  }
+  homeStore.delete(input.homeId);
+  homeMemberStore.delete(input.homeId);
+  homeShareCodeStore.delete(input.homeId);
+  return listDemoHomes({ userId: input.userId });
+}
+
+export function getDemoHomeDashboard(input: {
+  homeId: string;
+  userId: string;
+}): HomeDashboardResponse {
+  requireMembership(input.homeId, input.userId);
+  const home = homeStore.get(input.homeId);
+  if (!home) {
+    throw new Error("HOME not found");
+  }
+  const localTime = formatHomeClock(new Date(), home.timezone ?? defaultHomeTimezone);
+  return {
+    homeId: home.homeId,
+    homeName: home.name,
+    timezone: withDefaultHomeTimezone(home.timezone),
+    localTime,
+    deviceCount: 0,
+    onlineCount: 0,
+    alertCount: 0,
+    activeSceneCount: 0,
+    cards: [
+      createHomeSummaryCard({
+        homeId: home.homeId,
+        homeName: home.name,
+        deviceCount: 0,
+        alertCount: 0,
+        activeSceneCount: 0,
+        localTime
+      })
+    ]
+  };
 }
 
 export function createDemoHomeShareCode(input: {
@@ -284,6 +444,7 @@ export function redeemDemoHomeShareCode(input: {
     name: profile.name,
     email: profile.email,
     role: shareCode.role,
+    allowed: true,
     joinedAt: now,
     updatedAt: now,
     invitedByUserId: shareCode.createdByUserId
@@ -303,7 +464,7 @@ export function redeemDemoHomeShareCode(input: {
   const home = homeStore.get(shareCode.homeId)!;
 
   return {
-    home: mapHomeForRole(home, shareCode.role),
+    home: mapHomeForRole(home, shareCode.role, true),
     homes: listDemoHomes({
       userId: input.userId,
       userName: profile.name,
@@ -338,6 +499,39 @@ export function updateDemoHomeMemberRole(input: {
     updatedAt: new Date().toISOString()
   });
 
+  return listDemoHomeMembers(input.homeId, input.actorUserId);
+}
+
+export function updateDemoHomeMemberAccess(input: {
+  homeId: string;
+  actorUserId: string;
+  targetUserId: string;
+  allowed: boolean;
+}): HomeMemberRecord[] {
+  const actorMembership = requireMembership(input.homeId, input.actorUserId);
+  const targetMembership = listHomeMembersInternal(input.homeId).find(
+    (member) => member.userId === input.targetUserId
+  );
+
+  if (!targetMembership) {
+    throw new Error("HOME member not found");
+  }
+
+  if (
+    !canRevokeHomeMember(
+      actorMembership.role,
+      targetMembership.role,
+      actorMembership.userId === targetMembership.userId
+    )
+  ) {
+    throw new Error(`Role ${actorMembership.role} cannot update this member`);
+  }
+
+  saveHomeMember({
+    ...targetMembership,
+    allowed: input.allowed,
+    updatedAt: new Date().toISOString()
+  });
   return listDemoHomeMembers(input.homeId, input.actorUserId);
 }
 

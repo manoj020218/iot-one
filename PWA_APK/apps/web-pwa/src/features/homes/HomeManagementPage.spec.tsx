@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AuthSession } from "@jenix/shared";
 
@@ -29,25 +29,51 @@ describe("HomeManagementPage", () => {
     homeApiTesting.reset();
   });
 
-  it("renders the default HOME and creates a local share code fallback", async () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("creates a new home from the management screen", async () => {
     render(
-      <MemoryRouter
-        future={{
-          v7_relativeSplatPath: true,
-          v7_startTransition: true
-        }}
-      >
+      <MemoryRouter initialEntries={["/homes"]}>
         <AuthSessionProvider initialSession={session}>
-          <HomeManagementPage />
+          <Routes>
+            <Route path="/homes" element={<HomeManagementPage />} />
+          </Routes>
         </AuthSessionProvider>
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Choose the home you are operating right now")).toBeInTheDocument();
-    expect((await screen.findAllByText("HOME")).length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByRole("button", { name: "Create Home" }));
+    fireEvent.change(screen.getByPlaceholderText("Enter a home name"), {
+      target: { value: "Warehouse" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Home" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Share Code" }));
+    expect((await screen.findAllByText("Warehouse")).length).toBeGreaterThan(0);
+  });
 
-    expect(await screen.findByText(/Latest code:/)).toBeInTheDocument();
+  it("creates a one-hour invitation code from a home card", async () => {
+    render(
+      <MemoryRouter initialEntries={["/homes"]}>
+        <AuthSessionProvider initialSession={session}>
+          <Routes>
+            <Route path="/homes" element={<HomeManagementPage />} />
+          </Routes>
+        </AuthSessionProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create Home" }));
+    fireEvent.change(screen.getByPlaceholderText("Enter a home name"), {
+      target: { value: "Warehouse" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Home" }));
+
+    const warehouseCard = (await screen.findAllByText("Warehouse"))[0]!.closest("article");
+    expect(warehouseCard).not.toBeNull();
+    fireEvent.click(within(warehouseCard!).getByRole("button", { name: "Add Member" }));
+
+    expect(await screen.findByText(/Invitation JNX-/)).toBeInTheDocument();
   });
 });

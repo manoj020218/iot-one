@@ -79,6 +79,9 @@ export async function createMongoHomePersistenceStore(
 
         return record;
       },
+      async remove(homeId) {
+        await homeCollection.deleteOne({ homeId });
+      },
       async reset() {
         await homeCollection.deleteMany({});
       }
@@ -113,6 +116,9 @@ export async function createMongoHomePersistenceStore(
       async remove(_homeId, membershipId) {
         await homeMemberCollection.deleteOne({ membershipId });
       },
+      async removeByHome(homeId) {
+        await homeMemberCollection.deleteMany({ homeId });
+      },
       async reset() {
         await homeMemberCollection.deleteMany({});
       }
@@ -141,6 +147,9 @@ export async function createMongoHomePersistenceStore(
         );
 
         return record;
+      },
+      async removeByHome(homeId) {
+        await homeShareCodeCollection.deleteMany({ homeId });
       },
       async reset() {
         await homeShareCodeCollection.deleteMany({});
@@ -174,6 +183,9 @@ export async function createMongoHomePersistenceStore(
       },
       async append(record) {
         await homeAuditCollection.insertOne(record);
+      },
+      async removeByHome(homeId) {
+        await homeAuditCollection.deleteMany({ homeId });
       },
       async reset() {
         await homeAuditCollection.deleteMany({});

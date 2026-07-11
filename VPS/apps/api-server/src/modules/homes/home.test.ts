@@ -70,6 +70,46 @@ describe("home routes", () => {
     expect(redeemResponse.body.data.homes).toHaveLength(2);
   });
 
+  it("creates, updates, and summarizes a non-default HOME", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+
+    const createResponse = await request(createApp())
+      .post("/api/v1/homes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Warehouse",
+        timezone: "Europe/London"
+      });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body.data.name).toBe("Warehouse");
+    expect(createResponse.body.data.timezone).toBe("Europe/London");
+
+    const homeId = createResponse.body.data.homeId as string;
+    const updateResponse = await request(createApp())
+      .patch(`/api/v1/homes/${encodeURIComponent(homeId)}`)
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Warehouse Annex",
+        timezone: "Asia/Kolkata"
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.data.name).toBe("Warehouse Annex");
+
+    const dashboardResponse = await request(createApp())
+      .get(`/api/v1/homes/${encodeURIComponent(homeId)}/dashboard`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(dashboardResponse.status).toBe(200);
+    expect(dashboardResponse.body.data.homeName).toBe("Warehouse Annex");
+    expect(dashboardResponse.body.data.cards).toHaveLength(1);
+    expect(dashboardResponse.body.data.timezone).toBe("Asia/Kolkata");
+  });
+
   it("lets the owner update and revoke a shared member", async () => {
     const ownerSession = await createAuthenticatedSession({
       name: "Owner One",
@@ -121,6 +161,59 @@ describe("home routes", () => {
     expect(revokeResponse.body.data[0].userId).toBe(ownerSession.user.userId);
   });
 
+  it("marks a member as not allowed and blocks home-scoped access", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+    const invitedSession = await createAuthenticatedSession({
+      name: "Member One",
+      email: "member1@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    const shareCodeResponse = await request(createApp())
+      .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        role: "member",
+        expiresInHours: 1
+      });
+
+    await request(createApp())
+      .post("/api/v1/homes/redeem")
+      .set(createAuthHeaders(invitedSession))
+      .send({
+        code: shareCodeResponse.body.data.code
+      });
+
+    const accessResponse = await request(createApp())
+      .patch(
+        `/api/v1/homes/${encodeURIComponent(homeId)}/members/${encodeURIComponent(invitedSession.user.userId)}/access`
+      )
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        allowed: false
+      });
+
+    expect(accessResponse.status).toBe(200);
+    expect(accessResponse.body.data[1].allowed).toBe(false);
+
+    const homesResponse = await request(createApp())
+      .get("/api/v1/homes")
+      .set(createAuthHeaders(invitedSession));
+
+    expect(homesResponse.status).toBe(200);
+    expect(homesResponse.body.data.find((home: { homeId: string }) => home.homeId === homeId)?.allowed).toBe(false);
+
+    const blockedResponse = await request(createApp())
+      .get(`/api/v1/homes/${encodeURIComponent(homeId)}/members`)
+      .set(createAuthHeaders(invitedSession));
+
+    expect(blockedResponse.status).toBe(403);
+    expect(blockedResponse.body.error).toContain("disabled");
+  });
+
   it("blocks non-admin users from creating share codes", async () => {
     const ownerSession = await createAuthenticatedSession({
       name: "Owner One",
@@ -158,6 +251,29 @@ describe("home routes", () => {
 
     expect(blockedResponse.status).toBe(403);
     expect(blockedResponse.body.error).toContain("owner/admin");
+  });
+
+  it("deletes a non-default HOME after it is created", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner1@example.com"
+    });
+
+    const createResponse = await request(createApp())
+      .post("/api/v1/homes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Guest House"
+      });
+
+    const homeId = createResponse.body.data.homeId as string;
+    const deleteResponse = await request(createApp())
+      .delete(`/api/v1/homes/${encodeURIComponent(homeId)}`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.data).toHaveLength(1);
+    expect(deleteResponse.body.data[0].name).toBe("HOME");
   });
 
   it("returns a deduped UI bootstrap for a HOME", async () => {
