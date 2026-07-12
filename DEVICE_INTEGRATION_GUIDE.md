@@ -397,6 +397,11 @@ Relevant environment variables:
 - `MQTT_OTA_REQUEST_TOPIC`
 - `MQTT_OTA_ACK_TOPIC`
 
+Production recommendation:
+
+- Use a stable DNS broker URI such as `mqtt://mqtt.iotsoft.in:1883` for the platform runtime.
+- On device firmware, store `mqtt_host=mqtt.iotsoft.in` and `mqtt_port=1883` instead of any raw VPS IP.
+
 Default topic names from the repo:
 
 - telemetry: `jenix/runtime/telemetry`
