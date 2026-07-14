@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/hooks/useAuth";
 
 export function UserProfilePage() {
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
   const navigate = useNavigate();
 
   if (!session) {
@@ -40,6 +40,9 @@ export function UserProfilePage() {
           onClick={() => navigate("/homes")}
         >
           Homes
+        </button>
+        <button className="text-button" type="button" onClick={logout}>
+          Logout
         </button>
       </section>
       <section className="panel">

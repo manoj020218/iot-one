@@ -10,6 +10,10 @@ import {
 
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import {
+  fetchAuthenticatedJson,
+  shouldUseDemoFallback
+} from "../../../app/authenticatedRequest";
+import {
   listDemoDevices,
   resetDemoDevices,
   setDemoDevices
@@ -71,17 +75,6 @@ function mapDeviceToDashboardDevice(device: DeviceRecord): DashboardDevice {
   };
 }
 
-async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { data: T };
-  return payload.data;
-}
-
 export function getHomes(session: AuthSession): HomeRecord[] {
   return ensureDefaultHome(session.homes, session.user.userId);
 }
@@ -100,7 +93,7 @@ export async function getDashboardDevices(
   const currentHome = getCurrentHome(session);
 
   try {
-    const devices = await fetchJson<DeviceRecord[]>(deviceEndpoint, {
+    const devices = await fetchAuthenticatedJson<DeviceRecord[]>(deviceEndpoint, session, {
       method: "GET",
       headers: createAuthenticatedHeaders(session, {
         homeId: currentHome.homeId
@@ -108,7 +101,11 @@ export async function getDashboardDevices(
     });
 
     return devices.map(mapDeviceToDashboardDevice);
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoDevices(session.user.userId, currentHome.homeId).map(
       mapDeviceToDashboardDevice
     );
@@ -123,8 +120,9 @@ export async function renameDashboardDevice(
   const currentHome = getCurrentHome(session);
 
   try {
-    const device = await fetchJson<DeviceRecord>(
+    const device = await fetchAuthenticatedJson<DeviceRecord>(
       `${deviceEndpoint}/${encodeURIComponent(deviceId)}/rename`,
+      session,
       {
         method: "POST",
         headers: createAuthenticatedHeaders(session, {
@@ -138,7 +136,11 @@ export async function renameDashboardDevice(
     );
 
     return mapDeviceToDashboardDevice(device);
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     const devices = listDemoDevices(session.user.userId, currentHome.homeId);
     const updatedDevices = devices.map((device) =>
       device.deviceId === deviceId

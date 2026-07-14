@@ -26,6 +26,10 @@ import {
   upsertDemoScene
 } from "./sceneDemoStore";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
+import {
+  fetchAuthenticatedJson,
+  shouldUseDemoFallback
+} from "../../../app/authenticatedRequest";
 
 const sceneEndpoint = "/api/v1/scenes";
 
@@ -87,17 +91,6 @@ function getCurrentHome(session: AuthSession) {
 
 function getHomeRole(session: AuthSession): HomeAccessRole {
   return getCurrentHome(session).role;
-}
-
-async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { data: T };
-  return payload.data;
 }
 
 function createSceneId(): string {
@@ -308,13 +301,17 @@ export async function listScenes(session: AuthSession): Promise<SceneRecord[]> {
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneRecord[]>(sceneEndpoint, {
+    return await fetchAuthenticatedJson<SceneRecord[]>(sceneEndpoint, session, {
       method: "GET",
       headers: createAuthenticatedHeaders(session, {
         homeId: currentHome.homeId
       })
     });
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoScenes(session.user.userId, currentHome.homeId);
   }
 }
@@ -326,8 +323,9 @@ export async function getScene(
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneRecord>(
+    return await fetchAuthenticatedJson<SceneRecord>(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}`,
+      session,
       {
         method: "GET",
         headers: createAuthenticatedHeaders(session, {
@@ -335,7 +333,11 @@ export async function getScene(
         })
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     const scene = listDemoScenes(session.user.userId, currentHome.homeId).find(
       (item) => item.sceneId === sceneId
     );
@@ -355,7 +357,7 @@ export async function createScene(
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneRecord>(sceneEndpoint, {
+    return await fetchAuthenticatedJson<SceneRecord>(sceneEndpoint, session, {
       method: "POST",
       headers: createAuthenticatedHeaders(session, {
         contentType: "application/json",
@@ -363,7 +365,11 @@ export async function createScene(
       }),
       body: JSON.stringify(input)
     });
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return createFallbackScene(session, input);
   }
 }
@@ -376,8 +382,9 @@ export async function updateScene(
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneRecord>(
+    return await fetchAuthenticatedJson<SceneRecord>(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}`,
+      session,
       {
         method: "PATCH",
         headers: createAuthenticatedHeaders(session, {
@@ -387,7 +394,11 @@ export async function updateScene(
         body: JSON.stringify(patch)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return updateFallbackScene(session, sceneId, patch);
   }
 }
@@ -400,8 +411,9 @@ export async function runSceneManually(
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneRunResponse>(
+    return await fetchAuthenticatedJson<SceneRunResponse>(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}/run`,
+      session,
       {
         method: "POST",
         headers: createAuthenticatedHeaders(session, {
@@ -411,7 +423,11 @@ export async function runSceneManually(
         body: JSON.stringify(input)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return runFallbackScene(session, sceneId, input);
   }
 }
@@ -423,8 +439,9 @@ export async function listSceneDispatches(
   const currentHome = getCurrentHome(session);
 
   try {
-    return await fetchJson<SceneActionDispatchRecord[]>(
+    return await fetchAuthenticatedJson<SceneActionDispatchRecord[]>(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}/dispatches`,
+      session,
       {
         method: "GET",
         headers: createAuthenticatedHeaders(session, {
@@ -432,7 +449,11 @@ export async function listSceneDispatches(
         })
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoSceneDispatches(sceneId);
   }
 }
@@ -450,8 +471,9 @@ export async function replaySceneDispatch(
   }
 
   try {
-    return await fetchJson<SceneActionDispatchRecord>(
+    return await fetchAuthenticatedJson<SceneActionDispatchRecord>(
       `${sceneEndpoint}/${encodeURIComponent(sceneId)}/dispatches/${encodeURIComponent(jobId)}/replay`,
+      session,
       {
         method: "POST",
         headers: createAuthenticatedHeaders(session, {
@@ -459,7 +481,11 @@ export async function replaySceneDispatch(
         })
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     const existing = listDemoSceneDispatches(sceneId).find((dispatch) => dispatch.jobId === jobId);
 
     if (!existing) {

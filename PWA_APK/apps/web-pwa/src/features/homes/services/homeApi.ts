@@ -8,6 +8,10 @@ import type {
 
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import {
+  fetchAuthenticatedJson,
+  shouldUseDemoFallback
+} from "../../../app/authenticatedRequest";
+import {
   createDemoHome,
   createDemoHomeShareCode,
   deleteDemoHome,
@@ -43,24 +47,17 @@ export interface HomeRedeemResponse {
   homes: HomeRecord[];
 }
 
-async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { data: T };
-  return payload.data;
-}
-
 export async function listHomes(session: AuthSession): Promise<HomeRecord[]> {
   try {
-    return await fetchJson<HomeRecord[]>(homeEndpoint, {
+    return await fetchAuthenticatedJson<HomeRecord[]>(homeEndpoint, session, {
       method: "GET",
       headers: createAuthenticatedHeaders(session)
     });
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoHomes({
       userId: session.user.userId,
       userName: session.user.name,
@@ -74,14 +71,18 @@ export async function createHome(
   input: HomeUpsertInput
 ): Promise<HomeRecord> {
   try {
-    return await fetchJson<HomeRecord>(homeEndpoint, {
+    return await fetchAuthenticatedJson<HomeRecord>(homeEndpoint, session, {
       method: "POST",
       headers: createAuthenticatedHeaders(session, {
         contentType: "application/json"
       }),
       body: JSON.stringify(input)
     });
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return createDemoHome({
       userId: session.user.userId,
       userName: session.user.name,
@@ -96,14 +97,19 @@ export async function listHomeMembers(
   homeId: string
 ): Promise<HomeMemberRecord[]> {
   try {
-    return await fetchJson<HomeMemberRecord[]>(
+    return await fetchAuthenticatedJson<HomeMemberRecord[]>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members`,
+      session,
       {
         method: "GET",
         headers: createAuthenticatedHeaders(session)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoHomeMembers(homeId, session.user.userId);
   }
 }
@@ -113,14 +119,19 @@ export async function getHomeDashboard(
   homeId: string
 ): Promise<HomeDashboardResponse> {
   try {
-    return await fetchJson<HomeDashboardResponse>(
+    return await fetchAuthenticatedJson<HomeDashboardResponse>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/dashboard`,
+      session,
       {
         method: "GET",
         headers: createAuthenticatedHeaders(session)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return getDemoHomeDashboard({
       homeId,
       userId: session.user.userId
@@ -133,14 +144,19 @@ export async function listHomeShareCodes(
   homeId: string
 ): Promise<HomeShareCodeRecord[]> {
   try {
-    return await fetchJson<HomeShareCodeRecord[]>(
+    return await fetchAuthenticatedJson<HomeShareCodeRecord[]>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/share-codes`,
+      session,
       {
         method: "GET",
         headers: createAuthenticatedHeaders(session)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return listDemoHomeShareCodes(homeId, session.user.userId);
   }
 }
@@ -151,14 +167,22 @@ export async function updateHome(
   input: HomeUpsertInput
 ): Promise<HomeRecord> {
   try {
-    return await fetchJson<HomeRecord>(`${homeEndpoint}/${encodeURIComponent(homeId)}`, {
-      method: "PATCH",
-      headers: createAuthenticatedHeaders(session, {
-        contentType: "application/json"
-      }),
-      body: JSON.stringify(input)
-    });
-  } catch {
+    return await fetchAuthenticatedJson<HomeRecord>(
+      `${homeEndpoint}/${encodeURIComponent(homeId)}`,
+      session,
+      {
+        method: "PATCH",
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json"
+        }),
+        body: JSON.stringify(input)
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return updateDemoHome({
       homeId,
       userId: session.user.userId,
@@ -173,8 +197,9 @@ export async function createHomeShareCode(
   input: CreateHomeShareCodeInput
 ): Promise<HomeShareCodeRecord> {
   try {
-    return await fetchJson<HomeShareCodeRecord>(
+    return await fetchAuthenticatedJson<HomeShareCodeRecord>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/share-codes`,
+      session,
       {
         method: "POST",
         headers: createAuthenticatedHeaders(session, {
@@ -183,7 +208,11 @@ export async function createHomeShareCode(
         body: JSON.stringify(input)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return createDemoHomeShareCode({
       homeId,
       userId: session.user.userId,
@@ -200,16 +229,24 @@ export async function redeemHomeShareCode(
   code: string
 ): Promise<HomeRedeemResponse> {
   try {
-    return await fetchJson<HomeRedeemResponse>(`${homeEndpoint}/redeem`, {
-      method: "POST",
-      headers: createAuthenticatedHeaders(session, {
-        contentType: "application/json"
-      }),
-      body: JSON.stringify({
-        code
-      })
-    });
-  } catch {
+    return await fetchAuthenticatedJson<HomeRedeemResponse>(
+      `${homeEndpoint}/redeem`,
+      session,
+      {
+        method: "POST",
+        headers: createAuthenticatedHeaders(session, {
+          contentType: "application/json"
+        }),
+        body: JSON.stringify({
+          code
+        })
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return redeemDemoHomeShareCode({
       userId: session.user.userId,
       userName: session.user.name,
@@ -226,8 +263,9 @@ export async function updateHomeMemberRole(
   role: "admin" | "member" | "viewer"
 ): Promise<HomeMemberRecord[]> {
   try {
-    return await fetchJson<HomeMemberRecord[]>(
+    return await fetchAuthenticatedJson<HomeMemberRecord[]>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members/${encodeURIComponent(userId)}`,
+      session,
       {
         method: "PATCH",
         headers: createAuthenticatedHeaders(session, {
@@ -238,7 +276,11 @@ export async function updateHomeMemberRole(
         })
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return updateDemoHomeMemberRole({
       homeId,
       actorUserId: session.user.userId,
@@ -255,8 +297,9 @@ export async function updateHomeMemberAccess(
   allowed: boolean
 ): Promise<HomeMemberRecord[]> {
   try {
-    return await fetchJson<HomeMemberRecord[]>(
+    return await fetchAuthenticatedJson<HomeMemberRecord[]>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members/${encodeURIComponent(userId)}/access`,
+      session,
       {
         method: "PATCH",
         headers: createAuthenticatedHeaders(session, {
@@ -265,7 +308,11 @@ export async function updateHomeMemberAccess(
         body: JSON.stringify({ allowed })
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return updateDemoHomeMemberAccess({
       homeId,
       actorUserId: session.user.userId,
@@ -281,14 +328,19 @@ export async function revokeHomeMember(
   userId: string
 ): Promise<HomeMemberRecord[]> {
   try {
-    return await fetchJson<HomeMemberRecord[]>(
+    return await fetchAuthenticatedJson<HomeMemberRecord[]>(
       `${homeEndpoint}/${encodeURIComponent(homeId)}/members/${encodeURIComponent(userId)}`,
+      session,
       {
         method: "DELETE",
         headers: createAuthenticatedHeaders(session)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return revokeDemoHomeMember({
       homeId,
       actorUserId: session.user.userId,
@@ -302,11 +354,19 @@ export async function deleteHome(
   homeId: string
 ): Promise<HomeRecord[]> {
   try {
-    return await fetchJson<HomeRecord[]>(`${homeEndpoint}/${encodeURIComponent(homeId)}`, {
-      method: "DELETE",
-      headers: createAuthenticatedHeaders(session)
-    });
-  } catch {
+    return await fetchAuthenticatedJson<HomeRecord[]>(
+      `${homeEndpoint}/${encodeURIComponent(homeId)}`,
+      session,
+      {
+        method: "DELETE",
+        headers: createAuthenticatedHeaders(session)
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return deleteDemoHome({
       homeId,
       userId: session.user.userId
