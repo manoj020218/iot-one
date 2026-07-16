@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthPage } from "../features/auth/AuthPage";
+import { AuthForgotPasswordPage } from "../features/auth/AuthForgotPasswordPage";
+import { AuthSignupPage } from "../features/auth/AuthSignupPage";
 import { useAuth } from "../features/auth/hooks/useAuth";
 import { HomeDashboardPage } from "../features/home/HomeDashboardPage";
 import { DeviceDetailPage } from "../features/devices/DeviceDetailPage";
@@ -23,6 +25,8 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
+      <Route path="/login/signup" element={<AuthSignupPage />} />
+      <Route path="/login/forgot-password" element={<AuthForgotPasswordPage />} />
       <Route
         element={
           <RequireAuth>
