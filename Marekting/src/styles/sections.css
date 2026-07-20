@@ -1,0 +1,179 @@
+.hero-section,
+.content-section,
+.cta-band,
+.legal-document,
+.redirect-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.hero-section {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1.1fr 0.9fr;
+  padding: clamp(1.4rem, 4vw, 3rem);
+}
+
+.hero-copy h1,
+.section-heading h2,
+.cta-band h2,
+.legal-header h1,
+.redirect-card h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  line-height: 0.98;
+}
+
+.hero-body,
+.section-heading p,
+.cta-band p,
+.legal-header p,
+.redirect-card p {
+  color: var(--muted);
+  max-width: 62ch;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+.metric-strip,
+.card-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.metric-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1.8rem;
+}
+
+.metric-card,
+.feature-card {
+  padding: 1.1rem 1.15rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.metric-card strong {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 1.15rem;
+}
+
+.content-section,
+.legal-document {
+  margin-top: 1.5rem;
+  padding: clamp(1.3rem, 4vw, 2.4rem);
+}
+
+.section-heading {
+  margin-bottom: 1.4rem;
+}
+
+.card-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feature-card h3 {
+  margin: 0 0 0.65rem;
+  font-size: 1.15rem;
+}
+
+.feature-card p,
+.feature-card li,
+.legal-section p,
+.legal-section li {
+  color: var(--muted);
+}
+
+.cta-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: 1.5rem;
+  padding: clamp(1.3rem, 4vw, 2.2rem);
+}
+
+.orbit-shell {
+  position: relative;
+  min-height: 420px;
+  border-radius: 30px;
+  background: linear-gradient(180deg, rgba(7, 23, 38, 0.92), rgba(4, 14, 24, 0.84));
+  overflow: hidden;
+}
+
+.orbit-panel,
+.orbit-node {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(8, 23, 38, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.orbit-panel-main {
+  top: 18%;
+  left: 12%;
+  right: 12%;
+  padding: 1.2rem;
+}
+
+.orbit-badge {
+  display: inline-flex;
+  margin-bottom: 0.6rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(87, 211, 198, 0.12);
+  color: var(--teal);
+}
+
+.orbit-node { padding: 0.7rem 1rem; }
+.orbit-node-app { top: 8%; left: 8%; }
+.orbit-node-api { top: 14%; right: 8%; }
+.orbit-node-oem { bottom: 12%; right: 12%; }
+.orbit-node-edge { bottom: 18%; left: 10%; }
+.orbit-ring {
+  position: absolute;
+  border: 1px solid rgba(87, 211, 198, 0.2);
+  border-radius: 50%;
+}
+
+.orbit-ring-outer { inset: 7%; }
+.orbit-ring-inner { inset: 18%; border-color: rgba(244, 201, 119, 0.16); }
+
+.legal-header small { color: var(--gold); }
+.legal-section + .legal-section { margin-top: 1.6rem; }
+.legal-section h2 { margin-bottom: 0.7rem; font-size: 1.3rem; }
+
+.redirect-card {
+  margin-top: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .hero-section,
+  .cta-band {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .metric-strip,
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .orbit-shell {
+    min-height: 340px;
+  }
+}

@@ -1,0 +1,1093 @@
+The public website should be positioned as **Jenix OEM IoT Platform**—not merely an app login page. It should establish Jenix as a complete IoT technology partner for device manufacturers, system integrators, enterprises, and organizations.
+
+Google requires the OAuth homepage to be hosted on a verified domain, clearly identify the app or brand, explain the application’s functionality, and link to the same privacy policy used in the OAuth consent configuration. A login-only homepage is insufficient. ([Google Help][1])
+
+## Recommended branding
+
+**Platform:** Jenix One
+**Business positioning:** Jenix OEM IoT Platform
+**Primary domain:** `jenixone.com` or `iot.jenix.in`
+**Application:** `app.iotsoft.in`
+
+Suggested title:
+
+> **Jenix One — Build, Connect and Manage IoT Products**
+
+Suggested tagline:
+
+> **One secure platform for Jenix devices, OEM products and third-party IoT integrations.**
+
+# Jenix One Marketing Website and Compliance Specification
+
+## 1. Website objective
+
+The website must establish Jenix One as a reliable, professional and scalable IoT platform capable of:
+
+* Connecting and managing Jenix IoT devices.
+* Onboarding third-party IoT devices.
+* Providing OEM and white-label IoT solutions.
+* Providing APIs and SDKs for Jenix IoT products.
+* Supporting manufacturers, system integrators and enterprise customers.
+* Managing devices, users, locations, automation, alerts and firmware from one platform.
+* Supporting web, PWA and Android applications.
+* Enabling product-specific interfaces through a modular plugin architecture.
+
+The website must not mention or compare itself directly with any competing IoT platform.
+
+---
+
+# 2. Website structure
+
+## Public routes
+
+* `/` — Main marketing homepage
+* `/platform` — Platform capabilities
+* `/oem` — OEM and white-label solutions
+* `/integrations` — Third-party device integration
+* `/developers` — APIs, SDKs and developer resources
+* `/security` — Platform security
+* `/about` — About Jenix
+* `/contact` — Sales and technical enquiries
+* `/support` — Customer support
+* `/privacy` — Privacy Policy
+* `/terms` — Terms and Conditions
+* `/cookies` — Cookie Policy
+* `/acceptable-use` — Acceptable Use Policy
+* `/data-deletion` — Account and data deletion request
+* `/refund-policy` — Refund and cancellation policy, where applicable
+* `/login` — Redirect to the Jenix One application
+* `/signup` — Account registration or sales enquiry
+* `/status` — Optional system-status page
+
+Recommended application URL:
+
+`https://app.iotsoft.in`
+
+Recommended public marketing URL:
+
+`https://iotsoft.in`
+
+All OAuth-related pages should remain on the same verified parent domain wherever practical.
+
+---
+
+# 3. Header navigation
+
+## Logo
+
+Jenix One logo with the descriptor:
+
+**OEM IoT Platform**
+
+## Navigation
+
+* Platform
+* Solutions
+* OEM
+* Developers
+* Security
+* About
+* Contact
+
+## Header actions
+
+Secondary button:
+
+**Partner With Jenix**
+
+Primary button:
+
+**Open Jenix One**
+
+The primary button should open:
+
+`https://app.iotsoft.in`
+
+---
+
+# 4. Homepage content
+
+## Hero section
+
+### Headline
+
+**Build, Connect and Manage IoT Products on One Platform**
+
+### Supporting statement
+
+Jenix One is a modular IoT platform for manufacturers, system integrators and enterprises. Connect Jenix products, integrate third-party hardware, create automation and manage complete device fleets from web and mobile applications.
+
+### Primary call to action
+
+**Explore the Platform**
+
+### Secondary call to action
+
+**Discuss Your OEM Project**
+
+### Hero visual
+
+Use an original Jenix-branded illustration showing:
+
+* Mobile application
+* Web dashboard
+* Cloud platform
+* MQTT/API connectivity
+* Different IoT devices
+* Alerts and automation
+* Device provisioning
+* Firmware updates
+
+Do not use copied screenshots or visual elements from competing platforms.
+
+---
+
+# 5. Trust and capability strip
+
+Display concise capability indicators:
+
+* Secure Device Provisioning
+* MQTT and REST APIs
+* OTA Firmware Management
+* Android, PWA and Web
+* Multi-Tenant Architecture
+* OEM and White-Label Ready
+* Third-Party Device Integration
+* Role-Based Access Control
+
+Suggested introduction:
+
+**From a single smart device to thousands of connected installations, Jenix One provides the infrastructure required to launch and operate professional IoT products.**
+
+Avoid unsupported numerical claims such as “99.99% uptime,” “military-grade security,” or “millions of devices” until they can be independently demonstrated.
+
+---
+
+# 6. Core platform section
+
+## Heading
+
+**Everything Required to Operate a Connected Product**
+
+### Device onboarding
+
+Provision supported devices through Bluetooth, local access point or installer-assisted configuration.
+
+### Device dashboard
+
+View device status, telemetry, alarms, connectivity and product-specific controls.
+
+### Scenes and automation
+
+Create actions based on device state, schedules, sensor values, user commands and cross-device events.
+
+### Location management
+
+Organize devices by home, property, site, department, building, floor, room or custom operational structure.
+
+### Alerts and notifications
+
+Deliver operational alerts, fault notifications, security events and maintenance reminders.
+
+### OTA management
+
+Release firmware by product identity, hardware version, device group or controlled rollout policy.
+
+### Access management
+
+Assign users, installers, operators, administrators and viewers with controlled permissions.
+
+### Audit records
+
+Maintain traceable records of important user, device and administrative actions.
+
+---
+
+# 7. Jenix device ecosystem section
+
+## Heading
+
+**A Unified Experience for Jenix IoT Products**
+
+Suggested copy:
+
+Jenix products can use a common identity, provisioning system, cloud connection and application experience. Each product receives its own dashboard and operational controls while continuing to work within the wider Jenix One ecosystem.
+
+Potential product categories:
+
+* Safety and SOS systems
+* Smart access and gate automation
+* Water-level and pump controllers
+* Building and society automation
+* Environmental monitoring
+* Industrial control
+* Smart displays and token systems
+* Alarm and surveillance gateways
+* Energy and equipment monitoring
+
+CTA:
+
+**View Jenix IoT Solutions**
+
+---
+
+# 8. Third-party device integration section
+
+## Heading
+
+**Bring Existing Hardware into Jenix One**
+
+Suggested copy:
+
+Jenix One is designed to support approved third-party devices through documented integration interfaces. Manufacturers and system integrators can connect compatible hardware without rebuilding the complete application, cloud and device-management infrastructure.
+
+Supported integration approaches may include:
+
+* MQTT device integration
+* HTTPS and REST integration
+* Webhooks
+* Modbus gateway integration
+* RS485 gateway integration
+* Vendor-specific adapters
+* Edge gateway plugins
+* Custom firmware SDK
+* Cloud-to-cloud integration
+
+Important wording:
+
+Use “supported through approved integration” rather than implying that every third-party device will work automatically.
+
+CTA:
+
+**Request Integration Assessment**
+
+---
+
+# 9. OEM and white-label section
+
+## Heading
+
+**Launch Your Own Connected Product Faster**
+
+Suggested copy:
+
+Jenix provides an OEM-ready foundation for businesses that want to launch smart products under their own brand. The platform can be configured with customer-specific product identities, device interfaces, permissions, cloud environments and application branding.
+
+Capabilities:
+
+* OEM product identity
+* Custom device icons and controls
+* Customer-specific PID allocation
+* Branded Android application
+* Branded PWA and web portal
+* Custom domain
+* Custom onboarding flow
+* Customer-specific firmware channel
+* Tenant isolation
+* Role and permission configuration
+* API access
+* Product analytics
+* Technical onboarding and integration support
+
+CTA:
+
+**Start an OEM Discussion**
+
+Add a disclaimer:
+
+Availability of white-label features, dedicated infrastructure and source-code access depends on the selected commercial agreement.
+
+---
+
+# 10. Developer and API section
+
+## Heading
+
+**Integrate Jenix Products into Your Application**
+
+Suggested copy:
+
+Approved partners can use Jenix APIs to obtain device status, telemetry, event information and permitted control functions. APIs can also be used to integrate Jenix IoT products with enterprise software, building-management systems and custom applications.
+
+Developer capabilities:
+
+* REST API
+* MQTT topics
+* Webhooks
+* Secure access tokens
+* Device and user authorization
+* Sandbox environment
+* API usage records
+* Integration documentation
+* Sample payloads
+* Versioned APIs
+* Rate limiting
+* Partner credentials
+
+CTA buttons:
+
+* **Request API Access**
+* **View Developer Overview**
+
+Do not publicly expose private MQTT credentials, production endpoints, internal topic structures or device secrets.
+
+---
+
+# 11. Architecture section
+
+## Heading
+
+**Designed as a Modular IoT Operating Platform**
+
+Show a simple architecture flow:
+
+**Device Layer**
+
+Sensors, controllers, gateways, alarms, locks, displays and third-party hardware.
+
+?
+
+**Connectivity Layer**
+
+Wi-Fi, BLE, Ethernet, 4G, MQTT, HTTPS, RS485 and supported gateways.
+
+?
+
+**Jenix One Cloud**
+
+Device registry, identity, telemetry, commands, alerts, scenes, OTA, audit and APIs.
+
+?
+
+**Application Layer**
+
+Android application, PWA, web dashboard, OEM application and enterprise integrations.
+
+Suggested statement:
+
+Product-specific interfaces are implemented as modular plugins, allowing new products to be added without making the complete application unnecessarily large or difficult to maintain.
+
+---
+
+# 12. Security section
+
+## Heading
+
+**Security Across Devices, Users and Cloud Services**
+
+Only publish controls that are actually implemented.
+
+Planned security content:
+
+* Encrypted HTTPS and secure MQTT communication
+* Per-device credentials
+* Secure password storage
+* Token-based sessions
+* Role-based access control
+* Tenant and site isolation
+* Controlled device ownership transfer
+* Firmware validation
+* Administrative audit logs
+* API rate limiting
+* Login and account security controls
+* Backup and recovery procedures
+* Security incident response process
+
+CTA:
+
+**Read Our Security Approach**
+
+Do not use “unhackable,” “100% secure” or “military-grade” language.
+
+---
+
+# 13. Industries and use cases
+
+## Heading
+
+**One Platform, Multiple Connected Solutions**
+
+Suggested categories:
+
+### Residential and community
+
+Smart access, visitor systems, maintenance services, safety alerts and common-area automation.
+
+### Industrial operations
+
+Equipment monitoring, alarms, relay control, telemetry and preventive maintenance.
+
+### Infrastructure
+
+Waterlogging alerts, environmental sensors, remote sirens, gateways and field monitoring.
+
+### Security and safety
+
+SOS systems, panic buttons, nurse-call systems, access control and surveillance integrations.
+
+### Commercial buildings
+
+Energy monitoring, access, water management, facility services and equipment alerts.
+
+### OEM manufacturers
+
+Custom connected products using Jenix cloud, APIs and applications.
+
+---
+
+# 14. Why Jenix section
+
+## Heading
+
+**More Than a Device Dashboard**
+
+Differentiators:
+
+* Device firmware and cloud designed together
+* Modular support for different product categories
+* Local operation where supported
+* Remote device management
+* OEM and integration capabilities
+* Product-specific dashboards
+* Long-term maintainable architecture
+* Indian deployment and support capability
+* Custom industrial and infrastructure integrations
+* API-first partner ecosystem
+
+Suggested closing:
+
+Jenix combines embedded hardware, firmware, cloud software, mobile applications and field deployment knowledge to build complete connected-product solutions.
+
+---
+
+# 15. About Jenix page
+
+## Suggested heading
+
+**Engineering Connected Products for Real-World Operations**
+
+Suggested content:
+
+Jenix India Private Limited develops electronic, automation, safety, security and IoT products for residential, commercial, industrial and infrastructure applications.
+
+Jenix One has been created as the common digital platform for managing connected Jenix products and approved third-party devices. The platform brings device provisioning, telemetry, control, automation, firmware management, alerts and integrations into a unified environment.
+
+Our work combines:
+
+* Electronics and embedded engineering
+* IoT firmware development
+* Cloud and application development
+* Automation and control systems
+* Product integration
+* Installation and field support
+
+The page should display the company’s correct:
+
+* Registered legal name
+* Registered office address
+* Business correspondence address
+* Corporate identification number, where appropriate
+* GST details, where appropriate
+* Support email
+* Privacy email
+* Telephone number
+* Website
+* Authorized representative details, where required
+
+All information must match the company information used in Google Play Console and Google Cloud.
+
+---
+
+# 16. Contact page
+
+Provide separate contact purposes:
+
+## Sales and OEM enquiries
+
+For product partnerships, white-label applications, volume deployment and OEM projects.
+
+## Technical integration
+
+For API, firmware, gateway and third-party device integration.
+
+## Platform support
+
+For account, device and application assistance.
+
+## Privacy requests
+
+For access, correction, deletion or privacy-related enquiries.
+
+Recommended form fields:
+
+* Full name
+* Business email
+* Phone number
+* Company
+* Country
+* Enquiry type
+* Expected number of devices
+* Project description
+* Consent checkbox
+
+Add anti-spam protection, rate limiting and backend validation.
+
+---
+
+# 17. Footer
+
+Footer columns:
+
+## Platform
+
+* Features
+* OEM
+* Integrations
+* Developers
+* Security
+* System Status
+
+## Company
+
+* About
+* Contact
+* Support
+* Careers
+
+## Legal
+
+* Privacy Policy
+* Terms and Conditions
+* Cookie Policy
+* Acceptable Use Policy
+* Data Deletion
+* Refund Policy
+
+## Applications
+
+* Open Web App
+* Android App
+* Installer Portal
+
+Footer statement:
+
+**Jenix One is an IoT platform developed and operated by Jenix India Private Limited.**
+
+Also show:
+
+* Copyright year dynamically
+* Legal company name
+* Support email
+* Privacy email
+* Country of operation
+
+---
+
+# 18. Privacy Policy requirements
+
+The privacy policy must be specific to Jenix One and must not be a generic copied template.
+
+It should explain:
+
+* Identity of the data controller or operator
+* Applications and services covered
+* Account information collected
+* Google sign-in information received
+* Email and authentication information
+* Device identifiers
+* Product identity and ownership records
+* Home, site and location structures created by users
+* Wi-Fi information used during provisioning
+* Bluetooth and nearby-device access
+* Precise or approximate location access, where used
+* Device telemetry
+* Commands and automation records
+* Alert and notification data
+* Diagnostic and crash information
+* Uploaded files or media
+* Support communications
+* Payment data, if payments are introduced
+* Purpose of each collection
+* Legal or consent basis where applicable
+* Data processors and infrastructure providers
+* Data-sharing conditions
+* Data-storage and retention periods
+* Security practices
+* International data processing, if applicable
+* Children’s privacy
+* User access and correction rights
+* Account deletion process
+* Device ownership transfer
+* Policy-update process
+* Privacy contact details
+
+The policy must accurately describe the released application. Do not claim that data is not collected when it is processed by analytics, authentication, crash-reporting, push-notification or cloud SDKs.
+
+---
+
+# 19. Google sign-in disclosure
+
+Suggested sign-in disclosure:
+
+“When you choose Sign in with Google, Jenix One receives the basic account information authorized by you, such as your name, email address and profile identifier. This information is used to create or access your Jenix One account. Jenix One does not receive your Google password.”
+
+Only request the minimum Google scopes required for authentication.
+
+For ordinary Google login, the implementation should generally avoid requesting access to Gmail, Drive, Contacts, Calendar or other unrelated Google data.
+
+---
+
+# 20. Terms and Conditions structure
+
+The Terms and Conditions should cover:
+
+1. Legal entity and service provider
+2. Acceptance of terms
+3. Eligibility and authority
+4. Account registration
+5. Account-security responsibilities
+6. Platform licence
+7. Device compatibility
+8. Third-party devices
+9. Connectivity dependency
+10. Local and cloud operation
+11. Remote-control risks
+12. Safety-critical limitations
+13. User responsibilities
+14. Installer responsibilities
+15. OEM partner responsibilities
+16. API usage
+17. Fair-use and rate limits
+18. Subscription and payment terms
+19. Suspension and termination
+20. Intellectual property
+21. User-submitted content
+22. Prohibited activities
+23. Data and privacy
+24. Third-party services
+25. Availability and maintenance
+26. Warranty limitations
+27. Liability limitations
+28. Indemnity
+29. Governing law
+30. Dispute resolution
+31. Changes to terms
+32. Contact details
+
+For sirens, access-control systems, flood alerts, safety devices or industrial controls, the terms should clearly state that users must maintain appropriate physical safety procedures and must not rely solely on cloud connectivity for life-safety decisions.
+
+The final legal documents should be reviewed by a qualified Indian legal professional before publication.
+
+---
+
+# 21. Account and data deletion page
+
+Create a dedicated public page:
+
+`https://iotsoft.in/data-deletion`
+
+It should allow users to:
+
+* Sign in and delete their account.
+* Submit a deletion request without needing app access.
+* Identify which data will be deleted.
+* Identify any records retained for legal, fraud-prevention, security or financial obligations.
+* Understand the expected deletion process.
+* Contact the privacy team when they cannot access their account.
+
+Recommended application function:
+
+**Settings ? Account & Security ? Delete Account**
+
+Deletion should require:
+
+* Recent authentication
+* Clear confirmation
+* Explanation of consequences
+* Device ownership-transfer warning
+* Optional export before deletion
+* Audit record of the request
+* Revocation of active sessions and tokens
+
+Google Play requires developers whose apps support account creation to provide an account-deletion path and complete the related Data Safety declarations. ([Google Help][2])
+
+---
+
+# 22. Google OAuth readiness
+
+The production website must have:
+
+* A public homepage on a verified domain
+* Clear Jenix One branding
+* A description of the service
+* Privacy Policy link
+* Terms link
+* Support contact
+* Verified domain ownership
+* HTTPS on all pages
+* Matching application name and logo
+* Matching OAuth homepage URL
+* Matching privacy-policy URL
+* Authorized JavaScript origins
+* Authorized redirect URLs
+* Production support email
+* Production developer contact email
+
+Create separate Google Cloud projects for:
+
+* Development
+* Staging
+* Production
+
+Use only the production project for the published application.
+
+Google recommends separate projects for testing and production and separate projects for different brands or domains. ([Google for Developers][3])
+
+If only basic authentication scopes are requested, keep the OAuth configuration limited to:
+
+* `openid`
+* `email`
+* `profile`
+
+Do not request sensitive or restricted scopes without an essential product requirement. Sensitive or restricted scopes may require verification and a demonstration showing why each scope is required. ([Google for Developers][4])
+
+---
+
+# 23. Google Play readiness
+
+The website and application should support the following Play Console requirements:
+
+* Public privacy-policy URL
+* Privacy Policy accessible inside the app
+* Accurate Data Safety declaration
+* Account deletion URL
+* In-app account deletion
+* Ads declaration
+* Target-audience declaration
+* Content rating
+* App-access instructions
+* Reviewer demo account
+* Permission declarations
+* Support contact
+* Store-listing screenshots
+* Feature graphic
+* Application icon
+* Release notes
+* Device compatibility
+* Tested login process
+
+If the app has protected functionality, provide Google Play reviewers with a working demo account and all instructions necessary to access the app. Google’s current policy expressly requires login credentials or other resources needed for review. ([Google Help][5])
+
+---
+
+# 24. Android permissions disclosure
+
+The Jenix One application may require permissions such as:
+
+* Bluetooth scan and connection
+* Nearby devices
+* Location during device discovery or Wi-Fi provisioning
+* Camera for QR-code scanning
+* Notifications
+* Local network access
+* File or media access when uploading device images
+* Biometric authentication, if enabled
+
+Every permission must:
+
+* Be required by a visible application feature
+* Be requested at the time it is needed
+* Have a clear in-app explanation
+* Be accurately disclosed in the Privacy Policy
+* Match the Google Play Data Safety declaration
+
+Avoid requesting background location unless a confirmed product feature absolutely requires it.
+
+Google Play requires sensitive permissions to be necessary for the application’s promoted core functionality and to be used only for purposes to which the user has consented. ([Google Help][6])
+
+---
+
+# 25. Technical implementation requirements
+
+## Frontend
+
+* React
+* TypeScript
+* Tailwind CSS
+* PNPM
+* React Router
+* SEO metadata per page
+* Structured data
+* Responsive mobile-first design
+* Accessible navigation
+* Reusable sections and components
+* Lazy-loaded illustrations
+* Static generation or server-side rendering for public pages where practical
+
+## Backend
+
+* Node.js
+* Contact-form API
+* Rate limiting
+* Validation
+* Anti-spam controls
+* Audit logging
+* Email notification
+* Enquiry storage
+* Data deletion request workflow
+* Consent record storage
+
+## Code structure
+
+No normal source file should exceed approximately 200 lines.
+
+Suggested structure:
+
+```text
+apps/
+  marketing-web/
+    src/
+      components/
+      sections/
+      pages/
+      legal/
+      layouts/
+      seo/
+      forms/
+      assets/
+      config/
+  platform-web/
+  android/
+
+packages/
+  ui/
+  branding/
+  types/
+  validation/
+  analytics/
+```
+
+Legal content should be maintained as versioned content rather than embedded across multiple components.
+
+---
+
+# 26. SEO metadata
+
+## Homepage title
+
+Jenix One | OEM IoT Platform for Connected Products
+
+## Meta description
+
+Build, connect and manage Jenix and third-party IoT devices using one secure platform with provisioning, automation, OTA updates, APIs, web and Android applications.
+
+## Suggested keywords
+
+* OEM IoT platform
+* IoT device management
+* IoT application platform
+* white-label IoT platform
+* MQTT device platform
+* IoT API integration
+* industrial IoT platform India
+* smart-device application
+* Jenix IoT
+
+Do not use competitor names as SEO keywords.
+
+---
+
+# 27. Visual design direction
+
+The website should feel:
+
+* Technically capable
+* Trustworthy
+* Modern
+* Enterprise-ready
+* Clean
+* Original
+* Easy to understand
+* Suitable for both Indian and international customers
+
+Recommended visual elements:
+
+* Device-to-cloud architecture animations
+* Phone and dashboard mock-ups
+* Original line illustrations
+* Product-category cards
+* API payload visual
+* Device fleet map
+* Automation-flow diagram
+* OTA rollout graphic
+
+Avoid:
+
+* Generic smart-home stock photography
+* Excessive neon effects
+* Copied competitor layouts
+* Unsupported certifications
+* Fake customer logos
+* Fake testimonials
+* Fake device counts
+
+---
+
+# 28. Conversion actions
+
+Every main page should lead to one of four actions:
+
+* Open Jenix One
+* Request OEM consultation
+* Request API access
+* Request device integration
+
+Track only consented and necessary events, such as:
+
+* CTA clicked
+* Contact form opened
+* Contact form submitted
+* Developer enquiry submitted
+* App login opened
+
+Analytics and cookie behaviour must match the published Cookie and Privacy Policies.
+
+---
+
+# 29. Initial release scope
+
+## Phase 1
+
+* Homepage
+* Platform page
+* OEM page
+* Integration page
+* Developer overview
+* Security page
+* About page
+* Contact page
+* Support page
+* Privacy Policy
+* Terms and Conditions
+* Cookie Policy
+* Data deletion page
+* Login and app links
+* Responsive mobile design
+* SEO and sitemap
+* OAuth domain readiness
+
+## Phase 2
+
+* Developer documentation
+* Interactive API examples
+* Partner portal
+* Product catalogue
+* Case studies
+* Status page
+* Knowledge base
+* Multilingual support
+* Customer stories
+* OEM pricing enquiry workflow
+
+---
+
+# 30. Final positioning statement
+
+**Jenix One gives product manufacturers and solution providers a complete foundation for connected products—from device provisioning and cloud communication to mobile applications, automation, firmware updates and enterprise APIs.**
+
+Google also requires the privacy policy to explain what user and device data is collected, transmitted, used and shared, and the Play Console Data Safety answers must match actual application and SDK behaviour. ([Google Help][7])
+
+Before publishing, insert the exact legal name, registered address, support email, privacy email, data-retention policy, cloud providers and actual Android permissions. The Privacy Policy and Terms should not be published with placeholders.
+
+exact Legale nam eof business - Jain Enterprises
+reg address - 63/66A heera Path , Mansarovar, Jaipur -302020
+support email - jenixindia@gmail.com
+whatsapp for business query and suppoprt : 7240226566
+
+The branding and domain will be:
+
+* **Public website:** `https://one.jenix.in`
+* **Product name:** **Smart One**
+* **Brand presentation:** **Smart One by Jenix**
+* **Application URL:** `https://app.iotsoft.in`
+
+Recommended public identity:
+
+# Smart One by Jenix
+
+## Build, Connect and Manage IoT Products on One Platform
+
+Smart One by Jenix is a modular IoT platform for businesses, product manufacturers, system integrators and enterprise users.
+
+Connect Jenix IoT products, integrate approved third-party devices, create smart automation and manage complete device fleets through a unified web and mobile application.
+
+### Platform capabilities
+
+* Jenix IoT device management
+* Third-party IoT device integration
+* OEM and white-label product support
+* REST API, MQTT and webhook integration
+* Bluetooth and Wi-Fi device provisioning
+* Device dashboards and telemetry
+* Scenes and automation
+* Alerts and notifications
+* OTA firmware updates
+* User, home, site and role management
+* Android, PWA and web applications
+
+### Main call to action
+
+**Open Smart One**
+
+Application URL:
+
+`https://app.iotsoft.in`
+
+### Secondary call to action
+
+**Discuss Your OEM IoT Project**
+
+## Updated website routes
+
+The public pages should use:
+
+* `one.jenix.in/`
+* `one.jenix.in/platform`
+* `one.jenix.in/oem`
+* `one.jenix.in/integrations`
+* `one.jenix.in/developers`
+* `one.jenix.in/security`
+* `one.jenix.in/about`
+* `one.jenix.in/contact`
+* `one.jenix.in/support`
+* `one.jenix.in/privacy`
+* `one.jenix.in/terms`
+* `one.jenix.in/cookies`
+* `one.jenix.in/data-deletion`
+
+## SEO identity
+
+**Page title**
+
+> Smart One by Jenix | OEM IoT Device Management Platform
+
+**Meta description**
+
+> Smart One by Jenix is an OEM-ready IoT platform for connecting Jenix products and approved third-party devices with provisioning, automation, OTA updates, APIs, Android, PWA and web applications.
+
+## Footer identity
+
+> **Smart One is an IoT platform developed and operated by Jenix.**
+
+## OAuth branding
+
+Google OAuth should consistently show:
+
+* **Application name:** Smart One
+* **Developer/brand:** Jenix
+* **Homepage:** `https://one.jenix.in`
+* **Privacy Policy:** `https://one.jenix.in/privacy`
+* **Terms:** `https://one.jenix.in/terms`
+* **Data deletion:** `https://one.jenix.in/data-deletion`
+
+The logo used on Google OAuth, Google Play, the Android app and the public website should show the same **Smart One by Jenix** identity.

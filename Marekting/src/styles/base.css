@@ -1,0 +1,115 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+:root {
+  color-scheme: dark;
+  --bg: #07111c;
+  --panel: rgba(9, 22, 38, 0.84);
+  --panel-strong: rgba(12, 29, 49, 0.96);
+  --line: rgba(120, 175, 206, 0.18);
+  --text: #ecf2f7;
+  --muted: #a8b8c8;
+  --gold: #f4c977;
+  --gold-strong: #ffb648;
+  --teal: #57d3c6;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
+  --radius: 26px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top left, rgba(87, 211, 198, 0.14), transparent 30%),
+    radial-gradient(circle at top right, rgba(244, 201, 119, 0.18), transparent 24%),
+    linear-gradient(180deg, #07111c 0%, #09121e 40%, #0b1622 100%);
+  color: var(--text);
+  font-family: "Manrope", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+h1,
+h2,
+h3,
+strong {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+p,
+li,
+small,
+span {
+  line-height: 1.65;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0.92rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 800;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.button-primary {
+  background: linear-gradient(180deg, #ffd591 0%, #f5ba4f 100%);
+  color: #1b1204;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 16px 28px rgba(245, 186, 79, 0.24);
+}
+
+.button-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.button-ghost {
+  background: transparent;
+  color: var(--muted);
+}
