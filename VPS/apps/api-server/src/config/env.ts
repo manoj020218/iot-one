@@ -7,17 +7,15 @@ export interface AppConfig {
   mqttUsername?: string;
   mqttPassword?: string;
   mqttClientId: string;
-  mqttTelemetryTopic: string;
+  /** Internal-only (scheduler tick fan-out across instances) — not device-facing. */
   mqttScheduleTopic: string;
-  mqttDeviceCommandTopic: string;
-  mqttDeviceCommandAckTopic: string;
+  /** Internal-only (user notifications) — not device-facing. */
   mqttNotificationTopic: string;
-  mqttOtaRequestTopic: string;
-  mqttOtaAckTopic: string;
   authPersistenceMode: "memory" | "mongodb";
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
   uiPackagePersistenceMode: "memory" | "mongodb";
+  nurseCallReceiverPersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
   homePersistenceMode: "memory" | "mongodb";
   provisioningPersistenceMode: "memory" | "mongodb";
@@ -123,21 +121,10 @@ export function readAppConfig(): AppConfig {
   const mqttClientId =
     process.env.MQTT_CLIENT_ID?.trim() ||
     `jenix-api-${process.pid.toString()}`;
-  const mqttTelemetryTopic =
-    process.env.MQTT_TELEMETRY_TOPIC?.trim() || "jenix/runtime/telemetry";
   const mqttScheduleTopic =
     process.env.MQTT_SCHEDULE_TOPIC?.trim() || "jenix/runtime/schedule";
-  const mqttDeviceCommandTopic =
-    process.env.MQTT_DEVICE_COMMAND_TOPIC?.trim() || "jenix/runtime/commands";
-  const mqttDeviceCommandAckTopic =
-    process.env.MQTT_DEVICE_COMMAND_ACK_TOPIC?.trim() ||
-    "jenix/runtime/commands/ack";
   const mqttNotificationTopic =
     process.env.MQTT_NOTIFICATION_TOPIC?.trim() || "jenix/runtime/notifications";
-  const mqttOtaRequestTopic =
-    process.env.MQTT_OTA_REQUEST_TOPIC?.trim() || "jenix/runtime/ota";
-  const mqttOtaAckTopic =
-    process.env.MQTT_OTA_ACK_TOPIC?.trim() || "jenix/runtime/ota/ack";
   const sceneSchedulerIntervalMs = parsePositiveIntegerEnv(
     process.env.SCENE_SCHEDULER_INTERVAL_MS,
     30_000,
@@ -162,6 +149,11 @@ export function readAppConfig(): AppConfig {
     process.env.UI_PACKAGE_PERSISTENCE_MODE,
     Boolean(mongodbUri),
     "UI_PACKAGE_PERSISTENCE_MODE"
+  );
+  const nurseCallReceiverPersistenceMode = parsePersistenceMode(
+    process.env.NURSE_CALL_RECEIVER_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "NURSE_CALL_RECEIVER_PERSISTENCE_MODE"
   );
   const devicePersistenceMode = parsePersistenceMode(
     process.env.DEVICE_PERSISTENCE_MODE,
@@ -278,6 +270,12 @@ export function readAppConfig(): AppConfig {
     throw new Error("UI_PACKAGE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
+  if (nurseCallReceiverPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error(
+      "NURSE_CALL_RECEIVER_PERSISTENCE_MODE=mongodb requires MONGODB_URI"
+    );
+  }
+
   if (devicePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -309,13 +307,8 @@ export function readAppConfig(): AppConfig {
     ...(mqttUsername ? { mqttUsername } : {}),
     ...(mqttPassword ? { mqttPassword } : {}),
     mqttClientId,
-    mqttTelemetryTopic,
     mqttScheduleTopic,
-    mqttDeviceCommandTopic,
-    mqttDeviceCommandAckTopic,
     mqttNotificationTopic,
-    mqttOtaRequestTopic,
-    mqttOtaAckTopic,
     authPersistenceMode,
     matterRuntimeEnabled: parseBooleanEnv(
       process.env.MATTER_RUNTIME_ENABLED,
@@ -324,6 +317,7 @@ export function readAppConfig(): AppConfig {
     homePersistenceMode,
     pidPersistenceMode,
     uiPackagePersistenceMode,
+    nurseCallReceiverPersistenceMode,
     devicePersistenceMode,
     provisioningPersistenceMode,
     otaPersistenceMode,

@@ -381,10 +381,12 @@ export async function applyDeviceTelemetryState(
 
 function createRuntimeTelemetryIngressMessage(
   job: Awaited<ReturnType<typeof prepareTelemetrySceneEvaluationJob>>,
+  pid: string,
   payload: DeviceTelemetryIngestPayload
 ): RuntimeTelemetryIngressMessage {
   return {
     job,
+    pid,
     ...(payload.mqttStatus ? { mqttStatus: payload.mqttStatus } : {}),
     ...(payload.cloudStatus ? { cloudStatus: payload.cloudStatus } : {}),
     ...(payload.localStatus ? { localStatus: payload.localStatus } : {})
@@ -415,7 +417,11 @@ export async function ingestDeviceTelemetry(
 
   if (bridge) {
     await bridge.publishTelemetryIngress(
-      createRuntimeTelemetryIngressMessage(sceneEvaluationJob, normalizedPayload)
+      createRuntimeTelemetryIngressMessage(
+        sceneEvaluationJob,
+        savedDevice.pid,
+        normalizedPayload
+      )
     );
   } else {
     await enqueuePreparedSceneEvaluationJobs([sceneEvaluationJob]);
@@ -480,6 +486,7 @@ export async function dispatchDeviceUiCommand(
       source: "manual",
       requestedAt: queuedAt,
       deviceId: existing.deviceId,
+      pid: existing.pid,
       command: payload.command as "refresh",
       ...(payload.payload ? { payload: payload.payload } : {})
     });

@@ -36,7 +36,7 @@ export interface RedeemHomeShareCodePayload {
   code: string;
 }
 
-export interface UpdateHomePayload extends CreateHomePayload {}
+export type UpdateHomePayload = CreateHomePayload;
 
 export interface UpdateHomeMemberRolePayload {
   role: Exclude<HomeAccessRole, "owner">;

@@ -12,6 +12,7 @@ import { deviceRouter } from "./modules/devices/device.routes";
 import { healthRouter } from "./modules/health/health.routes";
 import { homeRouter } from "./modules/homes/home.routes";
 import { matterRouter } from "./modules/matter/matter.routes";
+import { nurseCallReceiverRouter } from "./modules/nurse-call-receiver/nurse-call-receiver.routes";
 import { publicPidRouter } from "./modules/pid/pid.public.routes";
 import { pidRouter } from "./modules/pid/pid.routes";
 import { provisioningRouter } from "./modules/provisioning/provisioning.routes";
@@ -28,6 +29,7 @@ export function createApp(): Express {
   app.use("/api/v1/homes", requireAuthenticatedUser, homeRouter);
   app.use("/api/v1/api-keys", requireAuthenticatedUser, apiKeyRouter);
   app.use("/api/v1/devices", deviceRouter);
+  app.use("/api/v1/devices", nurseCallReceiverRouter);
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/public", publicApiRouter);
   app.use("/api/v1/pids", publicPidRouter);

@@ -7,6 +7,8 @@ import { readAppConfig } from "./config/env";
 import { createMqttRuntimeBridge } from "./infrastructure/mqtt/mqtt-runtime-bridge";
 import {
   handleRuntimeDeviceCommandAckMessage,
+  handleRuntimeDeviceEventsMessage,
+  handleRuntimeDeviceStatusMessage,
   handleRuntimeOtaAckMessage,
   handleRuntimeScheduleTickMessage,
   handleRuntimeTelemetryIngressMessage
@@ -31,6 +33,8 @@ import { usePidPersistenceStore } from "./modules/pid/pid.model";
 import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
 import { useUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.model";
 import { createMongoUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.mongo-store";
+import { useNurseCallReceiverPersistenceStore } from "./modules/nurse-call-receiver/nurse-call-receiver.model";
+import { createMongoNurseCallReceiverPersistenceStore } from "./modules/nurse-call-receiver/nurse-call-receiver.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
@@ -58,6 +62,7 @@ async function bootstrap() {
     config.homePersistenceMode === "mongodb" ||
     config.pidPersistenceMode === "mongodb" ||
     config.uiPackagePersistenceMode === "mongodb" ||
+    config.nurseCallReceiverPersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
     config.provisioningPersistenceMode === "mongodb" ||
     config.otaPersistenceMode === "mongodb" ||
@@ -102,6 +107,15 @@ async function bootstrap() {
     console.log("[api-server] ui-package persistence driver: mongodb");
   } else {
     console.log("[api-server] ui-package persistence driver: memory");
+  }
+
+  if (config.nurseCallReceiverPersistenceMode === "mongodb") {
+    useNurseCallReceiverPersistenceStore(
+      await createMongoNurseCallReceiverPersistenceStore(database!)
+    );
+    console.log("[api-server] nurse-call-receiver persistence driver: mongodb");
+  } else {
+    console.log("[api-server] nurse-call-receiver persistence driver: memory");
   }
 
   if (config.devicePersistenceMode === "mongodb") {
@@ -167,13 +181,8 @@ async function bootstrap() {
         ...(config.mqttPassword ? { password: config.mqttPassword } : {}),
         clientId: config.mqttClientId,
         topics: {
-          telemetry: config.mqttTelemetryTopic,
           schedule: config.mqttScheduleTopic,
-          deviceCommand: config.mqttDeviceCommandTopic,
-          deviceCommandAck: config.mqttDeviceCommandAckTopic,
-          notification: config.mqttNotificationTopic,
-          otaRequest: config.mqttOtaRequestTopic,
-          otaAck: config.mqttOtaAckTopic
+          notification: config.mqttNotificationTopic
         },
         logger: (message) => console.log(message),
         onTelemetryMessage: async (message) => {
@@ -187,6 +196,12 @@ async function bootstrap() {
         },
         onOtaAckMessage: async (message) => {
           await handleRuntimeOtaAckMessage(message);
+        },
+        onDeviceEventsMessage: async (message) => {
+          await handleRuntimeDeviceEventsMessage(message);
+        },
+        onDeviceStatusMessage: async (message) => {
+          await handleRuntimeDeviceStatusMessage(message);
         }
       })
     : null;
@@ -271,7 +286,7 @@ async function bootstrap() {
     );
     if (runtimeMqttBridge) {
       console.log(
-        `[api-server] mqtt runtime bridge enabled on ${config.mqttUrl} using topics ${config.mqttTelemetryTopic}, ${config.mqttScheduleTopic}, ${config.mqttDeviceCommandTopic}, ${config.mqttDeviceCommandAckTopic}, ${config.mqttOtaRequestTopic}, ${config.mqttOtaAckTopic}`
+        `[api-server] mqtt runtime bridge enabled on ${config.mqttUrl} using canonical device topics (jnx/{tenantId}/{pid}/{deviceId}/...) plus internal topics ${config.mqttScheduleTopic}, ${config.mqttNotificationTopic}`
       );
     }
 

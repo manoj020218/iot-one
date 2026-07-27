@@ -14,4 +14,5 @@ export * from "./types/ui-package-registry";
 export * from "./utils/audit";
 export * from "./utils/device";
 export * from "./utils/home";
+export * from "./utils/mqtt-topics";
 export * from "./utils/scene";

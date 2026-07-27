@@ -1,7 +1,9 @@
+import { createDeviceRecord } from "@jenix/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
 import { handleRuntimeDeviceCommandAckMessage } from "../../infrastructure/mqtt/runtime.handlers";
+import { deviceRepository, resetDeviceRepository } from "../devices/device.model";
 import { createSceneActionDispatchWorker } from "./scene.action-worker";
 import { createScene, runSceneManually, sceneTesting } from "./scene.service";
 
@@ -11,9 +13,21 @@ const ownerContext = {
   homeRole: "owner" as const
 };
 
+async function registerTestDevice(deviceId: string) {
+  await deviceRepository.save(
+    createDeviceRecord({
+      deviceId,
+      pid: "JNX-TG-C3-001",
+      homeId: ownerContext.homeId,
+      ownerUserId: ownerContext.userId
+    })
+  );
+}
+
 describe("scene action dispatch worker", () => {
   beforeEach(async () => {
     await sceneTesting.reset();
+    resetDeviceRepository();
     useRuntimeMqttBridge(null);
   });
 
@@ -108,6 +122,8 @@ describe("scene action dispatch worker", () => {
   });
 
   it("publishes scene device commands through the MQTT bridge", async () => {
+    await registerTestDevice("JNX-TG-C3-A7F2");
+
     const publishedCommands: Array<{
       deviceId: string;
       command: string;
@@ -191,6 +207,8 @@ describe("scene action dispatch worker", () => {
   });
 
   it("retries dispatched scene commands when no acknowledgement arrives before the lease expires", async () => {
+    await registerTestDevice("JNX-TG-C3-A7F3");
+
     const publishedCommands: string[] = [];
 
     useRuntimeMqttBridge({

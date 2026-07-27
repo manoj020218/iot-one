@@ -23,6 +23,7 @@ export function createDeviceRecord(
     deviceId: input.deviceId.trim().toUpperCase(),
     pid: input.pid.trim().toUpperCase(),
     homeId: input.homeId,
+    tenantId: input.tenantId?.trim() || input.homeId,
     ownerUserId: input.ownerUserId,
     displayName: input.displayName?.trim() || input.deviceId.trim().toUpperCase(),
     mqttStatus: "unknown",

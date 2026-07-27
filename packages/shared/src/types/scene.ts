@@ -45,7 +45,10 @@ export type SceneActionCommand =
   | "factory_reset"
   | "ota_force"
   | "matter_commission"
-  | "matter_bridge_sync";
+  | "matter_bridge_sync"
+  | "attend_call"
+  | "start_learning"
+  | "restart";
 
 export interface SceneAction {
   actionId: string;

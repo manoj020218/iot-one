@@ -10,6 +10,8 @@ import type { SceneEvaluationJob, SceneRuntimeSource } from "../../modules/scene
 
 export interface RuntimeTelemetryIngressMessage {
   job: SceneEvaluationJob;
+  /** Needed to build the canonical per-device topic (jnx/{tenantId}/{pid}/{deviceId}/telemetry). */
+  pid: string;
   mqttStatus?: DeviceConnectivityStatus;
   cloudStatus?: DeviceConnectivityStatus;
   localStatus?: DeviceLocalStatus;
@@ -27,6 +29,8 @@ export interface RuntimeDeviceCommandMessage {
   source: SceneRuntimeSource;
   requestedAt: string;
   deviceId: string;
+  /** Needed to build the canonical per-device topic (jnx/{tenantId}/{pid}/{deviceId}/cmd). */
+  pid: string;
   command: NonNullable<SceneAction["command"]>;
   payload?: Record<string, unknown>;
 }
@@ -72,6 +76,20 @@ export interface RuntimeOtaAckMessage {
   status: "completed" | "failed";
   appliedVersion?: string;
   errorMessage?: string;
+}
+
+/**
+ * Generic inbound envelope for the "events" and "status" canonical topic
+ * suffixes — used by event-driven devices (e.g. the nurse call receiver) that
+ * don't fit the numeric telemetry model. Address comes from the topic itself
+ * (see parseDeviceTopic); the payload shape is device/PID-specific and
+ * interpreted by whichever module owns that PID.
+ */
+export interface RuntimeDeviceTopicMessage {
+  tenantId: string;
+  pid: string;
+  deviceId: string;
+  payload: Record<string, unknown>;
 }
 
 export interface RuntimeMqttBridge {

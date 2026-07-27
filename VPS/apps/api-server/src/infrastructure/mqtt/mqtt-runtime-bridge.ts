@@ -1,8 +1,15 @@
 import { connect, type IClientOptions, type MqttClient } from "mqtt";
 
+import {
+  buildDeviceTopic,
+  buildDeviceTopicWildcard,
+  parseDeviceTopic
+} from "@jenix/shared";
+
 import type {
   RuntimeDeviceCommandAckMessage,
   RuntimeDeviceCommandMessage,
+  RuntimeDeviceTopicMessage,
   RuntimeMqttBridge,
   RuntimeNotificationMessage,
   RuntimeOtaAckMessage,
@@ -11,14 +18,15 @@ import type {
   RuntimeTelemetryIngressMessage
 } from "./runtime.types";
 
+/**
+ * Only the two platform-internal topics remain statically configured. Every
+ * device-facing topic (telemetry/status/events/cmd/cmd-ack/ota/ota-ack/lwt) is
+ * built and parsed via the frozen jnx/{tenantId}/{pid}/{deviceId}/{suffix}
+ * scheme in @jenix/shared — see mqtt-topics.ts and MQTT_LICENSED_DEVICE_ACCESS_PLAN.md.
+ */
 interface MqttRuntimeTopics {
-  telemetry: string;
   schedule: string;
-  deviceCommand: string;
-  deviceCommandAck: string;
   notification: string;
-  otaRequest: string;
-  otaAck: string;
 }
 
 export interface MqttRuntimeBridgeOptions {
@@ -34,6 +42,9 @@ export interface MqttRuntimeBridgeOptions {
     message: RuntimeDeviceCommandAckMessage
   ) => Promise<void>;
   onOtaAckMessage: (message: RuntimeOtaAckMessage) => Promise<void>;
+  /** Event-driven devices only (e.g. nurse call receiver) — optional, no-op if omitted. */
+  onDeviceEventsMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
+  onDeviceStatusMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
 }
 
 function parseJsonMessage<T>(payload: Buffer): T {
@@ -93,6 +104,12 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     message: RuntimeDeviceCommandAckMessage
   ) => Promise<void>;
   private readonly onOtaAckMessage: (message: RuntimeOtaAckMessage) => Promise<void>;
+  private readonly onDeviceEventsMessage:
+    | ((message: RuntimeDeviceTopicMessage) => Promise<void>)
+    | undefined;
+  private readonly onDeviceStatusMessage:
+    | ((message: RuntimeDeviceTopicMessage) => Promise<void>)
+    | undefined;
   private client: MqttClient | null = null;
   private ready: Promise<void> | null = null;
 
@@ -111,6 +128,8 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     this.onScheduleTickMessage = options.onScheduleTickMessage;
     this.onDeviceCommandAckMessage = options.onDeviceCommandAckMessage;
     this.onOtaAckMessage = options.onOtaAckMessage;
+    this.onDeviceEventsMessage = options.onDeviceEventsMessage;
+    this.onDeviceStatusMessage = options.onDeviceStatusMessage;
   }
 
   private registerMessageHandlers(client: MqttClient) {
@@ -123,13 +142,6 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   }
 
   private async handleInboundMessage(topic: string, payload: Buffer): Promise<void> {
-    if (topic === this.topics.telemetry) {
-      await this.onTelemetryMessage(
-        parseJsonMessage<RuntimeTelemetryIngressMessage>(payload)
-      );
-      return;
-    }
-
     if (topic === this.topics.schedule) {
       await this.onScheduleTickMessage(
         parseJsonMessage<RuntimeScheduleTickMessage>(payload)
@@ -137,17 +149,50 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
       return;
     }
 
-    if (topic === this.topics.deviceCommandAck) {
+    const parsedTopic = parseDeviceTopic(topic);
+
+    if (!parsedTopic) {
+      return;
+    }
+
+    if (parsedTopic.suffix === "telemetry") {
+      await this.onTelemetryMessage(
+        parseJsonMessage<RuntimeTelemetryIngressMessage>(payload)
+      );
+      return;
+    }
+
+    if (parsedTopic.suffix === "cmd/ack") {
       await this.onDeviceCommandAckMessage(
         parseJsonMessage<RuntimeDeviceCommandAckMessage>(payload)
       );
       return;
     }
 
-    if (topic === this.topics.otaAck) {
+    if (parsedTopic.suffix === "ota/ack") {
       await this.onOtaAckMessage(
         parseJsonMessage<RuntimeOtaAckMessage>(payload)
       );
+      return;
+    }
+
+    if (parsedTopic.suffix === "events" && this.onDeviceEventsMessage) {
+      await this.onDeviceEventsMessage({
+        tenantId: parsedTopic.tenantId,
+        pid: parsedTopic.pid,
+        deviceId: parsedTopic.deviceId,
+        payload: parseJsonMessage<Record<string, unknown>>(payload)
+      });
+      return;
+    }
+
+    if (parsedTopic.suffix === "status" && this.onDeviceStatusMessage) {
+      await this.onDeviceStatusMessage({
+        tenantId: parsedTopic.tenantId,
+        pid: parsedTopic.pid,
+        deviceId: parsedTopic.deviceId,
+        payload: parseJsonMessage<Record<string, unknown>>(payload)
+      });
     }
   }
 
@@ -168,15 +213,20 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
       client.once("connect", () => {
         client.off("error", handleError);
         this.registerMessageHandlers(client);
+        const deviceTopicSubscriptions = [
+          buildDeviceTopicWildcard("telemetry"),
+          buildDeviceTopicWildcard("cmd/ack"),
+          buildDeviceTopicWildcard("ota/ack"),
+          buildDeviceTopicWildcard("events"),
+          buildDeviceTopicWildcard("status")
+        ];
         void Promise.all([
-          subscribeAsync(client, this.topics.telemetry),
-          subscribeAsync(client, this.topics.schedule),
-          subscribeAsync(client, this.topics.deviceCommandAck),
-          subscribeAsync(client, this.topics.otaAck)
+          ...deviceTopicSubscriptions.map((topic) => subscribeAsync(client, topic)),
+          subscribeAsync(client, this.topics.schedule)
         ])
           .then(() => {
             this.logger?.(
-              `[mqtt-runtime] connected and subscribed to ${this.topics.telemetry}, ${this.topics.schedule}, ${this.topics.deviceCommandAck}, ${this.topics.otaAck}`
+              `[mqtt-runtime] connected and subscribed to ${[...deviceTopicSubscriptions, this.topics.schedule].join(", ")}`
             );
             resolve();
           })
@@ -217,7 +267,17 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   }
 
   publishTelemetryIngress(message: RuntimeTelemetryIngressMessage): Promise<void> {
-    return this.publish(this.topics.telemetry, message);
+    const deviceId = message.job.deviceId;
+
+    if (!deviceId) {
+      throw new Error("Telemetry ingress message is missing a deviceId");
+    }
+
+    const topic = buildDeviceTopic(
+      { tenantId: message.job.homeId, pid: message.pid, deviceId },
+      "telemetry"
+    );
+    return this.publish(topic, message);
   }
 
   publishScheduleTick(message: RuntimeScheduleTickMessage): Promise<void> {
@@ -225,7 +285,11 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   }
 
   publishDeviceCommand(message: RuntimeDeviceCommandMessage): Promise<void> {
-    return this.publish(this.topics.deviceCommand, message);
+    const topic = buildDeviceTopic(
+      { tenantId: message.homeId, pid: message.pid, deviceId: message.deviceId },
+      "cmd"
+    );
+    return this.publish(topic, message);
   }
 
   publishNotification(message: RuntimeNotificationMessage): Promise<void> {
@@ -233,7 +297,11 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   }
 
   publishOtaRequest(message: RuntimeOtaRequestMessage): Promise<void> {
-    return this.publish(this.topics.otaRequest, message);
+    const topic = buildDeviceTopic(
+      { tenantId: message.homeId, pid: message.pid, deviceId: message.deviceId },
+      "ota"
+    );
+    return this.publish(topic, message);
   }
 }
 

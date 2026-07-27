@@ -110,6 +110,12 @@ async function dispatchSceneAction(
     };
   }
 
+  const device = await deviceRepository.get(deviceId);
+
+  if (!device) {
+    throw new Error(`Device not found for scene action dispatch: ${deviceId}`);
+  }
+
   await bridge.publishDeviceCommand({
     deliveryId: job.jobId,
     runId: job.runId,
@@ -118,6 +124,7 @@ async function dispatchSceneAction(
     source: job.source,
     requestedAt: job.requestedAt,
     deviceId,
+    pid: device.pid,
     command: job.action.command,
     ...(job.action.payload ? { payload: job.action.payload } : {})
   });

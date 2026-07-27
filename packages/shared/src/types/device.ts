@@ -20,6 +20,12 @@ export interface DeviceRecord {
   deviceId: string;
   pid: string;
   homeId: string;
+  /**
+   * MQTT topic tenant segment (see buildDeviceTopic). Defaults to homeId today —
+   * modeled as its own field so a future vendor/OEM tenant can populate it later
+   * without reshaping the device topic scheme.
+   */
+  tenantId: string;
   ownerUserId: string;
   displayName: string;
   firmwareVersion?: string;
@@ -42,6 +48,8 @@ export interface RegisterDeviceInput {
   firmwareVersion?: string;
   hardwareRevision?: string;
   matterEnabled?: boolean;
+  /** Defaults to homeId when omitted. */
+  tenantId?: string;
 }
 
 export interface DeviceFirmwareRequestInput {
