@@ -20,7 +20,8 @@
 - Current status: Phase 17 delivery acknowledgement and OTA dispatch persistence complete
 - Current status: Phase 18 rollout status APIs and replay controls complete
 - Current status: Phase 19 scene dispatch recovery UI complete
-- Current phase: Phase 19 - Scene Dispatch Recovery UI
+- Current status: Phase 20 dynamic device package delivery and VPS deployment flow complete
+- Current phase: Phase 20 - Dynamic Device Package Delivery
 
 ## Working Scope
 
@@ -501,6 +502,7 @@ Validation gates:
 1. Add protected-call retry-on-401 handling in the PWA for cases where a request races token expiry before refresh completes.
 2. Add delivery status badges and rollout summaries on dashboard and scene-management surfaces.
 3. Replace the Phase 11 Matter placeholders with live commissioner, bridge, and device acknowledgement flows when rollout prerequisites are met.
+4. Plan and then implement licensed MQTT device admission with per-device identity, signed entitlements, and paid third-party vendor access.
 
 ## Decision Log
 
@@ -533,6 +535,8 @@ Validation gates:
 - 2026-07-03: Added durable scene-command acknowledgement handling, OTA delivery job persistence, MQTT acknowledgement topics, and a dedicated OTA delivery worker so runtime delivery can retry safely beyond the request path.
 - 2026-07-03: Added rollout history and replay APIs for OTA and scene dispatch jobs, and surfaced failed firmware delivery recovery in the PWA device detail flow first.
 - 2026-07-07: Added scene-detail dispatch history, replay controls, and a local fallback ledger so scene delivery recovery is now operator-facing in the PWA without requiring API-only tooling.
+- 2026-07-09: Added PID-scoped dynamic device package delivery for Tank Guard, HOME bootstrap package bindings, a remote package loader on `/devices/:deviceId`, a dedicated `IOT_Devices` repo for published PID artifacts, and a VPS `device-registry` sync/deploy flow with `one.jenix.in` serving `/ui-packages` from runtime artifacts.
+- 2026-07-12: Documented the proposed licensed MQTT device access architecture so future work can replace anonymous or shared-broker trust with device-bound identity, signed entitlements, and vendor-ready paid access controls.
 
 ## Risks and Controls
 
@@ -570,3 +574,5 @@ Use this section for quick append-only execution notes after each meaningful imp
 - 2026-07-03: Phase 17 delivery acknowledgement and rollout persistence completed with scene-command ack tracking, retryable dispatch leases, OTA delivery jobs, a dedicated OTA worker, MQTT ack handlers, and full workspace validation.
 - 2026-07-03: Phase 18 rollout status and replay controls completed with device rollout history routes, scene dispatch history routes, replay APIs for failed jobs, device-detail rollout UI, and full workspace validation.
 - 2026-07-07: Phase 19 scene dispatch recovery UI completed with scene-detail dispatch history, failed-job replay controls, fallback dispatch persistence, and web-PWA lint, typecheck, test, and build validation.
+- 2026-07-09: Phase 20 dynamic device package delivery and VPS deployment flow completed with HOME bootstrap package contracts, Tank Guard remote page loading, PID-first artifact publishing in `IOT_Devices`, VPS deploy/sync scripts, and `one.jenix.in` runtime package serving from `device-registry`.
+- 2026-07-12: Added a root architecture plan for licensed MQTT device admission, broker hardening, and future third-party vendor monetization.
