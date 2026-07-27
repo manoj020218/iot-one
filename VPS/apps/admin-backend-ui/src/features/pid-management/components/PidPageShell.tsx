@@ -1,8 +1,7 @@
-import { AppShell, StatusPill } from "@jenix/ui";
 import type { PropsWithChildren, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { useDeveloperSession } from "../../../app/DeveloperSessionProvider";
+import { AdminConsoleShell } from "../../../app/AdminConsoleShell";
 
 export interface PidPageShellProps extends PropsWithChildren {
   title: string;
@@ -16,20 +15,13 @@ export function PidPageShell({
   aside,
   children
 }: PidPageShellProps) {
-  const { session } = useDeveloperSession();
-
   return (
-    <AppShell
-      eyebrow="Developer Backend"
-      title={title}
-      description={description}
-      aside={aside ?? <StatusPill label={session.role} tone="warning" />}
-    >
+    <AdminConsoleShell title={title} description={description} aside={aside}>
       <nav className="admin-nav">
         <Link to="/admin/developer/pid-management">PID Catalog</Link>
         <Link to="/admin/developer/pid-management/new">Create PID</Link>
       </nav>
       {children}
-    </AppShell>
+    </AdminConsoleShell>
   );
 }

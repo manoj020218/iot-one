@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import { PackageRegistryPage } from "../features/package-registry/PackageRegistryPage";
 import { PidCreatePage } from "../features/pid-management/PidCreatePage";
 import { PidDetailPage } from "../features/pid-management/PidDetailPage";
 import { PidEditPage } from "../features/pid-management/PidEditPage";
@@ -51,6 +52,14 @@ export function AppRouter() {
         element={
           <RequireDeveloper>
             <PidEditPage />
+          </RequireDeveloper>
+        }
+      />
+      <Route
+        path="/admin/developer/package-registry"
+        element={
+          <RequireDeveloper>
+            <PackageRegistryPage />
           </RequireDeveloper>
         }
       />

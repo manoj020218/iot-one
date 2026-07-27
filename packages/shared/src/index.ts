@@ -10,6 +10,7 @@ export * from "./types/platform";
 export * from "./types/provisioning";
 export * from "./types/scene";
 export * from "./types/ui-bootstrap";
+export * from "./types/ui-package-registry";
 export * from "./utils/audit";
 export * from "./utils/device";
 export * from "./utils/home";

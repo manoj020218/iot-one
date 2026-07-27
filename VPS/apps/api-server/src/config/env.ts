@@ -17,6 +17,7 @@ export interface AppConfig {
   authPersistenceMode: "memory" | "mongodb";
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
+  uiPackagePersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
   homePersistenceMode: "memory" | "mongodb";
   provisioningPersistenceMode: "memory" | "mongodb";
@@ -157,6 +158,11 @@ export function readAppConfig(): AppConfig {
     Boolean(mongodbUri),
     "PID_PERSISTENCE_MODE"
   );
+  const uiPackagePersistenceMode = parsePersistenceMode(
+    process.env.UI_PACKAGE_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "UI_PACKAGE_PERSISTENCE_MODE"
+  );
   const devicePersistenceMode = parsePersistenceMode(
     process.env.DEVICE_PERSISTENCE_MODE,
     Boolean(mongodbUri),
@@ -268,6 +274,10 @@ export function readAppConfig(): AppConfig {
     throw new Error("PID_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
+  if (uiPackagePersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("UI_PACKAGE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
   if (devicePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -313,6 +323,7 @@ export function readAppConfig(): AppConfig {
     ),
     homePersistenceMode,
     pidPersistenceMode,
+    uiPackagePersistenceMode,
     devicePersistenceMode,
     provisioningPersistenceMode,
     otaPersistenceMode,

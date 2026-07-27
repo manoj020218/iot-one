@@ -17,6 +17,7 @@ import { pidRouter } from "./modules/pid/pid.routes";
 import { provisioningRouter } from "./modules/provisioning/provisioning.routes";
 import { sceneRouter } from "./modules/scenes/scene.routes";
 import { otaRouter } from "./modules/ota/ota.routes";
+import { uiPackageRouter } from "./modules/ui-packages/ui-package.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -35,6 +36,7 @@ export function createApp(): Express {
   app.use("/api/v1/admin/api-packages", requireAdminApiKey, adminApiPackageRouter);
   app.use("/api/v1/admin/ota", requireAdminApiKey, otaRouter);
   app.use("/api/v1/admin/pids", requireAdminApiKey, pidRouter);
+  app.use("/api/v1/admin/ui-packages", requireAdminApiKey, uiPackageRouter);
   app.use("/api/v1/provisioning", requireAuthenticatedUser, provisioningRouter);
   app.use("/api/v1/scenes", requireAuthenticatedUser, sceneRouter);
   app.use("/api/v1", healthRouter);

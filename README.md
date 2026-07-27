@@ -5,6 +5,8 @@ Jenix IoT Platform is a PNPM monorepo for the Jenix One PWA, Android APK shell, 
 ## Integration Guide
 
 - Device developer handoff: [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md)
+- Dynamic package runtime and VPS deployment flow: [DEVICE_PACKAGE_RUNTIME.md](./DEVICE_PACKAGE_RUNTIME.md)
+- Licensed MQTT and third-party device access architecture plan: [MQTT_LICENSED_DEVICE_ACCESS_PLAN.md](./MQTT_LICENSED_DEVICE_ACCESS_PLAN.md)
 
 ## Workspace Layout
 
@@ -74,6 +76,7 @@ cmd /c pnpm build
 - The PWA device detail page now shows rollout acknowledgement state, last delivery error, and a replay action for failed firmware jobs.
 - PID persistence now supports `PID_PERSISTENCE_MODE=memory|mongodb` and device persistence now supports `DEVICE_PERSISTENCE_MODE=memory|mongodb`. Both default to MongoDB when `MONGODB_URI` is set.
 - PID records and PID audit logs now persist in MongoDB collections `product_pids` and `pid_audit_logs`, and device records persist in the `devices` collection when the MongoDB drivers are enabled.
+- The device UI package catalog is now registry-backed instead of a hardcoded source map: `UI_PACKAGE_PERSISTENCE_MODE=memory|mongodb` (defaults to MongoDB when `MONGODB_URI` is set) persists packages in `ui_packages` and their audit trail in `ui_package_audit_logs`. Adding a new device's remote UI package is now a `POST /api/v1/admin/ui-packages` call (gated by `x-admin-key` + `x-role: JENIX_DEVELOPER`, same as PID/OTA admin routes), not a code change — see the Package Registry screen in `admin-backend-ui`. Packages are versioned (draft/published/deprecated) with publish and rollback endpoints under `/api/v1/admin/ui-packages/:packageId/...`.
 - HOME-scoped device, scene, Matter, and API key permissions no longer trust `x-home-role`; the backend now resolves HOME membership from persisted sharing data.
 - Device firmware planning is available through `GET /api/v1/devices/:deviceId/firmware-plan`, and firmware requests now resolve against published OTA releases by PID and hardware revision before returning a queued intent.
 - OTA releases are managed through developer routes under `/api/v1/admin/ota/releases`.

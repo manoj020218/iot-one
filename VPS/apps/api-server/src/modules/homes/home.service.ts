@@ -11,6 +11,7 @@ import {
   formatHomeClock,
   isHomeAccessAllowed,
   type HomeUiBootstrapDeviceBinding,
+  type HomeUiBootstrapPackageRecord,
   type HomeUiBootstrapPidBinding,
   type HomeUiBootstrapResponse,
   type HomeAccessRole,
@@ -46,7 +47,7 @@ import type {
 } from "./home.types";
 import { HomeModuleError } from "./home.types";
 import { getPid } from "../pid/pid.service";
-import { resolveUiPackageArtifact } from "../ui-packages/ui-package.catalog";
+import { resolveUiPackageArtifact } from "../ui-packages/ui-package.service";
 
 function createMembershipId(): string {
   return `hm-${Math.random().toString(36).slice(2, 10)}`;
@@ -618,14 +619,14 @@ export async function getHomeUiBootstrap(
     uniquePids.map(async (pid) => [pid, mapPidBinding(await getPid(pid))] as const)
   );
   const pidBindingMap = new Map(pidEntries);
-  const packageMap = new Map<string, ReturnType<typeof resolveUiPackageArtifact>>();
+  const packageMap = new Map<string, HomeUiBootstrapPackageRecord>();
 
   for (const binding of pidBindingMap.values()) {
     if (!binding.uiPackageId || !binding.uiPackageVersion) {
       continue;
     }
 
-    const artifact = resolveUiPackageArtifact(
+    const artifact = await resolveUiPackageArtifact(
       binding.uiPackageId,
       binding.uiPackageVersion
     );

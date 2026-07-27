@@ -29,6 +29,8 @@ import { createMongoOtaPersistenceStore } from "./modules/ota/ota.mongo-store";
 import { createOtaDeliveryWorker } from "./modules/ota/ota.delivery-worker";
 import { usePidPersistenceStore } from "./modules/pid/pid.model";
 import { createMongoPidPersistenceStore } from "./modules/pid/pid.mongo-store";
+import { useUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.model";
+import { createMongoUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
@@ -55,6 +57,7 @@ async function bootstrap() {
     config.authPersistenceMode === "mongodb" ||
     config.homePersistenceMode === "mongodb" ||
     config.pidPersistenceMode === "mongodb" ||
+    config.uiPackagePersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
     config.provisioningPersistenceMode === "mongodb" ||
     config.otaPersistenceMode === "mongodb" ||
@@ -90,6 +93,15 @@ async function bootstrap() {
     console.log("[api-server] pid persistence driver: mongodb");
   } else {
     console.log("[api-server] pid persistence driver: memory");
+  }
+
+  if (config.uiPackagePersistenceMode === "mongodb") {
+    useUiPackagePersistenceStore(
+      await createMongoUiPackagePersistenceStore(database!)
+    );
+    console.log("[api-server] ui-package persistence driver: mongodb");
+  } else {
+    console.log("[api-server] ui-package persistence driver: memory");
   }
 
   if (config.devicePersistenceMode === "mongodb") {

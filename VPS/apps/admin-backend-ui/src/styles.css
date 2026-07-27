@@ -1,17 +1,95 @@
+/* Jenix One — Admin Console design tokens (frozen 2026-07-27).
+   Light professional direction, in the family of FireGuard's approved kit
+   (dark rail sidebar + light canvas, semantic-only color) with Jenix One's
+   own teal accent and a monospace column face for PIDs/package IDs/semver. */
+
 :root {
-  color: #0f172a;
-  background:
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.15), transparent 28%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-  font-family: "Segoe UI", sans-serif;
+  --page: #f3f7f7;
+  --surface: #ffffff;
+  --surface-2: #f8fbfb;
+  --border: #e0e9ea;
+  --border-strong: #cbd9da;
+  --text: #0e2226;
+  --text-muted: #5c7377;
+  --text-faint: #93a6a9;
+  --sidebar-bg: #08191c;
+  --sidebar-bg-2: #0d2327;
+  --sidebar-text: #b9cbcd;
+  --sidebar-text-dim: #6c8386;
+  --accent: #0d9aa0;
+  --accent-strong: #0b8388;
+  --accent-soft: #e3f4f4;
+  --on-accent: #ffffff;
+  --ok: #17a673;
+  --ok-soft: #e4f7ef;
+  --warning: #b4670a;
+  --warning-soft: #fbf0dc;
+  --critical: #dc2626;
+  --critical-soft: #fce8e8;
+  --idle: #6b7a7c;
+  --idle-soft: #eef2f2;
+  --info: #6d5fe0;
+  --info-soft: #eeebfc;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(14, 34, 38, 0.06);
+  --shadow-md: 0 10px 28px -10px rgba(14, 34, 38, 0.16);
+  --shadow-lg: 0 28px 56px -18px rgba(14, 34, 38, 0.24);
+  color-scheme: light;
+  color: var(--text);
+  background: var(--page);
+  font-family:
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #080b11;
+    --surface: #0f1521;
+    --surface-2: #131a28;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #e8edf6;
+    --text-muted: #8a97ad;
+    --text-faint: #5a6579;
+    --sidebar-bg: #05080d;
+    --sidebar-bg-2: #0a0e14;
+    --sidebar-text: #aab6c9;
+    --sidebar-text-dim: #5a6579;
+    --accent: #22e3d0;
+    --accent-strong: #12b8ff;
+    --accent-soft: rgba(34, 227, 208, 0.14);
+    --on-accent: #04211f;
+    --ok: #38e08a;
+    --ok-soft: rgba(56, 224, 138, 0.14);
+    --warning: #ffb23e;
+    --warning-soft: rgba(255, 178, 62, 0.14);
+    --critical: #ff5c6c;
+    --critical-soft: rgba(255, 92, 108, 0.14);
+    --idle: #8a97ad;
+    --idle-soft: rgba(255, 255, 255, 0.07);
+    --info: #a996ff;
+    --info-soft: rgba(139, 92, 246, 0.16);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--page);
+  color: var(--text);
 }
 
 a {
-  color: #0f766e;
+  color: var(--accent-strong);
   font-weight: 600;
   text-decoration: none;
 }
@@ -22,6 +100,26 @@ textarea,
 select {
   font: inherit;
 }
+
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- existing structural classes, re-skinned ---------- */
 
 .admin-nav,
 .card-actions,
@@ -44,10 +142,10 @@ select {
 .toolbar-card,
 .validation-card,
 .access-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 20px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   padding: 20px;
 }
 
@@ -82,13 +180,31 @@ select {
   gap: 8px;
 }
 
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 .field input,
 .field textarea,
 .field select {
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   min-height: 44px;
   padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
 }
 
 .field textarea {
@@ -109,8 +225,8 @@ select {
 }
 
 .toggle-grid label {
-  background: #f8fafc;
-  border: 1px solid #dbeafe;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 8px 12px;
 }
@@ -119,30 +235,535 @@ select {
 .secondary-button,
 .primary-link {
   appearance: none;
-  border: 0;
-  border-radius: 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
   display: inline-flex;
-  min-height: 44px;
-  padding: 10px 16px;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 9px 16px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .primary-button,
 .primary-link {
-  background: #0f766e;
-  color: #f8fafc;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.primary-button:hover,
+.primary-link:hover {
+  background: var(--accent-strong);
 }
 
 .secondary-button {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.secondary-button:hover {
+  border-color: var(--accent);
 }
 
 .validation-card {
-  border-color: #fca5a5;
+  border-color: var(--critical);
+  background: var(--critical-soft);
+  color: var(--critical);
 }
 
 .access-card {
   margin: 48px auto;
   max-width: 620px;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.2px;
+}
+
+/* ---------- status pills (StatusPill / PidStatusPill render inline styles
+   today — these classes are for the new Package Registry surface) ---------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.pill-critical {
+  background: var(--critical-soft);
+  color: var(--critical);
+}
+
+.pill-idle {
+  background: var(--idle-soft);
+  color: var(--idle);
+}
+
+.pill-info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.pill-accent {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* ---------- admin console shell (rail + topbar) ---------- */
+
+.console-shell {
+  max-width: 1400px;
+  margin: 20px auto 60px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: var(--surface);
+  min-height: 70vh;
+}
+
+.console-rail {
+  background: linear-gradient(180deg, var(--sidebar-bg-2), var(--sidebar-bg));
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.console-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px 18px;
+}
+
+.console-brand .mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--on-accent);
+}
+
+.console-brand .name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+
+.console-brand .name small {
+  display: block;
+  font-weight: 500;
+  font-size: 10px;
+  color: var(--sidebar-text-dim);
+  letter-spacing: 0.04em;
+}
+
+.console-navgroup {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sidebar-text-dim);
+  padding: 14px 10px 6px;
+}
+
+.console-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.console-navitem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.console-navitem.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.console-foot {
+  margin-top: auto;
+  padding: 10px;
+  font-size: 10.5px;
+  color: var(--sidebar-text-dim);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.console-canvas {
+  background: var(--page);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.console-topbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.console-topbar h1 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.console-topbar p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+.console-topbar .spacer {
+  flex: 1;
+}
+
+.console-content {
+  padding: 20px 24px 40px;
+  overflow: auto;
+}
+
+/* ---------- kpi tiles + panel + table (Package Registry) ---------- */
+
+.kpirow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi .l {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.kpi .v {
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: 6px;
+  letter-spacing: -0.4px;
+}
+
+.kpi .v.accent {
+  color: var(--accent-strong);
+}
+
+.kpi .v.crit {
+  color: var(--critical);
+}
+
+.kpi .d {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.panel .phead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.panel .phead h2 {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.panel .phead p {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 1px 0 0;
+}
+
+.panel .phead .spacer {
+  flex: 1;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table.registry-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+table.registry-table thead th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+table.registry-table tbody td {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+table.registry-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+table.registry-table tbody tr.row-hover {
+  cursor: pointer;
+}
+
+table.registry-table tbody tr.row-hover:hover {
+  background: var(--surface-2);
+}
+
+.tname {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.tsub {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 1px;
+}
+
+.subpanel {
+  background: var(--surface-2);
+  border-top: 1px dashed var(--border-strong);
+  padding: 14px 22px 16px 46px;
+}
+
+.subpanel h4 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.vh-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.vh-row:last-child {
+  border-bottom: none;
+}
+
+.vh-row .vv {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-weight: 600;
+  width: 70px;
+}
+
+.vh-row .vt {
+  color: var(--text-faint);
+  font-size: 11px;
+  flex: 1;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 11.5px;
+  border-radius: 8px;
+  min-height: 30px;
+}
+
+.btn-danger {
+  background: var(--critical-soft);
+  color: var(--critical);
+  border-color: transparent;
+}
+
+.btn-danger:hover {
+  background: var(--critical);
+  color: #fff;
+}
+
+/* ---------- drawer (register package) ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 14, 16, 0.45);
+  z-index: 40;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 440px;
+  max-width: 92vw;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer .dhead {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.drawer .dhead h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.drawer .dhead p {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.drawer .dhead .spacer {
+  flex: 1;
+}
+
+.drawer .dbody {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drawer .dfoot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.iconbtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.iconbtn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.callout {
+  background: var(--info-soft);
+  color: var(--info);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
