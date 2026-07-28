@@ -68,3 +68,83 @@ export function parseDeviceTopic(topic: string): ParsedDeviceTopic | undefined {
 
   return { tenantId, pid, deviceId, suffix: suffix as DeviceTopicSuffix };
 }
+
+/**
+ * Legacy per-product-family topic contract — used by already-flashed firmware
+ * (Smart RF Transmitter, Tank Guard, and Token Dispenser per the same design
+ * intent) that predates the canonical scheme above. See
+ * JENIXONE_MQTT_HANDOFF.md and MQTT_LICENSED_DEVICE_ACCESS_PLAN.md.
+ *
+ * Shape: {topicRoot}/{deviceId}/{suffix}
+ *   topicRoot groups one product family (e.g. "jenixone/v1/transmitters",
+ *   "jnx/tg"). Each family declares its own suffix vocabulary — the shape is
+ *   shared, the suffix set is not (Transmitter's per-action cmd/* topics vs
+ *   Tank Guard's telemetry/status/event/alarm/config, for example).
+ *
+ * New devices use buildDeviceTopic instead — this exists purely as a
+ * translation target so already-tested hardware doesn't need reflashing.
+ */
+export const legacyDeviceTopicSuffixes = [
+  "availability",
+  "status",
+  "meta/commands",
+  "evt/ack"
+] as const;
+
+export type LegacyDeviceTopicSuffix = (typeof legacyDeviceTopicSuffixes)[number];
+
+export function buildLegacyDeviceTopic(
+  topicRoot: string,
+  deviceId: string,
+  suffix: string
+): string {
+  return [topicRoot, deviceId, suffix].join("/");
+}
+
+/** Command topics are per-action (e.g. "cmd/trigger"), not part of the fixed suffix set. */
+export function buildLegacyCommandTopic(
+  topicRoot: string,
+  deviceId: string,
+  actionSuffix: string
+): string {
+  return buildLegacyDeviceTopic(topicRoot, deviceId, `cmd/${actionSuffix}`);
+}
+
+/** Broker-side wildcard subscription for every device on a given product family + suffix. */
+export function buildLegacyDeviceTopicWildcard(topicRoot: string, suffix: string): string {
+  return [topicRoot, "+", suffix].join("/");
+}
+
+export interface ParsedLegacyDeviceTopic {
+  topicRoot: string;
+  deviceId: string;
+  suffix: string;
+}
+
+export function parseLegacyDeviceTopic(
+  topic: string,
+  topicRoot: string
+): ParsedLegacyDeviceTopic | undefined {
+  const prefix = `${topicRoot}/`;
+
+  if (!topic.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const segments = topic
+    .slice(prefix.length)
+    .split("/")
+    .filter((segment) => segment.length > 0);
+
+  if (segments.length < 2) {
+    return undefined;
+  }
+
+  const [deviceId, ...suffixSegments] = segments;
+
+  if (!deviceId) {
+    return undefined;
+  }
+
+  return { topicRoot, deviceId, suffix: suffixSegments.join("/") };
+}

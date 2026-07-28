@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildDeviceTopic,
   buildDeviceTopicWildcard,
-  parseDeviceTopic
+  buildLegacyCommandTopic,
+  buildLegacyDeviceTopic,
+  buildLegacyDeviceTopicWildcard,
+  parseDeviceTopic,
+  parseLegacyDeviceTopic
 } from "../src/index";
 
 const address = { tenantId: "home-1", pid: "PD-RFNC-01", deviceId: "JNX-RFNC-04C8" };
@@ -74,5 +78,55 @@ describe("device MQTT topic scheme", () => {
 
   it("rejects topics missing address segments", () => {
     expect(parseDeviceTopic("jnx/home-1/telemetry")).toBeUndefined();
+  });
+});
+
+describe("legacy device topic contract", () => {
+  const topicRoot = "jenixone/v1/transmitters";
+  const deviceId = "JNX-SRR-A0EC";
+
+  it("builds a legacy retained-topic string", () => {
+    expect(buildLegacyDeviceTopic(topicRoot, deviceId, "status")).toBe(
+      "jenixone/v1/transmitters/JNX-SRR-A0EC/status"
+    );
+  });
+
+  it("builds a per-action legacy command topic", () => {
+    expect(buildLegacyCommandTopic(topicRoot, deviceId, "profile/upsert")).toBe(
+      "jenixone/v1/transmitters/JNX-SRR-A0EC/cmd/profile/upsert"
+    );
+  });
+
+  it("builds a legacy wildcard subscription topic", () => {
+    expect(buildLegacyDeviceTopicWildcard(topicRoot, "evt/ack")).toBe(
+      "jenixone/v1/transmitters/+/evt/ack"
+    );
+  });
+
+  it("parses a legacy topic back into topicRoot/deviceId/suffix", () => {
+    expect(
+      parseLegacyDeviceTopic(
+        "jenixone/v1/transmitters/JNX-SRR-A0EC/status",
+        topicRoot
+      )
+    ).toEqual({ topicRoot, deviceId, suffix: "status" });
+  });
+
+  it("parses a multi-segment legacy suffix", () => {
+    expect(
+      parseLegacyDeviceTopic(
+        "jenixone/v1/transmitters/JNX-SRR-A0EC/meta/commands",
+        topicRoot
+      )
+    ).toEqual({ topicRoot, deviceId, suffix: "meta/commands" });
+  });
+
+  it("rejects a topic belonging to a different product family root", () => {
+    expect(
+      parseLegacyDeviceTopic(
+        "jenixone/v1/token-dispensers/JNX-TD-001/status",
+        topicRoot
+      )
+    ).toBeUndefined();
   });
 });

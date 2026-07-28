@@ -16,6 +16,8 @@ export interface AppConfig {
   pidPersistenceMode: "memory" | "mongodb";
   uiPackagePersistenceMode: "memory" | "mongodb";
   nurseCallReceiverPersistenceMode: "memory" | "mongodb";
+  smartRfTransmitterPersistenceMode: "memory" | "mongodb";
+  tokenDispenserPersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
   homePersistenceMode: "memory" | "mongodb";
   provisioningPersistenceMode: "memory" | "mongodb";
@@ -155,6 +157,16 @@ export function readAppConfig(): AppConfig {
     Boolean(mongodbUri),
     "NURSE_CALL_RECEIVER_PERSISTENCE_MODE"
   );
+  const smartRfTransmitterPersistenceMode = parsePersistenceMode(
+    process.env.SMART_RF_TRANSMITTER_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "SMART_RF_TRANSMITTER_PERSISTENCE_MODE"
+  );
+  const tokenDispenserPersistenceMode = parsePersistenceMode(
+    process.env.TOKEN_DISPENSER_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "TOKEN_DISPENSER_PERSISTENCE_MODE"
+  );
   const devicePersistenceMode = parsePersistenceMode(
     process.env.DEVICE_PERSISTENCE_MODE,
     Boolean(mongodbUri),
@@ -276,6 +288,18 @@ export function readAppConfig(): AppConfig {
     );
   }
 
+  if (smartRfTransmitterPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error(
+      "SMART_RF_TRANSMITTER_PERSISTENCE_MODE=mongodb requires MONGODB_URI"
+    );
+  }
+
+  if (tokenDispenserPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error(
+      "TOKEN_DISPENSER_PERSISTENCE_MODE=mongodb requires MONGODB_URI"
+    );
+  }
+
   if (devicePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -318,6 +342,8 @@ export function readAppConfig(): AppConfig {
     pidPersistenceMode,
     uiPackagePersistenceMode,
     nurseCallReceiverPersistenceMode,
+    smartRfTransmitterPersistenceMode,
+    tokenDispenserPersistenceMode,
     devicePersistenceMode,
     provisioningPersistenceMode,
     otaPersistenceMode,

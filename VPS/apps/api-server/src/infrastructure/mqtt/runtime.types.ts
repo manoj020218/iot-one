@@ -92,12 +92,34 @@ export interface RuntimeDeviceTopicMessage {
   payload: Record<string, unknown>;
 }
 
+/**
+ * Inbound envelope for the legacy per-product-family topic contract
+ * ({topicRoot}/{deviceId}/{suffix} — see mqtt-topics.ts and
+ * JENIXONE_MQTT_HANDOFF.md). `payload` is the raw string "online"/"offline"
+ * for the `availability` suffix and JSON-parsed for every other suffix.
+ */
+export interface RuntimeLegacyDeviceMessage {
+  topicRoot: string;
+  deviceId: string;
+  suffix: string;
+  payload: unknown;
+}
+
 export interface RuntimeMqttBridge {
   publishTelemetryIngress(message: RuntimeTelemetryIngressMessage): Promise<void>;
   publishScheduleTick(message: RuntimeScheduleTickMessage): Promise<void>;
   publishDeviceCommand(message: RuntimeDeviceCommandMessage): Promise<void>;
   publishNotification(message: RuntimeNotificationMessage): Promise<void>;
   publishOtaRequest(message: RuntimeOtaRequestMessage): Promise<void>;
+  /** Legacy per-product-family command dispatch — optional; only implemented devices use it. */
+  publishLegacyDeviceCommand?(input: {
+    topicRoot: string;
+    deviceId: string;
+    actionSuffix: string;
+    payload: Record<string, unknown>;
+  }): Promise<void>;
+  /** Escape hatch for device families with a bespoke topic grammar — optional. */
+  publishRaw?(topic: string, payload: unknown): Promise<void>;
   start?(): Promise<void>;
   stop?(): Promise<void>;
 }

@@ -3,13 +3,17 @@ import { connect, type IClientOptions, type MqttClient } from "mqtt";
 import {
   buildDeviceTopic,
   buildDeviceTopicWildcard,
-  parseDeviceTopic
+  buildLegacyCommandTopic,
+  buildLegacyDeviceTopicWildcard,
+  parseDeviceTopic,
+  parseLegacyDeviceTopic
 } from "@jenix/shared";
 
 import type {
   RuntimeDeviceCommandAckMessage,
   RuntimeDeviceCommandMessage,
   RuntimeDeviceTopicMessage,
+  RuntimeLegacyDeviceMessage,
   RuntimeMqttBridge,
   RuntimeNotificationMessage,
   RuntimeOtaAckMessage,
@@ -29,6 +33,14 @@ interface MqttRuntimeTopics {
   notification: string;
 }
 
+/** One legacy device family: a fixed topic root plus the suffixes that family
+ *  actually publishes/subscribes (vocabularies differ per family — see
+ *  buildLegacyDeviceTopic in @jenix/shared). */
+export interface LegacyTopicFamily {
+  topicRoot: string;
+  suffixes: readonly string[];
+}
+
 export interface MqttRuntimeBridgeOptions {
   url: string;
   username?: string;
@@ -45,6 +57,33 @@ export interface MqttRuntimeBridgeOptions {
   /** Event-driven devices only (e.g. nurse call receiver) — optional, no-op if omitted. */
   onDeviceEventsMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
   onDeviceStatusMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
+  /**
+   * Legacy device families to bridge, each with its own topic root and suffix
+   * vocabulary — see JENIXONE_MQTT_HANDOFF.md. Empty/omitted means no legacy
+   * devices are wired up.
+   */
+  legacyTopicRoots?: LegacyTopicFamily[];
+  onLegacyDeviceMessage?: (message: RuntimeLegacyDeviceMessage) => Promise<void>;
+  /**
+   * Fixed global ack topics some already-flashed firmware still publishes to
+   * (predates per-device ack topics — e.g. Tank Guard's real firmware, which
+   * hardcodes jenix/runtime/commands/ack and jenix/runtime/ota/ack). The
+   * payload shape on these topics already matches
+   * RuntimeDeviceCommandAckMessage/RuntimeOtaAckMessage exactly, so they're
+   * routed straight into the same onDeviceCommandAckMessage/onOtaAckMessage
+   * handlers as the canonical per-device ack topics — no separate handler.
+   */
+  legacyGlobalAckTopics?: { commandAck: string; otaAck: string };
+  /**
+   * Arbitrary topic filters for device families whose real wire contract
+   * doesn't fit either the canonical or legacyTopicRoots shape (e.g. Token
+   * Dispenser's jenix/{tenantId}/{siteId}/{deviceId}/{suffix}, where
+   * tenantId/siteId vary per device rather than being a fixed family root).
+   * The bridge does no parsing here — onRawMessage gets the raw topic string
+   * and payload and is responsible for recognizing what it owns.
+   */
+  rawSubscriptions?: string[];
+  onRawMessage?: (topic: string, payload: Buffer) => Promise<void>;
 }
 
 function parseJsonMessage<T>(payload: Buffer): T {
@@ -110,6 +149,17 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   private readonly onDeviceStatusMessage:
     | ((message: RuntimeDeviceTopicMessage) => Promise<void>)
     | undefined;
+  private readonly legacyTopicRoots: LegacyTopicFamily[];
+  private readonly onLegacyDeviceMessage:
+    | ((message: RuntimeLegacyDeviceMessage) => Promise<void>)
+    | undefined;
+  private readonly legacyGlobalAckTopics:
+    | { commandAck: string; otaAck: string }
+    | undefined;
+  private readonly rawSubscriptions: string[];
+  private readonly onRawMessage:
+    | ((topic: string, payload: Buffer) => Promise<void>)
+    | undefined;
   private client: MqttClient | null = null;
   private ready: Promise<void> | null = null;
 
@@ -130,6 +180,11 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     this.onOtaAckMessage = options.onOtaAckMessage;
     this.onDeviceEventsMessage = options.onDeviceEventsMessage;
     this.onDeviceStatusMessage = options.onDeviceStatusMessage;
+    this.legacyTopicRoots = options.legacyTopicRoots ?? [];
+    this.onLegacyDeviceMessage = options.onLegacyDeviceMessage;
+    this.legacyGlobalAckTopics = options.legacyGlobalAckTopics;
+    this.rawSubscriptions = options.rawSubscriptions ?? [];
+    this.onRawMessage = options.onRawMessage;
   }
 
   private registerMessageHandlers(client: MqttClient) {
@@ -141,6 +196,38 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     });
   }
 
+  private async handleLegacyInboundMessage(
+    topic: string,
+    payload: Buffer
+  ): Promise<boolean> {
+    if (!this.onLegacyDeviceMessage) {
+      return false;
+    }
+
+    for (const family of this.legacyTopicRoots) {
+      const parsedLegacy = parseLegacyDeviceTopic(topic, family.topicRoot);
+
+      if (!parsedLegacy) {
+        continue;
+      }
+
+      const rawPayload =
+        parsedLegacy.suffix === "availability"
+          ? payload.toString("utf8")
+          : parseJsonMessage<unknown>(payload);
+
+      await this.onLegacyDeviceMessage({
+        topicRoot: parsedLegacy.topicRoot,
+        deviceId: parsedLegacy.deviceId,
+        suffix: parsedLegacy.suffix,
+        payload: rawPayload
+      });
+      return true;
+    }
+
+    return false;
+  }
+
   private async handleInboundMessage(topic: string, payload: Buffer): Promise<void> {
     if (topic === this.topics.schedule) {
       await this.onScheduleTickMessage(
@@ -149,9 +236,28 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
       return;
     }
 
+    if (this.legacyGlobalAckTopics && topic === this.legacyGlobalAckTopics.commandAck) {
+      await this.onDeviceCommandAckMessage(
+        parseJsonMessage<RuntimeDeviceCommandAckMessage>(payload)
+      );
+      return;
+    }
+
+    if (this.legacyGlobalAckTopics && topic === this.legacyGlobalAckTopics.otaAck) {
+      await this.onOtaAckMessage(parseJsonMessage<RuntimeOtaAckMessage>(payload));
+      return;
+    }
+
+    if (await this.handleLegacyInboundMessage(topic, payload)) {
+      return;
+    }
+
     const parsedTopic = parseDeviceTopic(topic);
 
     if (!parsedTopic) {
+      if (this.onRawMessage) {
+        await this.onRawMessage(topic, payload);
+      }
       return;
     }
 
@@ -220,13 +326,23 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
           buildDeviceTopicWildcard("events"),
           buildDeviceTopicWildcard("status")
         ];
-        void Promise.all([
-          ...deviceTopicSubscriptions.map((topic) => subscribeAsync(client, topic)),
-          subscribeAsync(client, this.topics.schedule)
-        ])
+        const legacyTopicSubscriptions = this.legacyTopicRoots.flatMap((family) =>
+          family.suffixes.map((suffix) => buildLegacyDeviceTopicWildcard(family.topicRoot, suffix))
+        );
+        const legacyGlobalAckSubscriptions = this.legacyGlobalAckTopics
+          ? [this.legacyGlobalAckTopics.commandAck, this.legacyGlobalAckTopics.otaAck]
+          : [];
+        const allSubscriptions = [
+          ...deviceTopicSubscriptions,
+          ...legacyTopicSubscriptions,
+          ...legacyGlobalAckSubscriptions,
+          ...this.rawSubscriptions,
+          this.topics.schedule
+        ];
+        void Promise.all(allSubscriptions.map((topic) => subscribeAsync(client, topic)))
           .then(() => {
             this.logger?.(
-              `[mqtt-runtime] connected and subscribed to ${[...deviceTopicSubscriptions, this.topics.schedule].join(", ")}`
+              `[mqtt-runtime] connected and subscribed to ${allSubscriptions.join(", ")}`
             );
             resolve();
           })
@@ -302,6 +418,20 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
       "ota"
     );
     return this.publish(topic, message);
+  }
+
+  publishLegacyDeviceCommand(input: {
+    topicRoot: string;
+    deviceId: string;
+    actionSuffix: string;
+    payload: Record<string, unknown>;
+  }): Promise<void> {
+    const topic = buildLegacyCommandTopic(input.topicRoot, input.deviceId, input.actionSuffix);
+    return this.publish(topic, input.payload);
+  }
+
+  publishRaw(topic: string, payload: unknown): Promise<void> {
+    return this.publish(topic, payload);
   }
 }
 

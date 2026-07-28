@@ -2,6 +2,8 @@ import { hostname } from "node:os";
 
 import type { Db } from "mongodb";
 
+import { legacyDeviceTopicSuffixes } from "@jenix/shared";
+
 import { createApp } from "./app";
 import { readAppConfig } from "./config/env";
 import { createMqttRuntimeBridge } from "./infrastructure/mqtt/mqtt-runtime-bridge";
@@ -9,9 +11,13 @@ import {
   handleRuntimeDeviceCommandAckMessage,
   handleRuntimeDeviceEventsMessage,
   handleRuntimeDeviceStatusMessage,
+  handleRuntimeLegacyDeviceMessage,
   handleRuntimeOtaAckMessage,
+  handleRuntimeRawMessage,
   handleRuntimeScheduleTickMessage,
-  handleRuntimeTelemetryIngressMessage
+  handleRuntimeTelemetryIngressMessage,
+  tankGuardLegacyTopicRoot,
+  tankGuardLegacyTopicSuffixes
 } from "./infrastructure/mqtt/runtime.handlers";
 import { useRuntimeMqttBridge } from "./infrastructure/mqtt/runtime.binding";
 import { closeMongoClient, getMongoDb } from "./infrastructure/mongo";
@@ -35,6 +41,12 @@ import { useUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.m
 import { createMongoUiPackagePersistenceStore } from "./modules/ui-packages/ui-package.mongo-store";
 import { useNurseCallReceiverPersistenceStore } from "./modules/nurse-call-receiver/nurse-call-receiver.model";
 import { createMongoNurseCallReceiverPersistenceStore } from "./modules/nurse-call-receiver/nurse-call-receiver.mongo-store";
+import { useSmartRfTransmitterPersistenceStore } from "./modules/smart-rf-transmitter/smart-rf-transmitter.model";
+import { createMongoSmartRfTransmitterPersistenceStore } from "./modules/smart-rf-transmitter/smart-rf-transmitter.mongo-store";
+import { defaultSmartRfTopicRoot } from "./modules/smart-rf-transmitter/smart-rf-transmitter.service";
+import { useTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.model";
+import { createMongoTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.mongo-store";
+import { tokenDispenserRawSubscriptions } from "./modules/token-dispenser/token-dispenser.service";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
@@ -63,6 +75,8 @@ async function bootstrap() {
     config.pidPersistenceMode === "mongodb" ||
     config.uiPackagePersistenceMode === "mongodb" ||
     config.nurseCallReceiverPersistenceMode === "mongodb" ||
+    config.smartRfTransmitterPersistenceMode === "mongodb" ||
+    config.tokenDispenserPersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
     config.provisioningPersistenceMode === "mongodb" ||
     config.otaPersistenceMode === "mongodb" ||
@@ -116,6 +130,24 @@ async function bootstrap() {
     console.log("[api-server] nurse-call-receiver persistence driver: mongodb");
   } else {
     console.log("[api-server] nurse-call-receiver persistence driver: memory");
+  }
+
+  if (config.smartRfTransmitterPersistenceMode === "mongodb") {
+    useSmartRfTransmitterPersistenceStore(
+      await createMongoSmartRfTransmitterPersistenceStore(database!)
+    );
+    console.log("[api-server] smart-rf-transmitter persistence driver: mongodb");
+  } else {
+    console.log("[api-server] smart-rf-transmitter persistence driver: memory");
+  }
+
+  if (config.tokenDispenserPersistenceMode === "mongodb") {
+    useTokenDispenserPersistenceStore(
+      await createMongoTokenDispenserPersistenceStore(database!)
+    );
+    console.log("[api-server] token-dispenser persistence driver: mongodb");
+  } else {
+    console.log("[api-server] token-dispenser persistence driver: memory");
   }
 
   if (config.devicePersistenceMode === "mongodb") {
@@ -202,6 +234,24 @@ async function bootstrap() {
         },
         onDeviceStatusMessage: async (message) => {
           await handleRuntimeDeviceStatusMessage(message);
+        },
+        legacyTopicRoots: [
+          { topicRoot: defaultSmartRfTopicRoot, suffixes: legacyDeviceTopicSuffixes },
+          { topicRoot: tankGuardLegacyTopicRoot, suffixes: tankGuardLegacyTopicSuffixes }
+        ],
+        onLegacyDeviceMessage: async (message) => {
+          await handleRuntimeLegacyDeviceMessage(message);
+        },
+        // Tank Guard's real firmware still acks on the old flat global topics
+        // (predates per-device acks) — the payload shape already matches the
+        // existing handlers exactly, so no new handler is needed here.
+        legacyGlobalAckTopics: {
+          commandAck: "jenix/runtime/commands/ack",
+          otaAck: "jenix/runtime/ota/ack"
+        },
+        rawSubscriptions: tokenDispenserRawSubscriptions,
+        onRawMessage: async (topic, payload) => {
+          await handleRuntimeRawMessage(topic, payload);
         }
       })
     : null;
