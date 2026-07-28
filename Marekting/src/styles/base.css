@@ -8,9 +8,11 @@
   --line: rgba(120, 175, 206, 0.18);
   --text: #ecf2f7;
   --muted: #a8b8c8;
+  --faint: #6d8093;
   --gold: #f4c977;
   --gold-strong: #ffb648;
   --teal: #57d3c6;
+  --alert: #ef8354;
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
   --radius: 26px;
 }

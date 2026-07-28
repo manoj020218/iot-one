@@ -1,4 +1,5 @@
 import { CallToActionBand } from "../components/CallToActionBand";
+import { DeviceShowcase } from "../components/DeviceShowcase";
 import { FeatureSection } from "../components/FeatureSection";
 import { HeroSection } from "../components/HeroSection";
 import { PageMeta } from "../components/PageMeta";
@@ -20,7 +21,9 @@ export function HomePage() {
         secondaryAction={primaryActions.discussOem}
         metrics={homeMetrics}
       />
-      {homeSections.map((section) => (
+      <FeatureSection section={homeSections[0]} />
+      <DeviceShowcase />
+      {homeSections.slice(1).map((section) => (
         <FeatureSection key={section.title} section={section} />
       ))}
       <CallToActionBand

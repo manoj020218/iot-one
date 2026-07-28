@@ -20,17 +20,6 @@ export const homeSections: PageSection[] = [
     ]
   },
   {
-    eyebrow: "Device Ecosystem",
-    title: "One platform for Jenix products and approved partner hardware",
-    body:
-      "The platform is designed for Jenix-native products while also allowing approved third-party integrations through documented interfaces and modular plugins.",
-    cards: [
-      { title: "Jenix Device Experience", body: "Unified identity, provisioning and cloud connection while preserving product-specific controls." },
-      { title: "Third-Party Integration", body: "MQTT, HTTPS, webhooks, gateway adapters and custom integration paths for compatible hardware." },
-      { title: "Product Plugins", body: "New device categories can load their own dashboards without making the application large or difficult to maintain." }
-    ]
-  },
-  {
     eyebrow: "Who It Serves",
     title: "Built for OEM launches, field operations and long-term product support",
     body:

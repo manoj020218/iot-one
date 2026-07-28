@@ -6,6 +6,7 @@ import { App } from "./App";
 import "./styles/base.css";
 import "./styles/layout.css";
 import "./styles/sections.css";
+import "./styles/deviceShowcase.css";
 import "./styles/forms.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
