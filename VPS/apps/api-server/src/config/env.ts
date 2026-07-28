@@ -18,6 +18,8 @@ export interface AppConfig {
   nurseCallReceiverPersistenceMode: "memory" | "mongodb";
   smartRfTransmitterPersistenceMode: "memory" | "mongodb";
   tokenDispenserPersistenceMode: "memory" | "mongodb";
+  p10DisplayPersistenceMode: "memory" | "mongodb";
+  sosSirenPersistenceMode: "memory" | "mongodb";
   devicePersistenceMode: "memory" | "mongodb";
   homePersistenceMode: "memory" | "mongodb";
   provisioningPersistenceMode: "memory" | "mongodb";
@@ -167,6 +169,16 @@ export function readAppConfig(): AppConfig {
     Boolean(mongodbUri),
     "TOKEN_DISPENSER_PERSISTENCE_MODE"
   );
+  const p10DisplayPersistenceMode = parsePersistenceMode(
+    process.env.P10_DISPLAY_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "P10_DISPLAY_PERSISTENCE_MODE"
+  );
+  const sosSirenPersistenceMode = parsePersistenceMode(
+    process.env.SOS_SIREN_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "SOS_SIREN_PERSISTENCE_MODE"
+  );
   const devicePersistenceMode = parsePersistenceMode(
     process.env.DEVICE_PERSISTENCE_MODE,
     Boolean(mongodbUri),
@@ -300,6 +312,14 @@ export function readAppConfig(): AppConfig {
     );
   }
 
+  if (p10DisplayPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("P10_DISPLAY_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (sosSirenPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("SOS_SIREN_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
   if (devicePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("DEVICE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
@@ -344,6 +364,8 @@ export function readAppConfig(): AppConfig {
     nurseCallReceiverPersistenceMode,
     smartRfTransmitterPersistenceMode,
     tokenDispenserPersistenceMode,
+    p10DisplayPersistenceMode,
+    sosSirenPersistenceMode,
     devicePersistenceMode,
     provisioningPersistenceMode,
     otaPersistenceMode,

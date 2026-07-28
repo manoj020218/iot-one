@@ -48,7 +48,9 @@ export type SceneActionCommand =
   | "matter_bridge_sync"
   | "attend_call"
   | "start_learning"
-  | "restart";
+  | "restart"
+  | "trigger_alarm"
+  | "stop_alarm";
 
 export interface SceneAction {
   actionId: string;

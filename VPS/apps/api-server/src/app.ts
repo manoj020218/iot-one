@@ -13,7 +13,9 @@ import { healthRouter } from "./modules/health/health.routes";
 import { homeRouter } from "./modules/homes/home.routes";
 import { matterRouter } from "./modules/matter/matter.routes";
 import { nurseCallReceiverRouter } from "./modules/nurse-call-receiver/nurse-call-receiver.routes";
+import { p10DisplayRouter } from "./modules/p10-display/p10-display.routes";
 import { smartRfTransmitterRouter } from "./modules/smart-rf-transmitter/smart-rf-transmitter.routes";
+import { sosSirenRouter } from "./modules/sos-siren/sos-siren.routes";
 import { tokenDispenserRouter } from "./modules/token-dispenser/token-dispenser.routes";
 import { publicPidRouter } from "./modules/pid/pid.public.routes";
 import { pidRouter } from "./modules/pid/pid.routes";
@@ -34,6 +36,8 @@ export function createApp(): Express {
   app.use("/api/v1/devices", nurseCallReceiverRouter);
   app.use("/api/v1/devices", smartRfTransmitterRouter);
   app.use("/api/v1/devices", tokenDispenserRouter);
+  app.use("/api/v1/devices", p10DisplayRouter);
+  app.use("/api/v1/devices", sosSirenRouter);
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/public", publicApiRouter);
   app.use("/api/v1/pids", publicPidRouter);

@@ -47,6 +47,11 @@ import { defaultSmartRfTopicRoot } from "./modules/smart-rf-transmitter/smart-rf
 import { useTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.model";
 import { createMongoTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.mongo-store";
 import { tokenDispenserRawSubscriptions } from "./modules/token-dispenser/token-dispenser.service";
+import { useP10DisplayPersistenceStore } from "./modules/p10-display/p10-display.model";
+import { createMongoP10DisplayPersistenceStore } from "./modules/p10-display/p10-display.mongo-store";
+import { p10DisplayRawSubscriptions } from "./modules/p10-display/p10-display.service";
+import { useSosSirenPersistenceStore } from "./modules/sos-siren/sos-siren.model";
+import { createMongoSosSirenPersistenceStore } from "./modules/sos-siren/sos-siren.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
@@ -77,6 +82,8 @@ async function bootstrap() {
     config.nurseCallReceiverPersistenceMode === "mongodb" ||
     config.smartRfTransmitterPersistenceMode === "mongodb" ||
     config.tokenDispenserPersistenceMode === "mongodb" ||
+    config.p10DisplayPersistenceMode === "mongodb" ||
+    config.sosSirenPersistenceMode === "mongodb" ||
     config.devicePersistenceMode === "mongodb" ||
     config.provisioningPersistenceMode === "mongodb" ||
     config.otaPersistenceMode === "mongodb" ||
@@ -148,6 +155,24 @@ async function bootstrap() {
     console.log("[api-server] token-dispenser persistence driver: mongodb");
   } else {
     console.log("[api-server] token-dispenser persistence driver: memory");
+  }
+
+  if (config.p10DisplayPersistenceMode === "mongodb") {
+    useP10DisplayPersistenceStore(
+      await createMongoP10DisplayPersistenceStore(database!)
+    );
+    console.log("[api-server] p10-display persistence driver: mongodb");
+  } else {
+    console.log("[api-server] p10-display persistence driver: memory");
+  }
+
+  if (config.sosSirenPersistenceMode === "mongodb") {
+    useSosSirenPersistenceStore(
+      await createMongoSosSirenPersistenceStore(database!)
+    );
+    console.log("[api-server] sos-siren persistence driver: mongodb");
+  } else {
+    console.log("[api-server] sos-siren persistence driver: memory");
   }
 
   if (config.devicePersistenceMode === "mongodb") {
@@ -249,7 +274,7 @@ async function bootstrap() {
           commandAck: "jenix/runtime/commands/ack",
           otaAck: "jenix/runtime/ota/ack"
         },
-        rawSubscriptions: tokenDispenserRawSubscriptions,
+        rawSubscriptions: [...tokenDispenserRawSubscriptions, ...p10DisplayRawSubscriptions],
         onRawMessage: async (topic, payload) => {
           await handleRuntimeRawMessage(topic, payload);
         }
