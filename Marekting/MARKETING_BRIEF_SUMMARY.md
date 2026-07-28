@@ -5,7 +5,7 @@
 - Product name: `Smart One`
 - Brand presentation: `Smart One by Jenix`
 - Public website: `https://one.jenix.in`
-- Application URL: `https://app.iotsoft.in`
+- Application URL: `https://one.jenix.in/app` (kept under the same domain the Google OAuth client is already approved for — buyers onboard mostly via Google login, and a separate root domain like `app.iotsoft.in` would need its own Google domain verification)
 - Business identity: `Jain Enterprises`
 - Support email: `jenixindia@gmail.com`
 - Support / business WhatsApp: `7240226566`

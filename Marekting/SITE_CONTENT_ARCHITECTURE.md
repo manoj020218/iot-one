@@ -232,7 +232,7 @@ Must allow:
 
 ## Login-Related Public Behavior
 
-- `/login` should open or redirect to `https://app.iotsoft.in`
+- `/login` should open or redirect to `https://one.jenix.in/app`
 - `/signup` may serve either registration guidance or OEM/contact conversion
 - public marketing site should not look like the internal app shell
 

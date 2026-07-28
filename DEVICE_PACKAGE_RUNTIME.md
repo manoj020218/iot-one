@@ -135,13 +135,28 @@ Usage:
 
 ## Why `one.jenix.in` serves `/ui-packages`
 
-The browser loads `/ui-packages/...` from the same origin as the PWA. Because the PWA is served from `one.jenix.in`, the package alias must also live there.
+The browser loads `/ui-packages/...` from the same origin as the PWA. The PWA is served
+from `one.jenix.in` (under `/app`, alongside the marketing site at the domain root — see
+below), so the package alias must also live on that same origin, at the same top level.
 
 Current nginx behavior:
 - URL: `https://one.jenix.in/ui-packages/...`
 - Filesystem alias: `/root/projects/IOT_one/device-registry/ui-packages/...`
 
 `backend.jenix.in` was intentionally left untouched because it already serves a different site and is not the right browser origin for the remote package scripts.
+
+### Update: the PWA now lives at `/app`, not the domain root
+
+The marketing site (`Marekting/`) was later deployed to `one.jenix.in`'s domain root,
+which silently displaced the PWA that used to live there. Rather than move the PWA to a
+new root domain (e.g. `app.iotsoft.in`), it now lives at `https://one.jenix.in/app`
+instead — same domain the Google OAuth client is already approved for, so buyers signing
+in with Google keep working with zero changes needed in Google Cloud Console (origin
+checks are scheme+host only, no path, and `one.jenix.in` was already authorized). See
+`VPS/nginx/one.jenix.in.conf` for the full config: the marketing site's build goes to
+`/var/www/one.jenix.in/`, the PWA's build (built with `base: "/app/"` in
+`PWA_APK/apps/web-pwa/vite.config.ts`) goes to `/var/www/one.jenix.in/app/`, and nginx
+checks `/app/` before falling through to the marketing site's own SPA catch-all.
 
 ## What is complete
 

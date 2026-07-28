@@ -2,7 +2,7 @@ export const platformIdentity = {
   projectName: "Jenix IoT Platform",
   appName: "Jenix One",
   apiPrefix: "/api/v1",
-  webUrl: "https://app.iotsoft.in"
+  webUrl: "https://one.jenix.in/app"
 } as const;
 
 export const mobileTabs = [

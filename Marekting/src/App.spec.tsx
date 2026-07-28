@@ -22,7 +22,7 @@ describe("marketing site routes", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /open smart one/i })[0]).toHaveAttribute(
       "href",
-      "https://app.iotsoft.in"
+      "https://one.jenix.in/app"
     );
   });
 

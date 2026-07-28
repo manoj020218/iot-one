@@ -69,7 +69,7 @@ jenix One/
 | --- | --- | --- |
 | VPS backend | `VPS/apps/api-server` | Node.js + TypeScript API, auth, PID, scenes, provisioning, MQTT, WebSocket |
 | VPS admin UI | `VPS/apps/admin-backend-ui` | Developer-only PID management UI and backend operations UI |
-| PWA | `PWA_APK/apps/web-pwa` | React + TypeScript mobile-first app hosted at `app.iotsoft.in` |
+| PWA | `PWA_APK/apps/web-pwa` | React + TypeScript mobile-first app hosted at `one.jenix.in/app` (built with Vite `base: "/app/"`, same domain as the marketing site so the already-approved Google OAuth client keeps working) |
 | Android APK | `PWA_APK/apps/android` | Capacitor wrapper and Android-specific integration for the PWA |
 | Shared domain | `packages/shared` | Shared types, constants, schemas, API contracts, utilities |
 | Shared UI | `packages/ui` | Reusable UI primitives for web-facing apps |

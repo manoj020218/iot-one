@@ -22,7 +22,7 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   const currentVersion = packageJson.version;
 
   try {
-    const response = await fetch(`/app-release.json?ts=${Date.now()}`);
+    const response = await fetch(`${import.meta.env.BASE_URL}app-release.json?ts=${Date.now()}`);
     const published = (await response.json()) as PublishedRelease;
 
     return {

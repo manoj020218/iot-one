@@ -7,6 +7,7 @@ import "./styles.css";
 export function App() {
   return (
     <BrowserRouter
+      basename="/app"
       future={{
         v7_relativeSplatPath: true,
         v7_startTransition: true

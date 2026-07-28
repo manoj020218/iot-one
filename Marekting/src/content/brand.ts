@@ -4,7 +4,7 @@ export const brand = {
   name: "Smart One",
   presentation: "Smart One by Jenix",
   descriptor: "OEM IoT Platform",
-  appUrl: "https://app.iotsoft.in",
+  appUrl: "https://one.jenix.in/app",
   publicUrl: "https://one.jenix.in",
   supportEmail: "jenixindia@gmail.com",
   whatsapp: "7240226566",
