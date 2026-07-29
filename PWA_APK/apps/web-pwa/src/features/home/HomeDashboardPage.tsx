@@ -1,4 +1,4 @@
-import { AppShell, StatusPill } from "@jenix/ui";
+import { AppShell } from "@jenix/ui";
 import { useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +12,6 @@ import { useHomeDashboard } from "./hooks/useHomeDashboard";
 import { useLiveMetrics } from "./hooks/useLiveMetrics";
 import { type HomeFilter } from "./components/HomeFilterTabs";
 import { useToast } from "./hooks/useToast";
-import { litres } from "./telemetry/deviceTelemetry";
 import { HomeSelectorSheet } from "../homes/components/HomeSelectorSheet";
 import { HomeFormSheet } from "../homes/components/HomeFormSheet";
 import { createHome, listHomes, type HomeUpsertInput } from "../homes/services/homeApi";
@@ -25,7 +24,7 @@ export function HomeDashboardPage() {
   const activeSession = session;
   const currentHome = getCurrentHome(activeSession);
   const { devices } = useDashboardDevices(activeSession);
-  const { dashboard, error } = useHomeDashboard(activeSession);
+  const { error } = useHomeDashboard(activeSession);
   const { metrics, togglePump } = useLiveMetrics(devices);
   const { toast, show } = useToast();
   const [filter, setFilter] = useState<HomeFilter>("all");
@@ -35,10 +34,6 @@ export function HomeDashboardPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const online = devices.filter((device) => device.online).length;
   const alerts = devices.filter((device) => metrics[device.deviceId]?.alert).length;
-  const water = devices.reduce((sum, device) => {
-    const deviceMetrics = metrics[device.deviceId];
-    return sum + (deviceMetrics ? litres(deviceMetrics) : 0);
-  }, 0);
 
   async function handleCreateHome(input: HomeUpsertInput) {
     setSaving(true); setSaveError(null);
@@ -53,23 +48,20 @@ export function HomeDashboardPage() {
 
   return (
     <AppShell
-      eyebrow="Home"
       title={
         <button
           className="home-title-switch"
           onClick={() => setSelectorOpen(true)}
           type="button"
         >
-          {currentHome.name}
+          Home
           <FiChevronDown size={20} />
         </button>
       }
-      description={currentHome.locationLabel ?? "Devices, scenes, and members for this home."}
-      aside={<StatusPill label={(dashboard?.timezone ?? currentHome.timezone ?? "India").toUpperCase()} tone="neutral" />}
     >
-      <StatStrip online={online} total={devices.length} waterLitres={water} alerts={alerts} />
+      <StatStrip online={online} total={devices.length} alerts={alerts} />
       {error ? <section className="panel">{error}</section> : null}
-      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection devices={devices} filter={filter} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={(deviceId) => navigate(`/devices/${encodeURIComponent(deviceId)}`)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
+      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection devices={devices} filter={filter} homeName={currentHome.name} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={(deviceId) => navigate(`/devices/${encodeURIComponent(deviceId)}`)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
       {toast ? <div className="jx-toast"><div><strong>{toast.title}</strong>{toast.detail ? <div style={{ color: "var(--muted)", fontSize: 12 }}>{toast.detail}</div> : null}</div></div> : null}
       <HomeSelectorSheet currentHomeId={currentHome.homeId} homes={activeSession.homes} onClose={() => setSelectorOpen(false)} onCreate={() => { setSelectorOpen(false); setFormOpen(true); }} onSelect={setActiveHome} open={selectorOpen} />
       <HomeFormSheet open={formOpen} title="Create Home" subtitle="Create a new home with its own device list, timezone, and member access." submitting={saving} error={saveError} onClose={() => setFormOpen(false)} onSubmit={handleCreateHome} />

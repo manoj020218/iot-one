@@ -1,13 +1,12 @@
-import { FiAlertTriangle, FiCpu, FiDroplet } from "react-icons/fi";
+import { FiAlertTriangle, FiCpu } from "react-icons/fi";
 
 export interface StatStripInput {
   online: number;
   total: number;
-  waterLitres: number;
   alerts: number;
 }
 
-export function StatStrip({ online, total, waterLitres, alerts }: StatStripInput) {
+export function StatStrip({ online, total, alerts }: StatStripInput) {
   const cards = [
     {
       key: "online",
@@ -15,13 +14,6 @@ export function StatStrip({ online, total, waterLitres, alerts }: StatStripInput
       value: `${online}/${total}`,
       color: "var(--green)",
       icon: <FiCpu />
-    },
-    {
-      key: "water",
-      label: "Water stored",
-      value: `${(waterLitres / 1000).toFixed(1)}k L`,
-      color: "var(--cyan2)",
-      icon: <FiDroplet />
     },
     {
       key: "alerts",

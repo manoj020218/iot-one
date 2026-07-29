@@ -6,6 +6,7 @@ import { HomeFilterTabs, type HomeFilter } from "./HomeFilterTabs";
 export interface HomeDeviceSectionProps {
   devices: DashboardDevice[];
   filter: HomeFilter;
+  homeName: string;
   metrics: MetricsMap;
   onChangeFilter: (filter: HomeFilter) => void;
   onOpenDevice: (deviceId: string) => void;
@@ -15,6 +16,7 @@ export interface HomeDeviceSectionProps {
 export function HomeDeviceSection({
   devices,
   filter,
+  homeName,
   metrics,
   onChangeFilter,
   onOpenDevice,
@@ -32,17 +34,18 @@ export function HomeDeviceSection({
     return true;
   });
 
+  if (devices.length === 0) {
+    return null;
+  }
+
   return (
     <section>
       <div className="jx-sec">
-        <h2>Devices in this home</h2>
+        <h2>Devices in {homeName}</h2>
         <HomeFilterTabs active={filter} onChange={onChangeFilter} />
       </div>
       {visible.length === 0 ? (
-        <section className="empty-state">
-          <h2>No devices for this filter</h2>
-          <p>Provision a device or switch to another home to continue.</p>
-        </section>
+        <p className="hint-text">No devices match this filter.</p>
       ) : (
         <div className="jx-grid">
           {visible.map((device) => {

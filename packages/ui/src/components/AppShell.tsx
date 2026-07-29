@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 export interface AppShellProps {
-  eyebrow: string;
+  eyebrow?: string;
   title: ReactNode;
-  description: string;
+  description?: string;
   aside?: ReactNode;
   children: ReactNode;
 }
@@ -30,17 +30,19 @@ export function AppShell({
           marginBottom: 24
         }}
       >
-        <span
-          style={{
-            color: "#67707c",
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase"
-          }}
-        >
-          {eyebrow}
-        </span>
+        {eyebrow ? (
+          <span
+            style={{
+              color: "#67707c",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase"
+            }}
+          >
+            {eyebrow}
+          </span>
+        ) : null}
         <div
           style={{
             display: "flex",
@@ -62,16 +64,18 @@ export function AppShell({
             >
               {title}
             </h1>
-            <p
-              style={{
-                margin: 0,
-                color: "#67707c",
-                maxWidth: 640,
-                lineHeight: 1.6
-              }}
-            >
-              {description}
-            </p>
+            {description ? (
+              <p
+                style={{
+                  margin: 0,
+                  color: "#67707c",
+                  maxWidth: 640,
+                  lineHeight: 1.6
+                }}
+              >
+                {description}
+              </p>
+            ) : null}
           </div>
           {aside}
         </div>
