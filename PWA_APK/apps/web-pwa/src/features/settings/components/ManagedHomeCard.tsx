@@ -49,7 +49,7 @@ export function ManagedHomeCard({
         <div>
           <strong>{home.name}</strong>
           <p className="hint-text">
-            {home.locationLabel ?? "Location not captured"} - {home.timezone ?? "Asia/Kolkata"}
+            {home.locationLabel ?? "No address set"} - {home.timezone ?? "Asia/Kolkata"}
           </p>
         </div>
         <span className="status-chip" data-status={home.allowed === false ? "failed" : "completed"}>

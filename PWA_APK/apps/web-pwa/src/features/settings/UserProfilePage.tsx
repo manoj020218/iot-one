@@ -80,7 +80,6 @@ export function UserProfilePage() {
               <strong>{home.name}</strong>
               <span>{home.role}</span>
             </div>
-            <span className="hint-text">{home.homeId}</span>
           </article>
         ))}
       </section>
