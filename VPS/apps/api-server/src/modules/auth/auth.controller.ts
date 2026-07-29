@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import {
   loginWithEmail,
+  loginWithGoogle,
   loginWithProvider,
   logout,
   refreshAccessToken,
@@ -10,6 +11,7 @@ import {
 import type {
   EmailLoginPayload,
   EmailSignupPayload,
+  GoogleAuthPayload,
   ProviderAuthPayload
 } from "./auth.types";
 import { AuthModuleError } from "./auth.types";
@@ -56,6 +58,15 @@ function readProviderPayload(body: unknown): ProviderAuthPayload | null {
 
   const token = readStringField((body as Record<string, unknown>).token);
   return token ? { token } : null;
+}
+
+function readGoogleAuthPayload(body: unknown): GoogleAuthPayload | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const accessToken = readStringField((body as Record<string, unknown>).accessToken);
+  return accessToken ? { accessToken } : null;
 }
 
 function sendError(response: Response, error: unknown) {
@@ -106,7 +117,7 @@ export async function emailLoginController(request: Request, response: Response)
 }
 
 export async function googleLoginController(request: Request, response: Response) {
-  const payload = readProviderPayload(request.body);
+  const payload = readGoogleAuthPayload(request.body);
 
   if (!payload) {
     response.status(400).json({ error: "Invalid Google login payload" });
@@ -115,7 +126,7 @@ export async function googleLoginController(request: Request, response: Response
 
   try {
     response.status(200).json({
-      data: await loginWithProvider(payload, "google")
+      data: await loginWithGoogle(payload.accessToken)
     });
   } catch (error) {
     sendError(response, error);

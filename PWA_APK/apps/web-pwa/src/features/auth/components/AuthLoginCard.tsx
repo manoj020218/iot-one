@@ -11,6 +11,25 @@ export interface AuthLoginCardProps {
 export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    setError(null);
+    try {
+      await onSubmit({ email, password });
+    } catch {
+      setError("We couldn't sign you in with that email and password.");
+    }
+  }
+
+  async function handleGoogle() {
+    setError(null);
+    try {
+      await onGoogle();
+    } catch {
+      setError("Google sign-in didn't complete. Please try again.");
+    }
+  }
 
   return (
     <>
@@ -18,7 +37,7 @@ export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
         className="auth-form"
         onSubmit={(event) => {
           event.preventDefault();
-          void onSubmit({ email, password });
+          void handleSubmit();
         }}
       >
         <label className="field">
@@ -45,7 +64,8 @@ export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
           Continue
         </button>
       </form>
-      <GooglePrimaryAction onPress={onGoogle} />
+      {error ? <p className="auth-error">{error}</p> : null}
+      <GooglePrimaryAction onPress={handleGoogle} />
       <div className="auth-link-stack">
         <div className="auth-link-row">
           <Link className="auth-link quiet" to="/login/forgot-password">

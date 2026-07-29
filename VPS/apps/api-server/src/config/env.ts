@@ -12,6 +12,7 @@ export interface AppConfig {
   /** Internal-only (user notifications) — not device-facing. */
   mqttNotificationTopic: string;
   authPersistenceMode: "memory" | "mongodb";
+  googleClientId?: string;
   matterRuntimeEnabled: boolean;
   pidPersistenceMode: "memory" | "mongodb";
   uiPackagePersistenceMode: "memory" | "mongodb";
@@ -119,6 +120,7 @@ export function readAppConfig(): AppConfig {
   const rawPort = process.env.PORT ?? "4000";
   const port = Number(rawPort);
   const mongodbUri = process.env.MONGODB_URI?.trim() || undefined;
+  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
   const mqttUrl = process.env.MQTT_URL?.trim() || undefined;
   const mqttUsername = process.env.MQTT_USERNAME?.trim() || undefined;
   const mqttPassword = process.env.MQTT_PASSWORD?.trim() || undefined;
@@ -346,6 +348,7 @@ export function readAppConfig(): AppConfig {
     nodeEnv: process.env.NODE_ENV ?? "development",
     port,
     ...(mongodbUri ? { mongodbUri } : {}),
+    ...(googleClientId ? { googleClientId } : {}),
     mqttRuntimeEnabled,
     ...(mqttUrl ? { mqttUrl } : {}),
     ...(mqttUsername ? { mqttUsername } : {}),

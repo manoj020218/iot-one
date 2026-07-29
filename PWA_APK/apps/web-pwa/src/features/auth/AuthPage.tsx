@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthLoginCard } from "./components/AuthLoginCard";
+import { requestGoogleAccessToken } from "./services/googleIdentity";
 
 export function AuthPage() {
   const auth = useAuth();
@@ -14,6 +15,11 @@ export function AuthPage() {
     navigate("/home");
   }
 
+  async function handleGoogle() {
+    const accessToken = await requestGoogleAccessToken();
+    await auth.loginWithGoogle(accessToken);
+  }
+
   return (
     <AuthLayout
       title={`Welcome to ${platformIdentity.appName}`}
@@ -22,7 +28,7 @@ export function AuthPage() {
     >
       <AuthLoginCard
         onSubmit={(payload) => goHome(auth.loginWithEmail(payload))}
-        onGoogle={() => goHome(auth.loginWithProvider("google"))}
+        onGoogle={() => goHome(handleGoogle())}
       />
     </AuthLayout>
   );

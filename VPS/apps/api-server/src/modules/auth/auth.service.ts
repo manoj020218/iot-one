@@ -8,6 +8,7 @@ import {
 } from "@jenix/shared";
 
 import { syncUserHomes } from "../homes/home.service";
+import { verifyGoogleAccessToken } from "./auth.google";
 import {
   authRefreshSessionRepository,
   authUserRepository,
@@ -178,6 +179,17 @@ export async function loginWithProvider(
     email: `${provider}.${tokenSeed}@jenix.local`,
     name: `${provider[0]!.toUpperCase()}${provider.slice(1)} User`,
     provider
+  });
+
+  return buildSession(user);
+}
+
+export async function loginWithGoogle(accessToken: string): Promise<AuthSession> {
+  const verifiedProfile = await verifyGoogleAccessToken(accessToken);
+  const user = await upsertProviderUser({
+    email: verifiedProfile.email,
+    name: verifiedProfile.name,
+    provider: "google"
   });
 
   return buildSession(user);

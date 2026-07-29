@@ -8,6 +8,7 @@ import {
 
 import {
   loginWithEmail as loginWithEmailRequest,
+  loginWithGoogle as loginWithGoogleRequest,
   loginWithProvider as loginWithProviderRequest,
   logoutSession as logoutSessionRequest,
   refreshAuthSession as refreshAuthSessionRequest,
@@ -32,6 +33,7 @@ export interface AuthContextValue {
     password: string;
   }) => Promise<void>;
   loginWithProvider: (provider: AuthProvider) => Promise<void>;
+  loginWithGoogle: (accessToken: string) => Promise<void>;
   replaceHomes: (homes: HomeRecord[], activeHomeId?: string) => void;
   setActiveHome: (homeId: string) => void;
   logout: () => void;
@@ -184,6 +186,9 @@ export function AuthSessionProvider({
     },
     async loginWithProvider(provider) {
       setSessionState(createSessionState(await loginWithProviderRequest(provider)));
+    },
+    async loginWithGoogle(accessToken) {
+      setSessionState(createSessionState(await loginWithGoogleRequest(accessToken)));
     },
     replaceHomes(homes, activeHomeId) {
       setSessionState((current) => {

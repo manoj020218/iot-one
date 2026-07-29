@@ -188,6 +188,16 @@ button, input, select, textarea { font: inherit; }
   font-weight: 500;
 }
 
+.auth-error {
+  background: var(--danger-tint);
+  border-radius: var(--radius-control);
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: -6px 0 0;
+  padding: 10px 14px;
+}
+
 .auth-footer {
   color: var(--faint);
   font-size: 0.82rem;

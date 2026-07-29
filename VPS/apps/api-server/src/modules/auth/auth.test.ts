@@ -48,4 +48,19 @@ describe("auth routes", () => {
     expect(response.body.data.user.provider).toBe("email");
     expect(response.body.data.tokens.refreshToken).toMatch(/^[^.]+\.[^.]+\.[^.]+$/);
   });
+
+  it("locks down Google sign-in until GOOGLE_CLIENT_ID is configured", async () => {
+    const originalClientId = process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_ID;
+
+    try {
+      const response = await request(createApp())
+        .post("/api/v1/auth/google")
+        .send({ accessToken: "some-access-token" });
+
+      expect(response.status).toBe(503);
+    } finally {
+      process.env.GOOGLE_CLIENT_ID = originalClientId;
+    }
+  });
 });

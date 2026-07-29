@@ -90,6 +90,16 @@ export async function signupWithEmail(payload: {
   }
 }
 
+export async function loginWithGoogle(accessToken: string): Promise<AuthSession> {
+  return fetchJson<AuthSession>(`${authEndpoint}/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ accessToken })
+  });
+}
+
 export async function loginWithProvider(provider: AuthProvider) {
   try {
     return await fetchJson<AuthSession>(`${authEndpoint}/${provider}`, {

@@ -13,6 +13,10 @@ export interface ProviderAuthPayload {
   token: string;
 }
 
+export interface GoogleAuthPayload {
+  accessToken: string;
+}
+
 export interface AuthSessionResponse {
   data: AuthSession;
 }
