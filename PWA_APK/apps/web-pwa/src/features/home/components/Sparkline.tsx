@@ -7,7 +7,7 @@ export interface SparklineProps {
 }
 
 /** Lightweight SVG area sparkline — cheap to render for every tile. */
-export function Sparkline({ data, color = "#22e3d0", height = 34 }: SparklineProps) {
+export function Sparkline({ data, color = "#16233f", height = 34 }: SparklineProps) {
   const id = useId().replace(/[:]/g, "");
   const width = 250;
 

@@ -1,20 +1,24 @@
 export interface StatusPillProps {
   label: string;
-  tone: "neutral" | "success" | "warning";
+  tone: "neutral" | "success" | "warning" | "danger";
 }
 
 const toneStyles: Record<StatusPillProps["tone"], { background: string; color: string }> = {
   neutral: {
-    background: "#e2e8f0",
-    color: "#0f172a"
+    background: "#eef1f6",
+    color: "#16233f"
   },
   success: {
-    background: "#dcfce7",
-    color: "#166534"
+    background: "rgba(47, 184, 126, 0.14)",
+    color: "#1f6e4d"
   },
   warning: {
-    background: "#fef3c7",
-    color: "#92400e"
+    background: "rgba(245, 166, 35, 0.16)",
+    color: "#8a5a12"
+  },
+  danger: {
+    background: "rgba(235, 87, 87, 0.12)",
+    color: "#b23636"
   }
 };
 

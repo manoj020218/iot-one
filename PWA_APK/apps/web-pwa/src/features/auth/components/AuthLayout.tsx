@@ -16,21 +16,23 @@ export function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <div className="auth-page">
-      <div className="auth-network" aria-hidden="true">
-        <span className="node a" />
-        <span className="node b" />
-        <span className="node c" />
-        <span className="node d" />
-        <span className="node e" />
-        <span className="node f" />
-        <span className="line l1" />
-        <span className="line l2" />
-        <span className="line l3" />
-        <span className="line l4" />
-      </div>
       <main className="auth-stage">
         <section className="auth-card">
-          <div className="auth-brand">J1</div>
+          <div className="auth-brand" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="26"
+              height="26"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />
+            </svg>
+          </div>
           <span className="auth-eyebrow">{eyebrow}</span>
           <h1>{title}</h1>
           <p>{description}</p>
