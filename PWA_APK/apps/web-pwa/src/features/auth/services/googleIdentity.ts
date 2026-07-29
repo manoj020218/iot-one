@@ -1,4 +1,4 @@
-import { googleWebClientId } from "@jenix/shared";
+const googleWebClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 interface GoogleTokenResponse {
   access_token?: string;
