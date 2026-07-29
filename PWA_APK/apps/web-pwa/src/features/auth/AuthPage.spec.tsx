@@ -27,7 +27,7 @@ describe("AuthPage", () => {
 
     expect(screen.getByLabelText("Email address")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
     expect(screen.getByText("Continue with Google")).toBeInTheDocument();
     expect(screen.queryByText("Continue with Facebook")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Forgot password?" })).toBeInTheDocument();

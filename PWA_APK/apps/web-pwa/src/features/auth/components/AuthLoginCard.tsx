@@ -26,6 +26,7 @@ export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
           <input
             required
             type="email"
+            placeholder="Email address"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
@@ -35,19 +36,19 @@ export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
           <input
             required
             type="password"
+            placeholder="Password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
         <button className="primary-button auth-cta" type="submit">
-          Sign In
+          Continue
         </button>
       </form>
-      <div className="auth-divider">or continue with</div>
       <GooglePrimaryAction onPress={onGoogle} />
       <div className="auth-link-stack">
         <div className="auth-link-row">
-          <Link className="auth-link" to="/login/forgot-password">
+          <Link className="auth-link quiet" to="/login/forgot-password">
             Forgot password?
           </Link>
         </div>

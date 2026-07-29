@@ -19,6 +19,7 @@ export function AuthForgotPasswordCard() {
           <input
             required
             type="email"
+            placeholder="Account email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />

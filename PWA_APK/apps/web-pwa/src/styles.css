@@ -97,6 +97,7 @@ button, input, select, textarea { font: inherit; }
   max-width: 380px;
   padding: 32px 26px 26px;
   position: relative;
+  text-align: center;
   width: min(100%, 380px);
 }
 
@@ -110,6 +111,7 @@ button, input, select, textarea { font: inherit; }
   font-size: 1.3rem;
   font-weight: 800;
   height: 58px;
+  justify-self: center;
   place-items: center;
   width: 58px;
 }
@@ -148,22 +150,20 @@ button, input, select, textarea { font: inherit; }
   justify-content: center;
 }
 
-.auth-divider {
-  align-items: center;
-  color: var(--faint);
-  display: flex;
-  font-size: 0.78rem;
-  font-weight: 700;
-  gap: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.auth-divider::before,
-.auth-divider::after {
-  content: "";
-  flex: 1;
+.auth-form .field span {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
   height: 1px;
-  background: var(--line);
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.auth-form .field input {
+  text-align: left;
 }
 
 .auth-link {
@@ -178,16 +178,21 @@ button, input, select, textarea { font: inherit; }
 }
 
 .auth-link.muted,
+.auth-link.quiet,
 .auth-card-note {
   color: var(--muted);
 }
 
+.auth-link.quiet {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 .auth-footer {
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.88rem;
+  color: var(--faint);
+  font-size: 0.82rem;
   line-height: 1.6;
-  padding-top: 16px;
+  margin-top: 4px;
 }
 
 .google-button {
@@ -221,17 +226,10 @@ button, input, select, textarea { font: inherit; }
 
 .google-mark {
   align-items: center;
-  background: #fff;
-  border-radius: 50%;
-  color: transparent;
   display: inline-grid;
-  font-size: 1.1rem;
-  font-weight: 900;
-  height: 26px;
+  height: 20px;
   place-items: center;
-  width: 26px;
-  background-image: conic-gradient(#4285f4 0 90deg, #34a853 90deg 180deg, #fbbc05 180deg 270deg, #ea4335 270deg 360deg);
-  -webkit-background-clip: text;
+  width: 20px;
 }
 
 .google-swipe {

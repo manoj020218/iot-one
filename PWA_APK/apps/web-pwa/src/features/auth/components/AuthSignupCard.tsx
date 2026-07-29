@@ -25,13 +25,19 @@ export function AuthSignupCard({ onSubmit }: AuthSignupCardProps) {
       >
         <label className="field">
           <span>Full name</span>
-          <input required value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            required
+            placeholder="Full name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </label>
         <label className="field">
           <span>Email address</span>
           <input
             required
             type="email"
+            placeholder="Email address"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
@@ -41,6 +47,7 @@ export function AuthSignupCard({ onSubmit }: AuthSignupCardProps) {
           <input
             required
             type="password"
+            placeholder="Create password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
