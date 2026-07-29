@@ -24,7 +24,7 @@ const session: AuthSession = {
 };
 
 describe("BleProvisioningPage", () => {
-  it("automatically scans on load and shows nearby devices", async () => {
+  it("shows the radar scanner first, then automatically finds nearby devices", async () => {
     render(
       <MemoryRouter
         future={{
@@ -38,7 +38,11 @@ describe("BleProvisioningPage", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Nearby provisioning targets")).toBeInTheDocument();
+    expect(await screen.findByText("Searching nearby devices")).toBeInTheDocument();
+
+    expect(
+      await screen.findByText("Nearby provisioning targets", {}, { timeout: 3000 })
+    ).toBeInTheDocument();
     expect(await screen.findByText("Smart Tank Guard")).toBeInTheDocument();
     expect(await screen.findByLabelText("Quick search")).toBeInTheDocument();
   });

@@ -6,6 +6,7 @@ const BLE_NAME_PREFIX = "JNX";
 const BLE_NAME_KEYWORDS = ["JENIX", "TANK GUARD", "SMART TANK GUARD"];
 const BLE_SERVICE_HINTS = ["ff00"];
 const DEFAULT_SCAN_WINDOW_MS = 3500;
+const DEMO_SCAN_DELAY_MS = 1200;
 
 const demoScanInventory: BleScanDevice[] = [
   {
@@ -277,6 +278,7 @@ export async function scanBleDevices(
   const ble = getBlePlugin();
 
   if (!ble) {
+    await delay(options.scanWindowMs ?? DEMO_SCAN_DELAY_MS);
     return {
       devices: clone(demoScanInventory),
       bluetoothEnabled: true,

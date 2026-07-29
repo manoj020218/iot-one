@@ -30,7 +30,7 @@ describe("bleDiscoveryService", () => {
   it("uses demo mode when the native plugin is unavailable", async () => {
     expect(getBleDiscoveryMode()).toBe("demo");
 
-    const result = await scanBleDevices();
+    const result = await scanBleDevices({ scanWindowMs: 0 });
     expect(result.bluetoothEnabled).toBe(true);
     expect(result.permissionDenied).toBe(false);
     expect(result.devices[0]?.deviceId).toBe("JNX-TG-C3-A7F2");
