@@ -719,7 +719,9 @@ button, input, select, textarea { font: inherit; }
   min-width: 0;
 }
 
-.home-list-item-body strong {
+.home-list-item-body strong,
+.home-list-item-body .hint-text {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
