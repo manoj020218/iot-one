@@ -58,7 +58,7 @@ export function HomeManagementSection() {
       setMembersByHome((current) => ({ ...current, [homeId]: nextMembers }));
       setCodesByHome((current) => ({ ...current, [homeId]: nextCodes }));
     } catch (loadError) {
-      setMessage(loadError instanceof Error ? loadError.message : "Unable to load HOME details.");
+      setMessage(loadError instanceof Error ? loadError.message : "Unable to load home details.");
     }
   }
 
@@ -75,7 +75,7 @@ export function HomeManagementSection() {
       await refreshHomes(record.homeId); setFormOpen(false); setEditHome(null); setExpandedHomeId(record.homeId);
       setMessage(`${record.name} saved successfully.`);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save HOME.");
+      setError(saveError instanceof Error ? saveError.message : "Unable to save home.");
     } finally { setSaving(false); }
   }
 
@@ -101,7 +101,7 @@ export function HomeManagementSection() {
       const homes = await deleteHome(activeSession, home.homeId);
       replaceHomes(homes, homes[0]?.homeId); setMessage(`${home.name} deleted.`);
     } catch (deleteError) {
-      setMessage(deleteError instanceof Error ? deleteError.message : "Unable to delete HOME.");
+      setMessage(deleteError instanceof Error ? deleteError.message : "Unable to delete home.");
     }
   }
 
@@ -109,10 +109,10 @@ export function HomeManagementSection() {
     try {
       const result = await redeemHomeShareCode(activeSession, joinCode);
       replaceHomes(result.homes, result.home.homeId); setActiveHome(result.home.homeId);
-      setMessage(`This ${result.home.name} by ${result.home.ownerUserId} you are allowed to access as ${result.home.name} Member.`);
+      setMessage(`You've joined ${result.home.name} as a member.`);
       setJoinCode("");
     } catch (joinError) {
-      setMessage(joinError instanceof Error ? joinError.message : "Unable to join HOME.");
+      setMessage(joinError instanceof Error ? joinError.message : "Unable to join home.");
     }
   }
 

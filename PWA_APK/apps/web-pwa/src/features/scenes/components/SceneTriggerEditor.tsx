@@ -66,7 +66,7 @@ export function SceneTriggerEditor({
           <span className="eyebrow">Triggers</span>
           <h2>How should this scene start?</h2>
           <p className="hint-text">
-            Use manual runs for operator testing, threshold triggers for device telemetry,
+            Use manual runs for testing, threshold triggers to react to device readings,
             and schedule triggers for time-based automation.
           </p>
         </div>

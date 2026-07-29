@@ -121,7 +121,7 @@ describe("DeviceDetailPage", () => {
 
     renderDeviceRoute(ownerSession);
 
-    expect(await screen.findByText("Unsupported Dynamic Page")).toBeInTheDocument();
+    expect(await screen.findByText("Control Screen Not Available")).toBeInTheDocument();
     expect(screen.getByText(/custom-water-math/)).toBeInTheDocument();
   });
 

@@ -20,8 +20,8 @@ export function ProvisioningSuccess({
           <span className="eyebrow">Ready</span>
           <h2>{summary.productName} is live</h2>
           <p>
-            Device <strong>{summary.deviceId}</strong> has been attached to your HOME
-            and is ready for dashboard telemetry.
+            Device <strong>{summary.deviceId}</strong> has been added to your home
+            and is ready for the dashboard.
           </p>
         </div>
         <StatusPill label="Provisioned" tone="success" />

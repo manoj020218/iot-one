@@ -39,7 +39,7 @@ export function BleDeviceScanList({
           <span className="eyebrow">Step 2</span>
           <h2>Nearby provisioning targets</h2>
           <p>
-            Select the device you want to attach to the current HOME, then continue
+            Select the device you want to attach to this home, then continue
             to Wi-Fi onboarding.
           </p>
         </div>

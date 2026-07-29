@@ -116,7 +116,7 @@ export function BleProvisioningPage() {
     <AppShell
       eyebrow="Provisioning"
       title="BLE Device Provisioning"
-      description="The primary commissioning flow discovers nearby Jenix devices, pushes Wi-Fi credentials, and completes registration into the active HOME."
+      description="Discover nearby Jenix devices over Bluetooth and connect them to this home's Wi-Fi."
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">

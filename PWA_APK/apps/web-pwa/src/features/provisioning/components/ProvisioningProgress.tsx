@@ -9,7 +9,7 @@ const statusCopy: Record<ProvisioningStatus, string> = {
   DEVICE_CONNECTING_WIFI: "Device is joining the Wi-Fi network",
   DEVICE_CONNECTING_CLOUD: "Device is linking to Jenix Cloud",
   MQTT_CONNECTED: "MQTT session established",
-  DEVICE_REGISTERED: "Device saved to your HOME",
+  DEVICE_REGISTERED: "Device saved to your home",
   SUCCESS: "Provisioning completed",
   FAILED: "Provisioning failed"
 };

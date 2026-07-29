@@ -29,9 +29,7 @@ function renderKnownDynamicPage(pageId: string, device: DeviceRecord) {
         <p className="scene-card-kicker">PID Dynamic Page</p>
         <h3>Tank Level</h3>
         <p className="hint-text">
-          Live tank metrics will hydrate here once widget-level telemetry bindings are
-          layered in. The backend telemetry path is already active for scenes and device
-          liveness.
+          Live tank readings for this device will appear here as new telemetry arrives.
         </p>
         <dl className="summary-grid">
           <div>
@@ -61,12 +59,10 @@ function renderKnownDynamicPage(pageId: string, device: DeviceRecord) {
         <p className="scene-card-kicker">PID Dynamic Page</p>
         <h3>Thresholds</h3>
         <p className="hint-text">
-          Threshold automation is managed in the scene pipeline. Use this PID page to
-          route operators toward the right automation surface.
+          Set alert thresholds for this device from the Scenes tab.
         </p>
         <div className="card-actions">
-          <span>Best paired with threshold-trigger scenes.</span>
-          <span>Recommended next step: configure alerts in Scenes.</span>
+          <span>Get notified when a reading crosses a limit you set.</span>
         </div>
       </article>
     );
@@ -75,10 +71,10 @@ function renderKnownDynamicPage(pageId: string, device: DeviceRecord) {
   return (
     <article key={pageId} className="scene-card">
       <p className="scene-card-kicker">PID Dynamic Page</p>
-      <h3>Unsupported Dynamic Page</h3>
+      <h3>Control Screen Not Available</h3>
       <p className="hint-text">
-        No renderer is registered yet for <strong>{pageId}</strong>. The device page
-        stays usable and surfaces this fallback instead of failing the route.
+        A dedicated <strong>{pageId}</strong> control screen isn't available for this
+        device yet.
       </p>
     </article>
   );
@@ -136,10 +132,10 @@ export function PidDynamicPageRenderer({
         <section className="content-grid">
           <article className="scene-card">
             <p className="scene-card-kicker">PID Dynamic Page</p>
-            <h3>UI Package Missing</h3>
+            <h3>Control Screen Unavailable</h3>
             <p className="hint-text">
-              The device is bound to remote-package mode, but no package artifact was
-              resolved from HOME bootstrap.
+              This device's control screen couldn't be loaded. Try refreshing, or check
+              back after your next app update.
             </p>
           </article>
         </section>
