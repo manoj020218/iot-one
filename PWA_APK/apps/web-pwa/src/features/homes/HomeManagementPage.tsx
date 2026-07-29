@@ -10,7 +10,7 @@ export function HomeManagementPage() {
   const currentHome = getCurrentHome(session.homes, session.user.userId, session.activeHomeId);
 
   return (
-    <AppShell eyebrow="Homes" title="Multi-Home Access Control" description="Manage homes, join invites, and control member permissions with the same professional flow used in settings." aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}>
+    <AppShell eyebrow="Homes" title="Multi-Home Access Control" description="Manage homes, join invites, and control member permissions." aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}>
       <HomeManagementSection />
     </AppShell>
   );
