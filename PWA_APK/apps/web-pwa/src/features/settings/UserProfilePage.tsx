@@ -30,7 +30,7 @@ export function UserProfilePage() {
         <button
           className="text-button"
           type="button"
-          onClick={() => navigate("/homes")}
+          onClick={() => navigate("/settings")}
         >
           Manage Homes
         </button>

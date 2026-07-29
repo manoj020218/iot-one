@@ -1,4 +1,5 @@
 import type { HomeMemberRecord, HomeRecord, HomeShareCodeRecord } from "@jenix/shared";
+import { FiChevronDown, FiChevronRight, FiHome } from "react-icons/fi";
 
 export interface ManagedHomeCardProps {
   expanded: boolean;
@@ -44,30 +45,36 @@ export function ManagedHomeCard({
   shareCodes
 }: ManagedHomeCardProps) {
   return (
-    <article className="panel">
-      <div className="home-card-head">
-        <div>
+    <article className="panel home-list-item">
+      <button
+        aria-expanded={expanded}
+        className="home-list-item-row"
+        onClick={() => onToggleExpand(home.homeId)}
+        type="button"
+      >
+        <span className="home-list-item-icon">
+          <FiHome size={18} />
+        </span>
+        <span className="home-list-item-body">
           <strong>{home.name}</strong>
-          <p className="hint-text">
+          <span className="hint-text">
             {home.locationLabel ?? "No address set"} - {home.timezone ?? "Asia/Kolkata"}
-          </p>
-        </div>
+          </span>
+        </span>
         <span className="status-chip" data-status={home.allowed === false ? "failed" : "completed"}>
           {home.allowed === false ? "Not allowed" : home.role}
         </span>
-      </div>
-      <div className="button-row">
-        <button className="secondary-button" onClick={() => onEdit(home)} type="button">Edit</button>
-        <button className="secondary-button" onClick={() => onAddMember(home)} type="button">Add Member</button>
-        <button className="secondary-button" onClick={() => onToggleExpand(home.homeId)} type="button">
-          {expanded ? "Hide Access" : "View Access"}
-        </button>
-        {!home.isDefault ? (
-          <button className="secondary-button" onClick={() => onDelete(home)} type="button">Delete</button>
-        ) : null}
-      </div>
+        {expanded ? <FiChevronDown size={18} /> : <FiChevronRight size={18} />}
+      </button>
       {expanded ? (
         <div className="home-management-stack">
+          <div className="button-row">
+            <button className="secondary-button" onClick={() => onEdit(home)} type="button">Edit</button>
+            <button className="secondary-button" onClick={() => onAddMember(home)} type="button">Add Member</button>
+            {!home.isDefault ? (
+              <button className="secondary-button" onClick={() => onDelete(home)} type="button">Delete</button>
+            ) : null}
+          </div>
           <section className="home-share-list">
             {shareCodes.length === 0 ? <p className="hint-text">No invitation codes created yet.</p> : null}
             {shareCodes.map((shareCode) => (

@@ -7,7 +7,6 @@ import { useAuth } from "../features/auth/hooks/useAuth";
 import { HomeDashboardPage } from "../features/home/HomeDashboardPage";
 import { DeviceDetailPage } from "../features/devices/DeviceDetailPage";
 import { DeviceManagementPage } from "../features/devices/DeviceManagementPage";
-import { HomeManagementPage } from "../features/homes/HomeManagementPage";
 import { ProvisioningHomePage } from "../features/provisioning/ProvisioningHomePage";
 import { ApProvisioningPage } from "../features/provisioning/ap/ApProvisioningPage";
 import { BleProvisioningPage } from "../features/provisioning/ble/BleProvisioningPage";
@@ -36,7 +35,7 @@ export function AppRouter() {
       >
         <Route path="/home" element={<HomeDashboardPage />} />
         <Route path="/dashboard" element={<Navigate replace to="/home" />} />
-        <Route path="/homes" element={<HomeManagementPage />} />
+        <Route path="/homes" element={<Navigate replace to="/settings" />} />
         <Route path="/devices" element={<DeviceManagementPage />} />
         <Route path="/devices/:deviceId" element={<DeviceDetailPage />} />
         <Route path="/provisioning" element={<ProvisioningHomePage />} />

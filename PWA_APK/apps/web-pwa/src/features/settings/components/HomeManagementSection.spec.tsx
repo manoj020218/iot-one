@@ -1,13 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AuthSession } from "@jenix/shared";
 
-import { AuthSessionProvider } from "../../app/AuthSessionProvider";
-import { HomeManagementPage } from "./HomeManagementPage";
-import { homeApiTesting } from "./services/homeApi";
+import { AuthSessionProvider } from "../../../app/AuthSessionProvider";
+import { homeApiTesting } from "../../homes/services/homeApi";
+import { HomeManagementSection } from "./HomeManagementSection";
 
 const session: AuthSession = {
   user: {
@@ -24,7 +23,7 @@ const session: AuthSession = {
   }
 };
 
-describe("HomeManagementPage", () => {
+describe("HomeManagementSection", () => {
   beforeEach(() => {
     homeApiTesting.reset();
   });
@@ -35,13 +34,9 @@ describe("HomeManagementPage", () => {
 
   it("creates a new home from the management screen", async () => {
     render(
-      <MemoryRouter initialEntries={["/homes"]}>
-        <AuthSessionProvider initialSession={session}>
-          <Routes>
-            <Route path="/homes" element={<HomeManagementPage />} />
-          </Routes>
-        </AuthSessionProvider>
-      </MemoryRouter>
+      <AuthSessionProvider initialSession={session}>
+        <HomeManagementSection />
+      </AuthSessionProvider>
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Create Home" }));
@@ -55,13 +50,9 @@ describe("HomeManagementPage", () => {
 
   it("creates a one-hour invitation code from a home card", async () => {
     render(
-      <MemoryRouter initialEntries={["/homes"]}>
-        <AuthSessionProvider initialSession={session}>
-          <Routes>
-            <Route path="/homes" element={<HomeManagementPage />} />
-          </Routes>
-        </AuthSessionProvider>
-      </MemoryRouter>
+      <AuthSessionProvider initialSession={session}>
+        <HomeManagementSection />
+      </AuthSessionProvider>
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Create Home" }));
