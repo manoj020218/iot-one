@@ -8,27 +8,6 @@ const BLE_SERVICE_HINTS = ["ff00"];
 const DEFAULT_SCAN_WINDOW_MS = 3500;
 const DEMO_SCAN_DELAY_MS = 1200;
 
-const demoScanInventory: BleScanDevice[] = [
-  {
-    transportId: "JNX-TG-C3-A7F2",
-    deviceId: "JNX-TG-C3-A7F2",
-    pid: foundationPidBlueprint.pid,
-    productName: foundationPidBlueprint.productName,
-    iconText: "TG",
-    rssi: -43,
-    provisioningReady: true
-  },
-  {
-    transportId: "JNX-TG-C3-B9D4",
-    deviceId: "JNX-TG-C3-B9D4",
-    pid: foundationPidBlueprint.pid,
-    productName: `${foundationPidBlueprint.productName} Edge`,
-    iconText: "TE",
-    rssi: -51,
-    provisioningReady: true
-  }
-];
-
 interface NativeBleScanResult {
   localName?: string;
   device?: {
@@ -76,10 +55,6 @@ interface BleReadinessResult {
   ready: boolean;
   bluetoothEnabled: boolean;
   permissionDenied: boolean;
-}
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
 }
 
 function delay(ms: number) {
@@ -280,7 +255,7 @@ export async function scanBleDevices(
   if (!ble) {
     await delay(options.scanWindowMs ?? DEMO_SCAN_DELAY_MS);
     return {
-      devices: clone(demoScanInventory),
+      devices: [],
       bluetoothEnabled: true,
       permissionDenied: false
     };
@@ -317,7 +292,3 @@ export async function scanBleDevices(
     permissionDenied: false
   };
 }
-
-export const bleDiscoveryTesting = {
-  demoScanInventory: clone(demoScanInventory)
-};

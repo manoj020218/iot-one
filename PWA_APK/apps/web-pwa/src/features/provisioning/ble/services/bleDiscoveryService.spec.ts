@@ -27,14 +27,13 @@ describe("bleDiscoveryService", () => {
     delete window.Capacitor;
   });
 
-  it("uses demo mode when the native plugin is unavailable", async () => {
+  it("uses demo mode when the native plugin is unavailable and finds no fabricated devices", async () => {
     expect(getBleDiscoveryMode()).toBe("demo");
 
     const result = await scanBleDevices({ scanWindowMs: 0 });
     expect(result.bluetoothEnabled).toBe(true);
     expect(result.permissionDenied).toBe(false);
-    expect(result.devices[0]?.deviceId).toBe("JNX-TG-C3-A7F2");
-    expect(result.devices[0]?.transportId).toBe("JNX-TG-C3-A7F2");
+    expect(result.devices).toHaveLength(0);
   });
 
   it("runs the two-pass native quick scan and filters likely Jenix devices", async () => {

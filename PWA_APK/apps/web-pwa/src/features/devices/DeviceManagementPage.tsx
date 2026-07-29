@@ -56,7 +56,6 @@ export function DeviceManagementPage() {
     <AppShell
       eyebrow="Device Center"
       title="Device Management"
-      description="See every device in this home and open one for live status and controls."
       aside={
         <button
           aria-label="Add device"
