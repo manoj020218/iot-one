@@ -26,26 +26,15 @@ export function SceneListPage() {
     >
       <section className="top-bar">
         <div>
-          <span className="eyebrow">Active Home</span>
-          <h2>{currentHome.name}</h2>
-          <p>Signed in as {session.user.name}</p>
+          <h2>Your scenes</h2>
         </div>
-        <div className="top-bar-meta">
-          <button
-            className="text-button"
-            onClick={() => navigate("/home")}
-            type="button"
-          >
-            Back to Dashboard
-          </button>
-          <button
-            className="primary-button"
-            onClick={() => navigate("/scenes/new")}
-            type="button"
-          >
-            + Create Scene
-          </button>
-        </div>
+        <button
+          className="primary-button"
+          onClick={() => navigate("/scenes/new")}
+          type="button"
+        >
+          + Create Scene
+        </button>
       </section>
       {loading ? <section className="panel">Loading scene catalog...</section> : null}
       {error ? <section className="panel">{error}</section> : null}

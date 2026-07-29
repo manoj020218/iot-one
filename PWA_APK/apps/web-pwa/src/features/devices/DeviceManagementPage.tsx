@@ -57,29 +57,6 @@ export function DeviceManagementPage() {
       description="See every device in this home and open one for live status and controls."
       aside={<StatusPill label={`${devices.length} device${devices.length === 1 ? "" : "s"}`} tone="neutral" />}
     >
-      <section className="tabs-strip">
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/home")}
-        >
-          Dashboard
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/provisioning")}
-        >
-          Provisioning
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/settings")}
-        >
-          Settings
-        </button>
-      </section>
       {loading ? <section className="panel">Loading managed devices...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
       {!loading && !devices.length ? (

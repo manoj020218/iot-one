@@ -238,24 +238,17 @@ export function SceneBuilderPage() {
       aside={<SceneStatusBadge status={draft.status} />}
     >
       <section className="top-bar">
-        <div>
-          <span className="eyebrow">Active Home</span>
-          <h2>{currentHome.name}</h2>
-          <p>Signed in as {session.user.name}</p>
-        </div>
-        <div className="top-bar-meta">
-          <StatusPill
-            label={`${deviceOptions.length} devices`}
-            tone={deviceOptions.length > 0 ? "success" : "warning"}
-          />
-          <button
-            className="text-button"
-            onClick={() => navigate("/scenes")}
-            type="button"
-          >
-            Back to Scenes
-          </button>
-        </div>
+        <button
+          className="text-button"
+          onClick={() => navigate("/scenes")}
+          type="button"
+        >
+          ← Back to Scenes
+        </button>
+        <StatusPill
+          label={`${deviceOptions.length} devices`}
+          tone={deviceOptions.length > 0 ? "success" : "warning"}
+        />
       </section>
       {loading ? <section className="panel">Loading scene builder...</section> : null}
       {error ? <section className="panel">{error}</section> : null}

@@ -156,21 +156,7 @@ export function DeviceDetailPage() {
           type="button"
           onClick={() => navigate("/devices")}
         >
-          Device Center
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/home")}
-        >
-          Dashboard
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/scenes")}
-        >
-          Scenes
+          ← Device Center
         </button>
       </section>
       {loading ? <section className="panel">Loading device detail...</section> : null}

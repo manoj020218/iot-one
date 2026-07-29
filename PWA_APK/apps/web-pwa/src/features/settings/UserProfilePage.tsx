@@ -30,16 +30,9 @@ export function UserProfilePage() {
         <button
           className="text-button"
           type="button"
-          onClick={() => navigate("/settings")}
-        >
-          Settings
-        </button>
-        <button
-          className="text-button"
-          type="button"
           onClick={() => navigate("/homes")}
         >
-          Homes
+          Manage Homes
         </button>
         <button className="text-button" type="button" onClick={logout}>
           Logout

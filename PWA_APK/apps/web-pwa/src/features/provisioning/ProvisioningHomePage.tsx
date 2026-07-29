@@ -40,20 +40,6 @@ export function ProvisioningHomePage() {
       description="Add a new device using Bluetooth, or fall back to Wi-Fi hotspot mode if needed."
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
-      <section className="top-bar">
-        <div>
-          <span className="eyebrow">Active Home</span>
-          <h2>{currentHome.name}</h2>
-          <p>Signed in as {session.user.name}</p>
-        </div>
-        <button
-          className="text-button"
-          onClick={() => navigate("/home")}
-          type="button"
-        >
-          Back to Dashboard
-        </button>
-      </section>
       <section className="provisioning-method-grid">
         {provisioningOptions.map((option) => (
           <article className="panel provisioning-method-card" key={option.route}>
