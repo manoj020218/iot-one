@@ -1,10 +1,10 @@
 import { AppShell, StatusPill } from "@jenix/ui";
 import { useState } from "react";
+import { FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
 import { getCurrentHome } from "../dashboard/services/dashboardApi";
-import { HomeHeroPanel } from "./components/HomeHeroPanel";
 import { HomeDeviceSection } from "./components/HomeDeviceSection";
 import { StatStrip } from "./components/StatStrip";
 import { useDashboardDevices } from "../dashboard/hooks/useDashboardDevices";
@@ -47,13 +47,26 @@ export function HomeDashboardPage() {
       replaceHomes(await listHomes(activeSession), created.homeId);
       setFormOpen(false); show("Home created", `${created.name} is ready`);
     } catch (createError) {
-      setSaveError(createError instanceof Error ? createError.message : "Unable to create HOME.");
+      setSaveError(createError instanceof Error ? createError.message : "Unable to create home.");
     } finally { setSaving(false); }
   }
 
   return (
-    <AppShell eyebrow="Home" title={currentHome.name} description="Live devices, members, and automations follow the selected home context." aside={<StatusPill label={(dashboard?.timezone ?? currentHome.timezone ?? "India").toUpperCase()} tone="neutral" />}>
-      <HomeHeroPanel currentHome={currentHome} dashboard={dashboard} loading={!dashboard && !error} onCreateHome={() => setFormOpen(true)} onOpenSelector={() => setSelectorOpen(true)} userName={activeSession.user.name} />
+    <AppShell
+      eyebrow="Home"
+      title={
+        <button
+          className="home-title-switch"
+          onClick={() => setSelectorOpen(true)}
+          type="button"
+        >
+          {currentHome.name}
+          <FiChevronDown size={20} />
+        </button>
+      }
+      description={currentHome.locationLabel ?? "Devices, scenes, and members for this home."}
+      aside={<StatusPill label={(dashboard?.timezone ?? currentHome.timezone ?? "India").toUpperCase()} tone="neutral" />}
+    >
       <StatStrip online={online} total={devices.length} waterLitres={water} alerts={alerts} />
       {error ? <section className="panel">{error}</section> : null}
       {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection devices={devices} filter={filter} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={(deviceId) => navigate(`/devices/${encodeURIComponent(deviceId)}`)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export interface AppShellProps {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   description: string;
   aside?: ReactNode;
   children: ReactNode;
