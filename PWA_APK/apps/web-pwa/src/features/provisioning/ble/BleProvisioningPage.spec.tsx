@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +24,7 @@ const session: AuthSession = {
 };
 
 describe("BleProvisioningPage", () => {
-  it("renders the BLE scan flow and shows nearby devices", async () => {
+  it("automatically scans on load and shows nearby devices", async () => {
     render(
       <MemoryRouter
         future={{
@@ -37,8 +37,6 @@ describe("BleProvisioningPage", () => {
         </AuthSessionProvider>
       </MemoryRouter>
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Start Demo Scan" }));
 
     expect(await screen.findByText("Nearby provisioning targets")).toBeInTheDocument();
     expect(await screen.findByText("Smart Tank Guard")).toBeInTheDocument();

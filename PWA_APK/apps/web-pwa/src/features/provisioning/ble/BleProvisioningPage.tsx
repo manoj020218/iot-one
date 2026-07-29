@@ -1,5 +1,5 @@
 import { AppShell, StatusPill } from "@jenix/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/hooks/useAuth";
@@ -20,7 +20,7 @@ import {
   getProvisioningSequence
 } from "../services/provisioningStateMachine";
 import { BleDeviceScanList } from "./components/BleDeviceScanList";
-import { BlePermissionStep } from "./components/BlePermissionStep";
+import { BleRadarScanner } from "./components/BleRadarScanner";
 import { useBleScan } from "./hooks/useBleScan";
 import { provisionBleDevice } from "./services/bleProvisioningService";
 
@@ -60,6 +60,10 @@ export function BleProvisioningPage() {
     setSearchQuery("");
     setScreen("scan");
   }
+
+  useEffect(() => {
+    void handleEnableScan();
+  }, []);
 
   function handleSelectDevice(device: BleScanDevice) {
     setSelectedDevice(device);
@@ -145,11 +149,10 @@ export function BleProvisioningPage() {
         </div>
       </section>
       {screen === "permission" ? (
-        <BlePermissionStep
-          loading={scan.scanning}
-          mode={scan.mode}
-          onEnable={handleEnableScan}
-          supported={scan.supported}
+        <BleRadarScanner
+          bluetoothEnabled={scan.bluetoothEnabled}
+          permissionDenied={scan.permissionDenied}
+          scanning={scan.scanning}
         />
       ) : null}
       {screen === "scan" ? (
@@ -199,7 +202,7 @@ export function BleProvisioningPage() {
           />
           {error ? (
             <section className="panel">
-              <h2>Operator actions</h2>
+              <h2>What you can do</h2>
               <p>
                 Retry the Wi-Fi step or switch to the AP path if this browser cannot
                 keep the device session stable.

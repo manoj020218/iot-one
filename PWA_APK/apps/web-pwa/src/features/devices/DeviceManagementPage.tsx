@@ -1,8 +1,10 @@
-import { AppShell, StatusPill } from "@jenix/ui";
+import { AppShell } from "@jenix/ui";
 import { useEffect, useState } from "react";
+import { FiPlus } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
+import { DeviceCatalogGrid } from "./components/DeviceCatalogGrid";
 import {
   listManagedDevices,
   type ManagedDeviceSummary
@@ -55,22 +57,21 @@ export function DeviceManagementPage() {
       eyebrow="Device Center"
       title="Device Management"
       description="See every device in this home and open one for live status and controls."
-      aside={<StatusPill label={`${devices.length} device${devices.length === 1 ? "" : "s"}`} tone="neutral" />}
+      aside={
+        <button
+          aria-label="Add device"
+          className="devices-add-button"
+          onClick={() => navigate("/provisioning/ble")}
+          type="button"
+        >
+          <FiPlus size={20} />
+        </button>
+      }
     >
       {loading ? <section className="panel">Loading managed devices...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
       {!loading && !devices.length ? (
-        <section className="empty-state">
-          <h2>No devices in this home</h2>
-          <p>Add a device through provisioning to populate the device center.</p>
-          <button
-            className="add-device-button"
-            type="button"
-            onClick={() => navigate("/provisioning")}
-          >
-            + Add Device
-          </button>
-        </section>
+        <DeviceCatalogGrid onSelect={() => navigate("/provisioning/ble")} />
       ) : null}
       {!loading && devices.length ? (
         <section className="content-grid">

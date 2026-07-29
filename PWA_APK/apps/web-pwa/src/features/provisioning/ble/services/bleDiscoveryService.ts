@@ -65,6 +65,18 @@ export interface BleScanOptions {
   scanWindowMs?: number;
 }
 
+export interface BleScanResult {
+  devices: BleScanDevice[];
+  bluetoothEnabled: boolean;
+  permissionDenied: boolean;
+}
+
+interface BleReadinessResult {
+  ready: boolean;
+  bluetoothEnabled: boolean;
+  permissionDenied: boolean;
+}
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
@@ -165,21 +177,36 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
   };
 }
 
-async function ensureBleReady(ble: NativeBluetoothLePlugin) {
+async function ensureBleReady(ble: NativeBluetoothLePlugin): Promise<BleReadinessResult> {
+  let permissionDenied = false;
+
   try {
     await ble.requestPermissions?.();
   } catch {
-    // Some platforms do not expose a permission request surface.
+    // Most platforms reject here when Location/Bluetooth permission was refused.
+    permissionDenied = true;
   }
 
   await ble.initialize({
     androidNeverForLocation: false
   });
 
-  const enabled = await ble.isEnabled();
-  if (!enabled?.value) {
-    await ble.requestEnable?.();
+  let bluetoothEnabled = Boolean((await ble.isEnabled())?.value);
+
+  if (!bluetoothEnabled) {
+    try {
+      await ble.requestEnable?.();
+      bluetoothEnabled = Boolean((await ble.isEnabled())?.value);
+    } catch {
+      bluetoothEnabled = false;
+    }
   }
+
+  return {
+    ready: bluetoothEnabled && !permissionDenied,
+    bluetoothEnabled,
+    permissionDenied
+  };
 }
 
 async function runNativeScanPass(
@@ -246,17 +273,30 @@ export function getBleDiscoveryMode(): BleDiscoveryMode {
 
 export async function scanBleDevices(
   options: BleScanOptions = {}
-): Promise<BleScanDevice[]> {
+): Promise<BleScanResult> {
   const ble = getBlePlugin();
 
   if (!ble) {
-    return clone(demoScanInventory);
+    return {
+      devices: clone(demoScanInventory),
+      bluetoothEnabled: true,
+      permissionDenied: false
+    };
+  }
+
+  const readiness = await ensureBleReady(ble);
+
+  if (!readiness.ready) {
+    return {
+      devices: [],
+      bluetoothEnabled: readiness.bluetoothEnabled,
+      permissionDenied: readiness.permissionDenied
+    };
   }
 
   const scanWindowMs = options.scanWindowMs ?? DEFAULT_SCAN_WINDOW_MS;
   const discovered = new Map<string, BleScanDevice>();
 
-  await ensureBleReady(ble);
   await runNativeScanPass(ble, discovered, {
     scanWindowMs,
     strictPrefixOnly: true
@@ -269,7 +309,11 @@ export async function scanBleDevices(
     });
   }
 
-  return Array.from(discovered.values()).sort((left, right) => right.rssi - left.rssi);
+  return {
+    devices: Array.from(discovered.values()).sort((left, right) => right.rssi - left.rssi),
+    bluetoothEnabled: true,
+    permissionDenied: false
+  };
 }
 
 export const bleDiscoveryTesting = {

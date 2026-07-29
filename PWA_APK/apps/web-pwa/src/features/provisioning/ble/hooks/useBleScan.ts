@@ -12,6 +12,8 @@ export function useBleScan() {
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<BleScanDevice[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const mode: BleDiscoveryMode = getBleDiscoveryMode();
   const supported = mode === "native";
 
@@ -20,7 +22,10 @@ export function useBleScan() {
     setError(null);
 
     try {
-      setDevices(await scanBleDevices());
+      const result = await scanBleDevices();
+      setDevices(result.devices);
+      setBluetoothEnabled(result.bluetoothEnabled);
+      setPermissionDenied(result.permissionDenied);
     } catch (scanError) {
       setError(
         scanError instanceof Error
@@ -44,6 +49,8 @@ export function useBleScan() {
     scanning,
     devices,
     error,
+    bluetoothEnabled,
+    permissionDenied,
     enable,
     refresh
   };
