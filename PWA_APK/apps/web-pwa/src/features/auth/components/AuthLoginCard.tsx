@@ -1,28 +1,19 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
-import { Sheet } from "../../../app/components/Sheet";
+import { GooglePrimaryAction } from "./GooglePrimaryAction";
 
-export interface AuthEmailSheetProps {
-  onClose: () => void;
+export interface AuthLoginCardProps {
   onSubmit: (payload: { email: string; password: string }) => Promise<void>;
-  open: boolean;
+  onGoogle: () => Promise<void>;
 }
 
-export function AuthEmailSheet({
-  onClose,
-  onSubmit,
-  open
-}: AuthEmailSheetProps) {
+export function AuthLoginCard({ onSubmit, onGoogle }: AuthLoginCardProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   return (
-    <Sheet
-      open={open}
-      title="Sign in with email"
-      subtitle="Use the same email linked to your homes and devices."
-      onClose={onClose}
-    >
+    <>
       <form
         className="auth-form"
         onSubmit={(event) => {
@@ -31,7 +22,7 @@ export function AuthEmailSheet({
         }}
       >
         <label className="field">
-          <span>Email</span>
+          <span>Email address</span>
           <input
             required
             type="email"
@@ -49,9 +40,21 @@ export function AuthEmailSheet({
           />
         </label>
         <button className="primary-button auth-cta" type="submit">
-          Login to Jenix One
+          Sign In
         </button>
       </form>
-    </Sheet>
+      <div className="auth-divider">or continue with</div>
+      <GooglePrimaryAction onPress={onGoogle} />
+      <div className="auth-link-stack">
+        <div className="auth-link-row">
+          <Link className="auth-link" to="/login/forgot-password">
+            Forgot password?
+          </Link>
+        </div>
+        <span className="auth-card-note">
+          New here? <Link className="auth-link" to="/login/signup">Create an account</Link>
+        </span>
+      </div>
+    </>
   );
 }

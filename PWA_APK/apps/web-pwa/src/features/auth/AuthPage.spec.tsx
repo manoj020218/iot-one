@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -16,7 +16,7 @@ describe("AuthPage", () => {
     ).Capacitor;
   });
 
-  it("renders quick access with Google and text links", () => {
+  it("renders a single-step login form with email/password fields, Google, and links", () => {
     render(
       <MemoryRouter>
         <AuthSessionProvider>
@@ -25,22 +25,12 @@ describe("AuthPage", () => {
       </MemoryRouter>
     );
 
+    expect(screen.getByLabelText("Email address")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
     expect(screen.getByText("Continue with Google")).toBeInTheDocument();
     expect(screen.queryByText("Continue with Facebook")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use email address" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create new account" })).toBeInTheDocument();
-  });
-
-  it("opens the email sheet from quick access", async () => {
-    render(
-      <MemoryRouter>
-        <AuthSessionProvider>
-          <AuthPage />
-        </AuthSessionProvider>
-      </MemoryRouter>
-    );
-
-    fireEvent.click(screen.getAllByRole("button", { name: "Use email address" })[0]!);
-    expect(await screen.findByText("Sign in with email")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Forgot password?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create an account" })).toBeInTheDocument();
   });
 });

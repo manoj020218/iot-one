@@ -148,6 +148,24 @@ button, input, select, textarea { font: inherit; }
   justify-content: center;
 }
 
+.auth-divider {
+  align-items: center;
+  color: var(--faint);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 .auth-link {
   background: transparent;
   border: 0;
