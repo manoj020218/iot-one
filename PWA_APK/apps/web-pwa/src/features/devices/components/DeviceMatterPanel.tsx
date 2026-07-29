@@ -49,9 +49,8 @@ export function DeviceMatterPanel({
           <span className="eyebrow">Matter</span>
           <h2>Matter Readiness</h2>
           <p className="hint-text">
-            Phase 11 keeps Matter at the MQTT/VPS architecture layer with product
-            mapping and readiness only. Live activation stays off until the vendor ID,
-            CSA process, and multi-product rollout are ready.
+            Matter lets this device work with other smart home platforms. Activation
+            turns on automatically once certification for this product is complete.
           </p>
         </div>
       </div>

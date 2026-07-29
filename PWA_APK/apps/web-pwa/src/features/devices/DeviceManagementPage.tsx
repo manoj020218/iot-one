@@ -54,8 +54,8 @@ export function DeviceManagementPage() {
     <AppShell
       eyebrow="Device Center"
       title="Device Management"
-      description="Manage current-home devices, inspect operational state, and open PID-driven detail pages without hardcoded product dashboards."
-      aside={<StatusPill label="Phase 9" tone="neutral" />}
+      description="See every device in this home and open one for live status and controls."
+      aside={<StatusPill label={`${devices.length} device${devices.length === 1 ? "" : "s"}`} tone="neutral" />}
     >
       <section className="tabs-strip">
         <button
@@ -84,7 +84,7 @@ export function DeviceManagementPage() {
       {error ? <section className="panel">{error}</section> : null}
       {!loading && !devices.length ? (
         <section className="empty-state">
-          <h2>No devices in this HOME</h2>
+          <h2>No devices in this home</h2>
           <p>Add a device through provisioning to populate the device center.</p>
           <button
             className="add-device-button"

@@ -6,7 +6,7 @@ export function EmptyHomeState() {
 
   return (
     <section className="empty-state">
-      <h2>No devices in this HOME yet</h2>
+      <h2>No devices in this home yet</h2>
       <p>Start provisioning from the dashboard and the first device will appear here.</p>
       <AddDeviceButton onPress={() => navigate("/provisioning")} />
     </section>

@@ -1,4 +1,4 @@
-import { FiActivity, FiAlertTriangle, FiCpu, FiDroplet } from "react-icons/fi";
+import { FiAlertTriangle, FiCpu, FiDroplet } from "react-icons/fi";
 
 export interface StatStripInput {
   online: number;
@@ -29,13 +29,6 @@ export function StatStrip({ online, total, waterLitres, alerts }: StatStripInput
       value: String(alerts),
       color: "var(--red)",
       icon: <FiAlertTriangle />
-    },
-    {
-      key: "data",
-      label: "Data points / hr",
-      value: "8.6k",
-      color: "var(--violet)",
-      icon: <FiActivity />
     }
   ];
 

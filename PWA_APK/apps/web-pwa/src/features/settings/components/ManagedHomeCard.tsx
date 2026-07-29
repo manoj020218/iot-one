@@ -12,9 +12,15 @@ export interface ManagedHomeCardProps {
   shareCodes: HomeShareCodeRecord[];
 }
 
-function describeShareCodeStatus(shareCode: HomeShareCodeRecord): string {
+function describeShareCodeStatus(
+  shareCode: HomeShareCodeRecord,
+  members: HomeMemberRecord[]
+): string {
   if (shareCode.redeemedByUserId) {
-    return `Accepted by ${shareCode.redeemedByUserId}`;
+    const redeemedBy = members.find(
+      (member) => member.userId === shareCode.redeemedByUserId
+    );
+    return `Accepted by ${redeemedBy?.name ?? redeemedBy?.email ?? "a new member"}`;
   }
 
   const timeLeftMs = new Date(shareCode.expiresAt).getTime() - Date.now();
@@ -67,7 +73,7 @@ export function ManagedHomeCard({
             {shareCodes.map((shareCode) => (
               <article className="home-share-card" key={shareCode.shareCodeId}>
                 <strong>{shareCode.code}</strong>
-                <span className="hint-text">{describeShareCodeStatus(shareCode)}</span>
+                <span className="hint-text">{describeShareCodeStatus(shareCode, members)}</span>
               </article>
             ))}
           </section>
@@ -77,7 +83,7 @@ export function ManagedHomeCard({
                 <div className="home-member-actions">
                   <div>
                     <strong>{member.name}</strong>
-                    <p className="hint-text">{member.userId} - {member.role}</p>
+                    <p className="hint-text">{member.email} - {member.role}</p>
                   </div>
                   {member.role !== "owner" ? (
                     <button

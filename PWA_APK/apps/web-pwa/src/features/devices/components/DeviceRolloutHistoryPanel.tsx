@@ -35,8 +35,7 @@ export function DeviceRolloutHistoryPanel({
           <span className="eyebrow">Delivery</span>
           <h2>Firmware Rollout History</h2>
           <p className="hint-text">
-            Phase 18 exposes durable OTA delivery status, acknowledgement state,
-            and manual replay for failed rollout jobs.
+            Track firmware delivery status and retry any rollout that failed.
           </p>
         </div>
         <button

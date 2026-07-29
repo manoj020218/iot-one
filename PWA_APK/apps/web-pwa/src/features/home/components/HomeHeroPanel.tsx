@@ -34,10 +34,9 @@ export function HomeHeroPanel({
 
       <div className="home-hero-copy">
         <div>
-          <h2>{userName.split(" ")[0] || "User"}, this HOME is ready for live control.</h2>
+          <h2>{userName.split(" ")[0] || "User"}, {currentHome.name} is ready for live control.</h2>
           <p>
-            Devices, scenes, time reporting, and member access all follow the selected
-            home context.
+            Your devices, scenes, and members for this home, all in one place.
           </p>
         </div>
         <div className="home-hero-meta">

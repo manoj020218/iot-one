@@ -39,8 +39,7 @@ export function DeviceFirmwarePanel({
           <span className="eyebrow">Firmware</span>
           <h2>Firmware Update Panel</h2>
           <p className="hint-text">
-            Phase 10 resolves published OTA releases by PID and hardware revision
-            before a firmware request is queued.
+            Check for the latest firmware for this device's exact hardware revision.
           </p>
         </div>
       </div>

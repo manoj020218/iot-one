@@ -234,12 +234,12 @@ export function SceneBuilderPage() {
     <AppShell
       eyebrow="Scene Builder"
       title={isCreateMode ? "Create an automation scene" : `Edit ${draft.name || "scene"}`}
-      description="Build threshold alerts, scheduled automations, and safe manual test flows from one operator-facing editor."
+      description="Set up alerts, schedules, and manual test runs for this scene."
       aside={<SceneStatusBadge status={draft.status} />}
     >
       <section className="top-bar">
         <div>
-          <span className="eyebrow">Active HOME</span>
+          <span className="eyebrow">Active Home</span>
           <h2>{currentHome.name}</h2>
           <p>Signed in as {session.user.name}</p>
         </div>
@@ -311,7 +311,7 @@ export function SceneBuilderPage() {
             </ul>
             {deviceOptions.length === 0 ? (
               <p className="provisioning-note">
-                No registered devices were found for this HOME yet. You can still enter
+                No registered devices were found for this home yet. You can still enter
                 device IDs manually, but provisioning a device first will make the builder
                 safer.
               </p>

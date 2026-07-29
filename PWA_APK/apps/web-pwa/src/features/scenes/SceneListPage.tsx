@@ -21,12 +21,12 @@ export function SceneListPage() {
     <AppShell
       eyebrow="Scenes"
       title="Automation scenes"
-      description="Phase 7 adds an operator-grade scene builder for device threshold alerts, scheduled automations, and controlled manual runs."
+      description="Automate your devices with scheduled routines, alerts, and one-tap scenes."
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">
         <div>
-          <span className="eyebrow">Active HOME</span>
+          <span className="eyebrow">Active Home</span>
           <h2>{currentHome.name}</h2>
           <p>Signed in as {session.user.name}</p>
         </div>

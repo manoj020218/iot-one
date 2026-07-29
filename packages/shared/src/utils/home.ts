@@ -12,7 +12,7 @@ export function createDefaultHome(ownerUserId: string, now = new Date()): HomeRe
 
   return {
     homeId: `home-${ownerUserId.toLowerCase()}`,
-    name: "HOME",
+    name: "My Home",
     ownerUserId,
     role: "owner",
     allowed: true,

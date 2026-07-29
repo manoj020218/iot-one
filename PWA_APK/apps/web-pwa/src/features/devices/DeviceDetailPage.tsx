@@ -147,7 +147,7 @@ export function DeviceDetailPage() {
     <AppShell
       eyebrow="Device Detail"
       title={device?.displayName ?? deviceId ?? "Device"}
-      description="Phase 11 extends device detail pages with Matter readiness, bridge placeholders, OTA resolution, and PID-driven rendering on a shared device contract."
+      description="Live status, controls, and firmware for this device."
       aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}
     >
       <section className="tabs-strip">

@@ -28,7 +28,7 @@ describe("home routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
-    expect(response.body.data[0].name).toBe("HOME");
+    expect(response.body.data[0].name).toBe("My Home");
     expect(response.body.data[0].role).toBe("owner");
   });
 
@@ -273,7 +273,7 @@ describe("home routes", () => {
 
     expect(deleteResponse.status).toBe(200);
     expect(deleteResponse.body.data).toHaveLength(1);
-    expect(deleteResponse.body.data[0].name).toBe("HOME");
+    expect(deleteResponse.body.data[0].name).toBe("My Home");
   });
 
   it("returns a deduped UI bootstrap for a HOME", async () => {

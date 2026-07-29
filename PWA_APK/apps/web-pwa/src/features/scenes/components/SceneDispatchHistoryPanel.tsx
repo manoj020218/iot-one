@@ -55,8 +55,7 @@ export function SceneDispatchHistoryPanel({
           <span className="eyebrow">Dispatch Recovery</span>
           <h2>Scene Dispatch History</h2>
           <p className="hint-text">
-            Phase 19 exposes failed scene deliveries, action-level dispatch state,
-            and replay controls directly on the scene operations surface.
+            Review deliveries that failed and replay them once the issue is resolved.
           </p>
         </div>
         <button

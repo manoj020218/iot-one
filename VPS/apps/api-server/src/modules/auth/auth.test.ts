@@ -22,7 +22,7 @@ describe("auth routes", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.user.email).toBe("asha@example.com");
-    expect(response.body.data.homes[0].name).toBe("HOME");
+    expect(response.body.data.homes[0].name).toBe("My Home");
     expect(response.body.data.homes[0].role).toBe("owner");
     expect(response.body.data.activeHomeId).toBe("home-user-asha-example-com");
     expect(response.body.data.tokens.accessToken).toMatch(/^[^.]+\.[^.]+\.[^.]+$/);

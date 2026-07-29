@@ -1,3 +1,4 @@
+import { StatusPill } from "@jenix/ui";
 import { useEffect, useState } from "react";
 
 import {
@@ -35,7 +36,7 @@ export function AppUpdateStatusCard() {
     <section className="panel">
       <div className="home-card-head">
         <strong>App Update</strong>
-        <span>{status?.channel ?? "preview"}</span>
+        <StatusPill label={status?.channel ?? "preview"} tone="neutral" />
       </div>
       <dl className="summary-grid">
         <div><dt>Current Version</dt><dd>{status?.currentVersion ?? "Loading..."}</dd></div>

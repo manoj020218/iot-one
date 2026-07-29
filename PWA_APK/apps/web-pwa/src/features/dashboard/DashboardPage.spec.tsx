@@ -38,7 +38,7 @@ describe("DashboardPage", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("HOME")).toBeInTheDocument();
+    expect(screen.getByText("My Home")).toBeInTheDocument();
     expect(await screen.findByText("+ Add Device")).toBeInTheDocument();
   });
 });

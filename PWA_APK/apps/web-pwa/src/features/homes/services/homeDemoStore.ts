@@ -433,7 +433,7 @@ export function redeemDemoHomeShareCode(input: {
   }
 
   if (listHomeMembersInternal(shareCode.homeId).some((member) => member.userId === input.userId)) {
-    throw new Error("User already has access to this HOME");
+    throw new Error("User already has access to this home");
   }
 
   const now = new Date().toISOString();

@@ -37,12 +37,12 @@ export function ProvisioningHomePage() {
     <AppShell
       eyebrow="Provisioning"
       title="Choose a provisioning path"
-      description="Phase 6 adds an operator-grade onboarding flow for new devices, with BLE as the primary path and AP mode as the recovery path."
+      description="Add a new device using Bluetooth, or fall back to Wi-Fi hotspot mode if needed."
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">
         <div>
-          <span className="eyebrow">Active HOME</span>
+          <span className="eyebrow">Active Home</span>
           <h2>{currentHome.name}</h2>
           <p>Signed in as {session.user.name}</p>
         </div>

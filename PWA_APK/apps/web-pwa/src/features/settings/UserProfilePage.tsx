@@ -23,7 +23,7 @@ export function UserProfilePage() {
     <AppShell
       eyebrow="Profile"
       title="User Profile"
-      description="This page keeps user identity, provider, and HOME access visible while the full account-management stack is still being hardened."
+      description="Your account identity and the homes you have access to."
       aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}
     >
       <section className="tabs-strip">
