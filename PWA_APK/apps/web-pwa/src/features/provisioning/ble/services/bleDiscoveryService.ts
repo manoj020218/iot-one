@@ -1,12 +1,23 @@
 import { foundationPidBlueprint } from "@jenix/device-schemas";
 
 import type { BleScanDevice } from "../../provisioning.types";
+import { BLE_SERVICE_UUID } from "./bleProtocol";
 
+/**
+ * Naming/UUID scheme defined in PROVISIONING.md (repo root) -- "JNX" is the
+ * brand-wide prefix every product's BLE name starts with
+ * (JNX{ProductCode}{6-hex-MAC}); the exact product is identified from the
+ * `hello` response's `pid` field once connected, not from the advertised
+ * name alone.
+ */
 const BLE_NAME_PREFIX = "JNX";
 const BLE_NAME_KEYWORDS = ["JENIX", "TANK GUARD", "SMART TANK GUARD"];
-const BLE_SERVICE_HINTS = ["ff00"];
 const DEFAULT_SCAN_WINDOW_MS = 3500;
 const DEMO_SCAN_DELAY_MS = 1200;
+
+function normalizeUuid(uuid: string): string {
+  return uuid.trim().toLowerCase();
+}
 
 interface NativeBleScanResult {
   localName?: string;
@@ -23,7 +34,7 @@ interface NativeBleListenerHandle {
   remove: () => Promise<void> | void;
 }
 
-interface NativeBluetoothLePlugin {
+export interface NativeBluetoothLePlugin {
   requestPermissions?: () => Promise<void>;
   initialize: (options: { androidNeverForLocation: boolean }) => Promise<void>;
   isEnabled: () => Promise<{ value: boolean } | undefined>;
@@ -37,6 +48,25 @@ interface NativeBluetoothLePlugin {
     allowDuplicates?: boolean;
   }) => Promise<void>;
   stopLEScan: () => Promise<void>;
+  connect: (
+    deviceId: string,
+    onDisconnect?: (deviceId: string) => void,
+    options?: { timeout?: number }
+  ) => Promise<void>;
+  disconnect: (deviceId: string) => Promise<void>;
+  write: (
+    deviceId: string,
+    service: string,
+    characteristic: string,
+    value: DataView,
+    options?: { timeout?: number }
+  ) => Promise<void>;
+  read: (
+    deviceId: string,
+    service: string,
+    characteristic: string,
+    options?: { timeout?: number }
+  ) => Promise<DataView>;
 }
 
 export type BleDiscoveryMode = "native" | "demo";
@@ -61,7 +91,7 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getBlePlugin(): NativeBluetoothLePlugin | null {
+export function getBlePlugin(): NativeBluetoothLePlugin | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -104,11 +134,9 @@ function isLikelyJenixDevice(
   const serviceIds = [
     ...(Array.isArray(result.uuids) ? result.uuids : []),
     ...(Array.isArray(result.serviceUuids) ? result.serviceUuids : [])
-  ].map((item) => String(item || "").toLowerCase());
+  ].map((item) => normalizeUuid(String(item || "")));
 
-  return serviceIds.some((serviceId) =>
-    BLE_SERVICE_HINTS.some((hint) => serviceId.includes(hint))
-  );
+  return serviceIds.includes(normalizeUuid(BLE_SERVICE_UUID));
 }
 
 function deriveBusinessDeviceId(rawName: string, transportId: string): string {
