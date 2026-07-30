@@ -14,6 +14,25 @@ work (and a follow-up alignment pass on existing firmware) should converge on.
 
 ---
 
+## 0. Scope — read this first
+
+**BLE and AP provisioning have exactly one job: hand the device its Wi-Fi
+credentials and confirm it joined the network.** That's it. Once the device
+replies `wifi_connected:true`, provisioning is done — the phone disconnects
+and walks away. Connecting to MQTT/the Jenix VPS is the device's own concern
+after that, over its new Wi-Fi link, entirely independent of BLE or the app.
+The app does not wait for it, poll for it, or confirm it during provisioning.
+
+This applies identically to both transports:
+- **BLE** — writes/reads the same JSON commands over the FF01 characteristic.
+- **AP (SoftAP fallback)** — the same JSON payload, sent as an HTTP POST
+  instead of a BLE write, once the phone is on the device's hotspot.
+
+One JSON contract, two transports. See Section 3 (Phase 2 / Phase 2-AP) and
+Section 4 for the exact payloads.
+
+---
+
 ## 1. Why this document exists
 
 Every Jenix device onboarded so far implemented BLE provisioning independently,
@@ -98,24 +117,46 @@ On `set_wifi` success:
 - Device replies with IP address
 - App receives response → shows success → device stops BLE
 
+### Phase 2-AP — AP (SoftAP) Credential Exchange, when BLE isn't available
+Same JSON contract as Phase 2, different transport: the phone connects to the
+device's own Wi-Fi hotspot (SSID = the device's BLE name, e.g. `JNXTGBAF968`)
+and sends one HTTP POST instead of a BLE write:
+
+```
+POST http://192.168.4.1/provision
+Content-Type: application/json
+
+{"cmd":"set_wifi","ssid":"MyNet","password":"pass"}
+```
+Response (identical shape to the BLE `set_wifi` response):
+```json
+{"ok":true,"wifi_connected":true,"ip":"192.168.1.42"}
+```
+This is a plain request/response — no polling needed, since HTTP already
+gives you a synchronous reply. Implement this as a small local web server
+(the device's existing captive-portal/AP web server, if it has one) with one
+route. `hello`/`scan_wifi` are optional here; `set_wifi` is the only command
+the app actually calls over AP today.
+
 ### Phase 3 — WiFi Connection
 ```
 WiFi.begin(ssid, pass)
   ├─ Connected (within 20s timeout)
-  │    ├─ Stop BLE advertising
-  │    └─ Proceed to Phase 4
+  │    ├─ Stop BLE advertising / SoftAP
+  │    └─ Provisioning is done from here on — proceed to Phase 4 on its own,
+  │       not driven by the phone
   └─ Failed
        └─ Reply {"ok":true,"cmd":"set_wifi","wifi_connected":false,"ip":""}
           App shows error, user retries or tries a different password
 ```
 
-### Phase 4 — Cloud Connection
+### Phase 4 — Cloud Connection (device's own responsibility, not part of provisioning)
 ```
 WiFi connected
-  └─ Connect to Jenix VPS MQTT
-       ├─ Connected → device is live on the dashboard
-       └─ Not yet → app polls {"cmd":"c"} every 2s (up to ~30s) until
-                    {"mqtt_connected":true} appears in the response
+  └─ Device connects to Jenix VPS MQTT on its own, over its new Wi-Fi link.
+     Neither the phone nor BLE/AP has any role here -- the app has already
+     disconnected by this point. The device will simply show up "online" on
+     the dashboard once MQTT connects, on whatever timeline that takes.
 ```
 
 ### Phase 5 — Steady State
@@ -162,12 +203,12 @@ firmware needs to speak the protocol above.
 
 ### 6.1 BLE Notify Characteristic (High priority)
 Add a second NOTIFY characteristic so the device pushes status instead of the
-app polling:
+app polling, for the Wi-Fi handoff itself (not cloud/MQTT -- out of scope per
+Section 0):
 ```json
 {"event":"wifi_connecting","ssid":"MyHomeWiFi"}
 {"event":"wifi_connected","ip":"192.168.1.42"}
-{"event":"mqtt_connected"}
-{"event":"mqtt_failed","reason":"no_internet"}
+{"event":"wifi_failed","reason":"wrong_password"}
 ```
 
 ### 6.2 QR Code on Device Label (High priority)
@@ -177,11 +218,12 @@ app polling:
 Scanning it auto-selects the device in the BLE scan list, skipping manual
 selection when several devices are nearby.
 
-### 6.3 AP Fallback Mode (Medium priority)
+### 6.3 AP Fallback Mode — app side already implemented
 If BLE provisioning fails (BLE disabled on phone, older Android): device opens
-a SoftAP named the same as its BLE name, phone connects and visits
-`http://192.168.4.1/` for a plain Wi-Fi credential form. Same credential
-payload as `set_wifi`.
+a SoftAP named the same as its BLE name, phone connects, app POSTs to
+`http://192.168.4.1/provision` per Phase 2-AP above. The web-pwa app already
+does this (`apProvisioningService.ts`) — firmware implementing the
+`/provision` route is the remaining piece.
 
 ### 6.4 Re-Provisioning Lock (Medium priority)
 After first successful provisioning, BLE advertising stops permanently.
@@ -230,6 +272,10 @@ for that follow-up.
       product; the whole point is one app code path for every device)
 - [ ] `hello` response includes the real `pid` string for that device
 - [ ] `set_wifi` returns `wifi_connected` + `ip` — never fire-and-forget
+- [ ] `/provision` HTTP route implemented on the SoftAP web server for the AP
+      fallback path, same JSON payload/response shape as BLE `set_wifi`
+- [ ] Neither BLE nor the AP web server tries to report MQTT/cloud status —
+      that happens on the device's own after Wi-Fi connects (Section 0)
 - [ ] NVS namespace is unique to the product (avoid clashing with another
       Jenix product sharing the same chip family)
 - [ ] Factory reset button hold time + LED feedback pattern documented in the
@@ -260,4 +306,15 @@ for that follow-up.
 
 // Device -> App: failure
 {"ok":true,"cmd":"set_wifi","wifi_connected":false,"ip":""}
+```
+
+AP fallback uses the exact same payload/response shapes, just over HTTP
+instead of a BLE characteristic:
+
+```
+POST http://192.168.4.1/provision
+{"cmd":"set_wifi","ssid":"HomeNet","password":"mysecretpass"}
+
+200 OK
+{"ok":true,"wifi_connected":true,"ip":"192.168.1.42"}
 ```
