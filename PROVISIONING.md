@@ -1,67 +1,121 @@
 # Jenix One — Device Provisioning Standard
 
-**Applies to:** every current and future Jenix One device (Tank Guard, Nurse Call
-Receiver, Smart RF Bridge, Token Dispenser, P10 Display, SOS Siren, and anything
-that ships after this document).
-**Adapted from:** the FloodGuard provisioning standard
-(`D:\IOT Device\RUB\FloodGuard\HARDWARE\PROVISIONING.md`), which was already
-written to extend beyond FloodGuard. This document is the Jenix One-specific
-version of that same standard.
-**Status:** target standard. See "Section 7 — Current State" below — none of
-the six devices shipped so far actually implement this yet; each one currently
-uses a different, incompatible BLE scheme. This document is what new firmware
-work (and a follow-up alignment pass on existing firmware) should converge on.
+**Applies to:** every current and future Jenix One device (Tank Guard, Nurse
+Call Receiver, Smart RF Bridge, Token Dispenser, P10 Display, SOS Siren,
+Smart Streamer, and anything that ships after this document).
+**Status:** this is the standard. Not a draft, not a "v1" awaiting a later
+hardening pass — this is the professional, secure, production configuration
+every device implements from here on.
 
 ---
 
-## 0. Scope — read this first
+## Executive Summary
 
-**BLE and AP provisioning have exactly one job: hand the device its Wi-Fi
-credentials and confirm it joined the network.** That's it. Once the device
-replies `wifi_connected:true`, provisioning is done — the phone disconnects
-and walks away. Connecting to MQTT/the Jenix VPS is the device's own concern
-after that, over its new Wi-Fi link, entirely independent of BLE or the app.
-The app does not wait for it, poll for it, or confirm it during provisioning.
+Provisioning is the moment a phone hands a brand-new device its home Wi-Fi
+credentials. Get it wrong and either the device is unreliable to set up, or
+it's an open door — an unauthenticated BLE credential exchange means any
+phone within range of an unconfigured device can read or inject Wi-Fi
+passwords.
 
-This applies identically to both transports:
-- **BLE** — writes/reads the same JSON commands over the FF01 characteristic.
-- **AP (SoftAP fallback)** — the same JSON payload, sent as an HTTP POST
-  instead of a BLE write, once the phone is on the device's hotspot.
+Rather than design a new protocol for this, Jenix One adopts **Espressif's
+own official Wi-Fi Provisioning framework** — the same `wifi_provisioning` /
+`protocomm` component built into ESP-IDF, the manufacturer's SDK for the
+exact chips every Jenix device runs on. This is not a third-party library or
+a convenience wrapper; it is core, permanent infrastructure that Espressif
+itself maintains and recommends for production use. Every Jenix device is an
+Espressif chip, so this is the manufacturer's own answer to "how do I
+provision this chip securely," not an outside opinion.
 
-One JSON contract, two transports. See Section 3 (Phase 2 / Phase 2-AP) and
-Section 4 for the exact payloads.
+What this buys us:
+
+- **Mutual, authenticated encryption**, not a plaintext credential exchange.
+  The phone and the device each prove they hold a shared secret (the
+  device's Proof-of-Possession, printed on its label or bound at
+  manufacturing) before any Wi-Fi credential is ever sent, using the same
+  SRP6a key-exchange method (RFC 5054) used in mainstream authenticated
+  protocols, followed by AES-256-GCM for the credential exchange itself.
+  Nobody who doesn't already have the device's PoP can read or forge that
+  exchange, even if they're within Bluetooth range.
+- **One implementation, every device.** Tank Guard, the Nurse Call Receiver,
+  the RF Bridge, the Token Dispenser, the P10 Display, the SOS Siren, and the
+  Smart Streamer all speak the identical protocol. A firmware engineer who
+  has implemented it once has implemented it for the whole product line.
+- **Maintained by the chip vendor, not by us.** This is the same guarantee
+  every other ESP32-based commercial product in the world relies on. It
+  isn't going anywhere in 10 years because Espressif's own SDK depends on it
+  continuing to exist.
+- **The phone app already speaks this protocol.** No app-side surprises —
+  the existing "tap + to add a device" flow, the radar scan animation, the
+  Wi-Fi credential screen, all stay exactly as they are. Only what happens
+  underneath, between phone and device, changed.
 
 ---
 
-## 1. Why this document exists
+## 1. Architecture
 
-Every Jenix device onboarded so far implemented BLE provisioning independently,
-and no two of them agree:
+Two layers, both part of ESP-IDF:
 
-| Device | Service UUID | Characteristics | Response channel |
+- **`protocomm`** — the transport- and security-agnostic base layer. It
+  defines how a phone and a device establish an encrypted session and
+  exchange request/response messages, independent of whether the link is
+  Bluetooth or Wi-Fi.
+- **`wifi_provisioning`** — built on top of `protocomm`, defines the actual
+  Wi-Fi commands (scan for networks, submit credentials, check connection
+  status) that flow through that encrypted session.
+
+**Transports** (`protocomm` supports both; every Jenix device implements
+both, matching the app's existing two-path flow):
+- **BLE** — GATT-based. Service UUID `021a9004-0382-4aea-bff4-6b3f1c5adfb4`.
+  Individual endpoints ("prov-session", "prov-scan", "prov-config") are
+  exposed as separate characteristics, discovered by name rather than a
+  hardcoded UUID per endpoint — this is Espressif's own design, and it means
+  neither the app nor the firmware has to keep a manually-maintained table
+  of characteristic UUIDs in sync.
+- **SoftAP** — the device opens its own Wi-Fi hotspot and runs a small local
+  HTTP server; the phone connects to it and exchanges the same protocol
+  messages as HTTP POST/response bodies. Used when BLE isn't available on
+  the phone.
+
+**Security**: `protocomm` offers three schemes. Jenix One devices use
+**Security Scheme 2**:
+
+| Scheme | Key exchange | Session encryption | Use |
 |---|---|---|---|
-| P10 Display | `1234...` (custom) | 2 write-only (`CHAR_WIFI`, `CHAR_BIND`) | none — fire-and-forget, app can't know if WiFi connected |
-| SOS Siren | not yet defined | stub only | none |
-| (others) | ad hoc, unverified | ad hoc | ad hoc |
+| 0 | none | none (plaintext) | never — not used on any Jenix device |
+| 1 | Curve25519 (X25519) | AES-256-CTR | acceptable fallback, not our default |
+| **2** | **SRP6a (RFC 5054)** | **AES-256-GCM** | **the Jenix One standard** |
 
-That means the app can't share one BLE code path across products, installers
-can't rely on one mental model, and there is no way for the phone to confirm a
-device actually joined Wi-Fi. This document fixes that by defining one scheme
-every device uses, so the platform's BLE app code (already implemented in
-`PWA_APK/apps/web-pwa/src/features/provisioning/ble/`) works identically
-regardless of which product is being paired.
+Espressif's own guidance: Security Scheme 2 "offers stronger authentication
+via SRP6a and is recommended for production." That's not our opinion — it's
+the chip manufacturer's current, written recommendation, which is exactly
+why we're using it rather than inventing our own judgment call.
+
+**Message format**: every message on the wire is a **Protobuf** (Google
+Protocol Buffers) payload — compact, versioned, and extensible without
+breaking older devices or app versions. The exact schemas are Espressif's
+own, defined in the `esp-idf` repository:
+- `components/protocomm/proto/constants.proto`
+- `components/protocomm/proto/session.proto`
+- `components/protocomm/proto/sec2.proto` (the security handshake)
+- `components/wifi_provisioning/proto/wifi_constants.proto`
+- `components/wifi_provisioning/proto/wifi_config.proto` (credential exchange)
+- `components/wifi_provisioning/proto/wifi_scan.proto` (network scan)
+
+Firmware and app both build against these exact files — nobody hand-writes
+or reinterprets the wire format.
 
 ---
 
 ## 2. Device Naming Convention
 
-### BLE Advertisement Name
+Unchanged from before — this is just the BLE advertising name, unrelated to
+the security layer above:
+
 ```
 JNX + {2-4 letter product code} + {last 6 hex digits of Wi-Fi STA MAC, uppercase}
 ```
-Product codes (matching the PID codes already in use):
 
-| Product | Code | Example name (MAC ...BA:F9:68) |
+| Product | Code | Example (MAC ...BA:F9:68) |
 |---|---|---|
 | Tank Guard | `TG` | `JNXTGBAF968` |
 | Nurse Call Receiver | `NC` | `JNXNCBAF968` |
@@ -69,252 +123,154 @@ Product codes (matching the PID codes already in use):
 | Token Dispenser | `TD` | `JNXTDBAF968` |
 | P10 Display | `P10` | `JNXP10BAF968` |
 | SOS Siren | `SOS` | `JNXSOSBAF968` |
-
-The app's scan filter matches the wide `JNX` prefix (so it discovers any Jenix
-device regardless of product), then reads the exact product via the `hello`
-response. Firmware should not need the app to know every product code ahead of
-time — only the `JNX` root prefix is load-bearing for discovery.
+| Smart Streamer | `SS` | `JNXSSBAF968` |
 
 ---
 
-## 3. Full Provisioning Flow
+## 3. The Provisioning Flow
 
-### Phase 0 — First Boot Detection
+### Phase 0 — First Boot
 ```
 Device starts
-  └─ NVS has WiFi credentials?
-       ├─ YES → skip BLE, go directly to WiFi connect (Phase 3)
-       └─ NO  → enter BLE advertisement mode (Phase 1)
+  └─ NVS has Wi-Fi credentials already?
+       ├─ YES → connect directly, skip provisioning entirely
+       └─ NO  → start the wifi_provisioning manager (Phase 1)
 ```
 
-### Phase 1 — BLE Advertisement
-- Start BLE, advertise as `JNX{ProductCode}{6-hex-MAC}`
-- Service UUID: `0000ff00-0000-1000-8000-00805f9b34fb`
-- Characteristic UUID: `0000ff01-0000-1000-8000-00805f9b34fb`
-  (READ + WRITE + WRITE_NR — one bidirectional channel, not one characteristic
-  per field)
-- Initial characteristic value: `{"ok":true,"cmd":"ready"}`
-- Timeout: BLE runs indefinitely until credentials received OR factory reset
+### Phase 1 — Advertise
+Device starts BLE advertising as `JNX{ProductCode}{6-hex-MAC}` and/or opens
+its SoftAP hotspot of the same name, and starts the `wifi_provisioning`
+manager configured for Security Scheme 2.
 
-### Phase 2 — BLE Credential Exchange
-App writes a JSON command to the characteristic, then polls-reads the same
-characteristic for the JSON response (no separate notify channel required for
-v1 — see Section 6.1 for the recommended upgrade):
-
-| Command | Payload | Response |
-|---|---|---|
-| `hello` | `{"cmd":"hello"}` | `{"ok":true,"cmd":"hello","pid":"JNX-TG-C3-001","ble_name":"JNXTGBAF968","wifi_connected":false,"ssid":"","ip":""}` |
-| `scan_wifi` | `{"cmd":"scan_wifi"}` | `{"ok":true,"cmd":"scan_wifi","networks":[{"ssid":"HomeNet","rssi":-45}]}` (up to 8) |
-| `set_wifi` | `{"cmd":"set_wifi","ssid":"MyNet","password":"pass"}` | `{"ok":true,"cmd":"set_wifi","wifi_connected":true,"ip":"192.168.1.42"}` |
-
-Short aliases for compact BLE packets: `"cmd":"h"`/`"w"` with `"s"`/`"p"` for
-ssid/password. The `hello` response's `pid` field is what lets one app-side
-code path identify which product it's talking to — include it from day one on
-every new device, unlike the current firmware which mostly omits it.
-
-On `set_wifi` success:
-- Credentials saved to NVS (persistent across reboot)
-- Device replies with IP address
-- App receives response → shows success → device stops BLE
-
-### Phase 2-AP — AP (SoftAP) Credential Exchange, when BLE isn't available
-Same JSON contract as Phase 2, different transport: the phone connects to the
-device's own Wi-Fi hotspot (SSID = the device's BLE name, e.g. `JNXTGBAF968`)
-and sends one HTTP POST instead of a BLE write:
+### Phase 2 — Secure Session Establishment (SRP6a)
+Before any Wi-Fi credential is exchanged, phone and device authenticate each
+other and derive a shared session key, using the device's Proof-of-Possession
+(a per-device secret, provisioned at manufacturing — see Section 6):
 
 ```
-POST http://192.168.4.1/provision
-Content-Type: application/json
-
-{"cmd":"set_wifi","ssid":"MyNet","password":"pass"}
-```
-Response (identical shape to the BLE `set_wifi` response):
-```json
-{"ok":true,"wifi_connected":true,"ip":"192.168.1.42"}
-```
-This is a plain request/response — no polling needed, since HTTP already
-gives you a synchronous reply. Implement this as a small local web server
-(the device's existing captive-portal/AP web server, if it has one) with one
-route. `hello`/`scan_wifi` are optional here; `set_wifi` is the only command
-the app actually calls over AP today.
-
-### Phase 3 — WiFi Connection
-```
-WiFi.begin(ssid, pass)
-  ├─ Connected (within 20s timeout)
-  │    ├─ Stop BLE advertising / SoftAP
-  │    └─ Provisioning is done from here on — proceed to Phase 4 on its own,
-  │       not driven by the phone
-  └─ Failed
-       └─ Reply {"ok":true,"cmd":"set_wifi","wifi_connected":false,"ip":""}
-          App shows error, user retries or tries a different password
+Phone -> Device:  client_username, client_pubkey        (Sec2SessionCmd0)
+Device -> Phone:  device_pubkey, device_salt             (Sec2SessionResp0)
+Phone -> Device:  client_proof                           (Sec2SessionCmd1)
+Device -> Phone:  device_proof, device_nonce              (Sec2SessionResp1)
 ```
 
-### Phase 4 — Cloud Connection (device's own responsibility, not part of provisioning)
-```
-WiFi connected
-  └─ Device connects to Jenix VPS MQTT on its own, over its new Wi-Fi link.
-     Neither the phone nor BLE/AP has any role here -- the app has already
-     disconnected by this point. The device will simply show up "online" on
-     the dashboard once MQTT connects, on whatever timeline that takes.
-```
+Both sides now hold the same session key without it ever having crossed the
+wire. Every message from here on is AES-256-GCM encrypted with that key. A
+phone that doesn't know the device's Proof-of-Possession cannot complete this
+exchange, cannot derive the session key, and cannot read or inject anything
+into the credential exchange that follows — this is what closes the "any
+nearby phone can provision the device" gap.
 
-### Phase 5 — Steady State
-- MQTT to VPS: telemetry, alerts, remote config
-- Factory reset (button hold, device-specific duration) → clears NVS Wi-Fi →
-  reboots to Phase 1
+### Phase 3 — Wi-Fi Credential Exchange (inside the encrypted session)
+```
+Phone -> Device:  CmdScanStart                    -> device scans nearby networks
+Phone -> Device:  CmdScanStatus / CmdScanResult    -> phone lists them for the user
+Phone -> Device:  CmdSetConfig { ssid, passphrase } -> device stores credentials
+Phone -> Device:  CmdApplyConfig                    -> device connects
+Phone -> Device:  CmdGetStatus  (polled)            -> connected / connecting / failed
+```
+Once `RespGetStatus` reports the device connected, provisioning is done. The
+phone disconnects. **That is the full scope of provisioning** — see Section 4.
+
+### Phase 4 — Everything After Wi-Fi Is the Device's Own Job
+Connecting to the Jenix VPS over MQTT happens on the device's own, over its
+new Wi-Fi link, independent of the phone or the provisioning session, which
+has already ended. Neither BLE nor SoftAP has any further role. The device
+simply becomes visible on the dashboard once MQTT connects.
 
 ---
 
-## 4. Credential Encoding
+## 4. Scope — On Purpose, Not by Omission
 
-Plain JSON, UTF-8, hex-encoded before writing to the characteristic (the app
-converts the JSON string to a hex string and back — the bytes on the wire are
-the same either way, hex-encoding is just how the Capacitor BLE plugin's
-`DataView` API is used on the app side). No encryption, no BLE pairing/bonding
-in v1 — see Section 6.5 for the recommended re-provisioning lock, since without
-it any nearby phone can re-provision a device that's still advertising.
-
-```json
-{"cmd":"set_wifi","ssid":"MyHomeWiFi","password":"mysecretpass"}
-```
-
-No cloud endpoint, tenant ID, or MQTT broker is sent over BLE — the MQTT host
-is fixed in firmware, and home/tenant binding happens after the device is
-online, through the normal provisioning-intent API
-(`registerProvisioningIntent` / `registerProvisionedDevice` /
-`completeProvisioningIntent` in `PWA_APK/apps/web-pwa/src/features/provisioning/services/provisioningApi.ts`),
-not over the BLE channel itself.
+Provisioning's only job is Phase 1 through Phase 3 above: authenticate,
+establish an encrypted session, hand over Wi-Fi credentials, confirm the
+device joined the network. It does not manage MQTT, does not manage home/
+tenant binding, and does not stay open a moment longer than it needs to.
+Home/tenant binding happens after the device is online, through the existing
+platform provisioning-intent API — a separate, ordinary authenticated REST
+call, not something layered onto the BLE session.
 
 ---
 
-## 5. App UI Flow
+## 5. App Side
 
-Already implemented in `PWA_APK/apps/web-pwa/src/features/provisioning/ble/`:
-tap "+" on the Devices page → animated radar scan (auto-starts, no button tap
-needed) → device list → Wi-Fi credential form → animated progress steps → done.
-See `BleRadarScanner.tsx`, `BleDeviceScanList.tsx`, `BleProvisioningPage.tsx`.
-New devices that follow this standard need no app-side UI changes — only
-firmware needs to speak the protocol above.
-
----
-
-## 6. Recommended Enhancements (apply as firmware work happens)
-
-### 6.1 BLE Notify Characteristic (High priority)
-Add a second NOTIFY characteristic so the device pushes status instead of the
-app polling, for the Wi-Fi handoff itself (not cloud/MQTT -- out of scope per
-Section 0):
-```json
-{"event":"wifi_connecting","ssid":"MyHomeWiFi"}
-{"event":"wifi_connected","ip":"192.168.1.42"}
-{"event":"wifi_failed","reason":"wrong_password"}
-```
-
-### 6.2 QR Code on Device Label (High priority)
-```json
-{"id":"JNXTGBAF968","pid":"JNX-TG-C3-001"}
-```
-Scanning it auto-selects the device in the BLE scan list, skipping manual
-selection when several devices are nearby.
-
-### 6.3 AP Fallback Mode — app side already implemented
-If BLE provisioning fails (BLE disabled on phone, older Android): device opens
-a SoftAP named the same as its BLE name, phone connects, app POSTs to
-`http://192.168.4.1/provision` per Phase 2-AP above. The web-pwa app already
-does this (`apProvisioningService.ts`) — firmware implementing the
-`/provision` route is the remaining piece.
-
-### 6.4 Re-Provisioning Lock (Medium priority)
-After first successful provisioning, BLE advertising stops permanently.
-Re-provisioning requires a physical button hold (device-specific duration)
-until the status LED flashes. Prevents a neighbour or anyone nearby from
-re-provisioning a device left advertising.
-
-### 6.5 Auth Token for Silent Re-Provisioning (Low priority)
-For installers managing many devices: accept `set_wifi` after the lock in 6.4
-only if a valid token is included:
-```json
-{"cmd":"set_wifi","ssid":"NewNet","password":"pass","token":"device-specific-token"}
-```
+Already built and unaffected by this document: the "+" button on the Devices
+page, the animated radar scan, the Wi-Fi credential form, the progress
+screens (`PWA_APK/apps/web-pwa/src/features/provisioning/`). What changed is
+only what runs underneath once a device is selected — the app now speaks the
+real `protocomm`/`wifi_provisioning` protocol described above (Protobuf
+messages, SRP6a handshake, AES-256-GCM session) instead of a custom scheme,
+using audited cryptographic primitives rather than anything hand-written for
+the SRP6a/AES math.
 
 ---
 
-## 7. Current State (as of this document)
+## 6. What Firmware Needs to Do
 
-None of the six devices shipped so far implement this standard yet:
+For each device:
 
-| Device | Firmware BLE code | Matches this standard? |
-|---|---|---|
-| Tank Guard | not located in this pass | unverified |
-| Nurse Call Receiver | not located in this pass | unverified |
-| Smart RF Bridge | `BleProvisioningService.cpp/.h` (multiple copies across `_tmp_*` work folders) | unverified — needs review |
-| Token Dispenser | `ble_provisioning.cpp/.h` | unverified — needs review |
-| P10 Display | `ble_provisioning.cpp/.h` | **No.** Custom `1234...` service UUID, two write-only characteristics (`CHAR_WIFI`, `CHAR_BIND`), no response/status channel at all — the app has no way to confirm Wi-Fi actually connected. Also only uses 2 hex MAC digits for the BLE name, not 6. |
-| SOS Siren | `BleProvisioningService.cpp/.h` | **No.** Header is a bare stub (`begin()`, `advertisedName()`) — no UUIDs, no characteristics defined yet. |
+1. Enable the `wifi_provisioning` component, configured for **Security
+   Scheme 2**, with both the **BLE** and **SoftAP** transports registered.
+2. Set the BLE advertised name / SoftAP SSID to `JNX{ProductCode}{6-hex-MAC}`
+   per Section 2.
+3. Assign a **per-device Proof-of-Possession** at manufacturing/flashing time
+   (not a single shared secret across the whole product line) — this is what
+   the SRP6a handshake authenticates against. Espressif's tooling supports
+   generating and burning these per unit; treat it the same as any other
+   per-device credential (MAC address, serial number).
+4. On credential-set success, save to NVS and connect — no different from
+   before.
 
-**This means:** the app-side code (`bleDiscoveryService.ts` /
-`bleProvisioningService.ts`) can implement this standard correctly today, but
-it will not be able to actually provision any of the six existing physical
-devices until their firmware is updated to match — that's a separate,
-hardware-facing effort (reflashing real units) and should happen deliberately,
-not as a side effect of an app redesign. Treat this table as the punch list
-for that follow-up.
+This applies identically whether the device is built with PlatformIO +
+Arduino (the current build for six of the seven devices) or native ESP-IDF
+(Smart Streamer). `wifi_provisioning` is an ESP-IDF component either way;
+PlatformIO's `espressif32` platform supports mixing `framework = arduino,
+espidf` in `platformio.ini` specifically for calling ESP-IDF components like
+this one from an otherwise-Arduino sketch.
+
+**Recommended rollout order**: pilot on **Tank Guard** first — validate the
+BLE + SoftAP + Security2 flow works reliably against real hardware and the
+app, end to end, before rolling out to the rest of the fleet. This is
+ordinary engineering discipline (prove it once, then repeat it six times),
+not a staged/partial version of the standard — every device converges on the
+identical configuration described in this document.
+
+---
+
+## 7. Fleet Status
+
+| Device | Chip | Build | Provisioning status |
+|---|---|---|---|
+| Tank Guard | ESP32-C3 | PlatformIO + Arduino | pilot device — implement first |
+| Nurse Call Receiver | ESP32-C3 | PlatformIO + Arduino | pending, after pilot validates |
+| Smart RF Bridge | ESP32-C3 | PlatformIO + Arduino | pending |
+| Token Dispenser | ESP32-C3 | PlatformIO + Arduino | pending |
+| P10 Display | ESP32-C3 | PlatformIO + Arduino | pending |
+| SOS Siren | ESP32-C3 | PlatformIO + Arduino | pending — no BLE stack exists yet, clean implementation |
+| Smart Streamer | ESP32-P4 | native ESP-IDF | pending — simplest integration, already native ESP-IDF |
 
 ---
 
 ## 8. Reuse Checklist for New Devices
 
-- [ ] Product code chosen and added to the table in Section 2 (2-4 letters, no
-      clash with an existing product)
-- [ ] BLE name = `JNX{code}{6-hex-MAC}`, service UUID `0000ff00...`,
-      characteristic UUID `0000ff01...` (reuse — do not invent a new UUID per
-      product; the whole point is one app code path for every device)
-- [ ] `hello` response includes the real `pid` string for that device
-- [ ] `set_wifi` returns `wifi_connected` + `ip` — never fire-and-forget
-- [ ] `/provision` HTTP route implemented on the SoftAP web server for the AP
-      fallback path, same JSON payload/response shape as BLE `set_wifi`
-- [ ] Neither BLE nor the AP web server tries to report MQTT/cloud status —
-      that happens on the device's own after Wi-Fi connects (Section 0)
-- [ ] NVS namespace is unique to the product (avoid clashing with another
-      Jenix product sharing the same chip family)
-- [ ] Factory reset button hold time + LED feedback pattern documented in the
-      device's own firmware README
+- [ ] Product code chosen and added to Section 2 (2-4 letters, no clash)
+- [ ] `wifi_provisioning` enabled with Security Scheme 2, BLE + SoftAP
+      transports both registered
+- [ ] Unique per-device Proof-of-Possession assigned at manufacturing
+- [ ] BLE/SoftAP name follows `JNX{code}{6-hex-MAC}`
+- [ ] Home/tenant binding happens after Wi-Fi connects, through the platform
+      API — never inside the provisioning session itself
+- [ ] Validated end-to-end against the app before considered done
 
 ---
 
-## 9. Quick Reference — BLE Packet Examples
+## References
 
-```json
-// App -> Device: check status
-{"cmd":"hello"}
-
-// Device -> App: response
-{"ok":true,"cmd":"hello","pid":"JNX-TG-C3-001","ble_name":"JNXTGBAF968","wifi_connected":false,"ssid":"","ip":""}
-
-// App -> Device: scan networks
-{"cmd":"scan_wifi"}
-
-// Device -> App: network list
-{"ok":true,"cmd":"scan_wifi","networks":[{"ssid":"HomeNet","rssi":-45},{"ssid":"GuestNet","rssi":-72}]}
-
-// App -> Device: provision
-{"cmd":"set_wifi","ssid":"HomeNet","password":"mysecretpass"}
-
-// Device -> App: success
-{"ok":true,"cmd":"set_wifi","wifi_connected":true,"ip":"192.168.1.42"}
-
-// Device -> App: failure
-{"ok":true,"cmd":"set_wifi","wifi_connected":false,"ip":""}
-```
-
-AP fallback uses the exact same payload/response shapes, just over HTTP
-instead of a BLE characteristic:
-
-```
-POST http://192.168.4.1/provision
-{"cmd":"set_wifi","ssid":"HomeNet","password":"mysecretpass"}
-
-200 OK
-{"ok":true,"wifi_connected":true,"ip":"192.168.1.42"}
-```
+- Espressif, "Unified Provisioning": https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/provisioning/provisioning.html
+- Espressif Developer Blog, "Simple Provisioning" (2026) — source for the
+  Security Scheme 2 / SRP6a production recommendation quoted in Section 1.
+- RFC 5054 — SRP6a for TLS, the key-exchange method Security Scheme 2 is
+  based on.
+- `espressif/esp-idf-provisioning-android` and
+  `espressif/esp-idf-provisioning-ios` — Espressif's own open-source
+  reference client implementations of this exact protocol.
