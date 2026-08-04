@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 import type { LinkAction, Metric } from "../content/types";
-import { OrbitVisual } from "./OrbitVisual";
+import { LiveStatusPanel } from "./LiveStatusPanel";
 
 interface HeroSectionProps {
   eyebrow: string;
@@ -42,7 +42,7 @@ export function HeroSection(props: HeroSectionProps) {
           </div>
         ) : null}
       </div>
-      <OrbitVisual />
+      <LiveStatusPanel />
     </section>
   );
 }

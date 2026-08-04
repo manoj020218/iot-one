@@ -14,6 +14,7 @@ export interface CardBlock {
   title: string;
   body: string;
   bullets?: string[];
+  icon?: import("../components/FeatureIcons").FeatureIconId;
 }
 
 export interface PageSection {

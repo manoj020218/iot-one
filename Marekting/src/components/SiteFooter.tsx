@@ -1,12 +1,16 @@
 import { Link } from "react-router-dom";
 
 import { brand, footerGroups } from "../content/brand";
+import { LogoMark } from "./Logo";
 
 export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="footer-brand">
-        <span className="eyebrow">Smart One by Jenix</span>
+        <div className="footer-brand-row">
+          <LogoMark size={36} />
+          <span className="eyebrow">Smart One by Jenix</span>
+        </div>
         <h2>Built for connected products, installers and long-term platform growth.</h2>
         <p>
           Smart One is an IoT platform developed and operated by Jenix under

@@ -14,9 +14,9 @@ export const homeSections: PageSection[] = [
     body:
       "Smart One combines provisioning, telemetry, automation, OTA, alerts, user management and product-specific dashboards in one operating layer.",
     cards: [
-      { title: "Provisioning", body: "Support installer-assisted onboarding, local access point setup and Bluetooth-assisted first configuration." },
-      { title: "Device Operations", body: "Track live telemetry, alarms, connectivity health and product-specific control surfaces from one dashboard." },
-      { title: "Automation", body: "Create scenes based on schedules, sensor values, commands, alerts and cross-device events." }
+      { title: "Provisioning", body: "Support installer-assisted onboarding, local access point setup and Bluetooth-assisted first configuration.", icon: "provisioning" },
+      { title: "Device Operations", body: "Track live telemetry, alarms, connectivity health and product-specific control surfaces from one dashboard.", icon: "operations" },
+      { title: "Automation", body: "Create scenes based on schedules, sensor values, commands, alerts and cross-device events.", icon: "automation" }
     ]
   },
   {
@@ -25,9 +25,9 @@ export const homeSections: PageSection[] = [
     body:
       "Smart One supports the needs of product builders, system integrators, operations teams and enterprises managing real installed hardware.",
     cards: [
-      { title: "OEM Teams", body: "Brandable app surfaces, custom domains, dedicated product identities and customer-specific rollout channels." },
-      { title: "System Integrators", body: "Connect existing hardware and operational flows without rebuilding the full cloud and application stack." },
-      { title: "Enterprise Operators", body: "Manage roles, sites, alerts, audits, automation and remote lifecycle operations across fleets." }
+      { title: "OEM Teams", body: "Brandable app surfaces, custom domains, dedicated product identities and customer-specific rollout channels.", icon: "oem" },
+      { title: "System Integrators", body: "Connect existing hardware and operational flows without rebuilding the full cloud and application stack.", icon: "integrators" },
+      { title: "Enterprise Operators", body: "Manage roles, sites, alerts, audits, automation and remote lifecycle operations across fleets.", icon: "enterprise" }
     ]
   }
 ];

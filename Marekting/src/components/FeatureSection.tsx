@@ -1,3 +1,4 @@
+import { FeatureIcon } from "./FeatureIcons";
 import type { PageSection } from "../content/types";
 
 export function FeatureSection({ section }: { section: PageSection }) {
@@ -12,6 +13,11 @@ export function FeatureSection({ section }: { section: PageSection }) {
         <div className="card-grid">
           {section.cards.map((card) => (
             <article className="feature-card" key={card.title}>
+              {card.icon ? (
+                <span className="feature-icon">
+                  <FeatureIcon id={card.icon} />
+                </span>
+              ) : null}
               <h3>{card.title}</h3>
               <p>{card.body}</p>
               {card.bullets ? (

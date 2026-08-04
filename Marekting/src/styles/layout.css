@@ -7,8 +7,8 @@
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(118, 155, 182, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(118, 155, 182, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(22, 35, 63, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 35, 63, 0.05) 1px, transparent 1px);
   background-size: 88px 88px;
   mask-image: radial-gradient(circle at center, black 48%, transparent 92%);
   pointer-events: none;
@@ -22,11 +22,18 @@
 }
 
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.2rem clamp(1rem, 4vw, 3rem);
+  padding: 1.1rem clamp(1rem, 4vw, 3rem);
+  background: rgba(246, 247, 249, 0.72);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--line);
 }
 
 .brand-mark {
@@ -35,32 +42,33 @@
   gap: 0.95rem;
 }
 
-.brand-chip {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(244, 201, 119, 0.22), rgba(87, 211, 198, 0.12));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow);
-  font-weight: 800;
+.logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
 }
 
-.brand-mark strong {
+.logo-wordmark strong {
   display: block;
   font-size: 1rem;
+  letter-spacing: -0.02em;
 }
 
-.brand-mark small {
+.logo-wordmark small {
+  display: block;
   color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 1px;
 }
 
 .menu-toggle {
   display: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.55);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
   padding: 0.7rem 0.95rem;
 }
@@ -92,8 +100,21 @@
   padding: 2rem;
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) + 4px);
-  background: rgba(7, 17, 28, 0.72);
-  backdrop-filter: blur(12px);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow);
+}
+
+.footer-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.4rem;
+}
+
+.footer-brand-row .eyebrow {
+  margin-bottom: 0;
 }
 
 .footer-grid {

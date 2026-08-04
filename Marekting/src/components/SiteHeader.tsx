@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
-import { brand, navItems, primaryActions } from "../content/brand";
+import { navItems, primaryActions } from "../content/brand";
+import { Logo } from "./Logo";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -9,11 +10,7 @@ export function SiteHeader() {
   return (
     <header className="site-header">
       <Link className="brand-mark" to="/">
-        <span className="brand-chip">Smart One</span>
-        <div>
-          <strong>{brand.presentation}</strong>
-          <small>{brand.descriptor}</small>
-        </div>
+        <Logo />
       </Link>
       <button
         aria-expanded={open}

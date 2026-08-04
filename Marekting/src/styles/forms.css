@@ -8,8 +8,10 @@
 .contact-sidebar,
 .contact-status {
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
 }
 
 .contact-form {
@@ -46,16 +48,16 @@
   width: 100%;
   padding: 0.95rem 1rem;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 15, 26, 0.86);
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text);
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: 2px solid rgba(244, 201, 119, 0.4);
-  border-color: rgba(244, 201, 119, 0.34);
+  outline: 2px solid rgba(200, 146, 47, 0.35);
+  border-color: var(--gold);
 }
 
 .checkbox-field {
