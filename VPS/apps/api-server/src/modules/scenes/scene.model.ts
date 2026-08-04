@@ -15,6 +15,7 @@ export interface SceneRepository {
   get(sceneId: string): Promise<SceneRecord | undefined>;
   list(): Promise<SceneRecord[]>;
   save(record: SceneRecord): Promise<SceneRecord>;
+  remove(sceneId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -103,6 +104,9 @@ function createInMemoryScenePersistenceStore(): ScenePersistenceStore {
     async save(record: SceneRecord) {
       sceneStore.set(record.sceneId, clone(record));
       return clone(record);
+    },
+    async remove(sceneId: string) {
+      sceneStore.delete(sceneId);
     },
     async reset() {
       sceneStore.clear();
@@ -398,6 +402,9 @@ export const sceneRepository: SceneRepository = {
   },
   save(record) {
     return activeScenePersistenceStore.scenes.save(record);
+  },
+  remove(sceneId) {
+    return activeScenePersistenceStore.scenes.remove(sceneId);
   },
   reset() {
     return activeScenePersistenceStore.scenes.reset();

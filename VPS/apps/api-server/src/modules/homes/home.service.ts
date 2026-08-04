@@ -557,6 +557,27 @@ export async function deleteHome(
   return listHomesForUserId(userId);
 }
 
+export async function leaveHome(
+  homeId: string,
+  context: HomeRequestContext
+): Promise<HomeRecord[]> {
+  const userId = requireUserId(context);
+  await syncUserHomes(createProfileSeed(userId, context));
+  const membership = await requireMembership(homeId, userId);
+
+  if (membership.role === "owner") {
+    throw new HomeModuleError(
+      409,
+      "The HOME owner cannot leave — delete the HOME instead"
+    );
+  }
+
+  await homeMemberRepository.remove(homeId, membership.membershipId);
+  await writeAudit(homeId, userId, "home.member.left");
+
+  return listHomesForUserId(userId);
+}
+
 export async function getHomeDashboard(
   homeId: string,
   context: HomeRequestContext

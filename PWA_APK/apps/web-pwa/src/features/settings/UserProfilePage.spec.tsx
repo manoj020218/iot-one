@@ -47,10 +47,13 @@ describe("UserProfilePage", () => {
       </MemoryRouter>
     );
 
-    const logoutButton = await screen.findByRole("button", { name: "Logout" });
+    const logoutButton = await screen.findByRole("button", { name: "Log Out" });
     expect(logoutButton).toBeInTheDocument();
 
     fireEvent.click(logoutButton);
+
+    const confirmButtons = await screen.findAllByRole("button", { name: "Log Out" });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
 
     expect(await screen.findByText("Continue with Google")).toBeInTheDocument();
   });

@@ -84,6 +84,82 @@ describe("scene routes", () => {
     expect(listResponse.body.data).toHaveLength(1);
   });
 
+  it("deletes a scene so it no longer appears in the list", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner-delete@example.com"
+    });
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Scene To Delete",
+        status: "active",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [{ type: "notification", message: "Delete me" }]
+      });
+
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    const deleteResponse = await request(createApp())
+      .delete(`/api/v1/scenes/${sceneId}`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.data.sceneId).toBe(sceneId);
+
+    const listResponse = await request(createApp())
+      .get("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession));
+
+    expect(listResponse.body.data).toHaveLength(0);
+
+    const getResponse = await request(createApp())
+      .get(`/api/v1/scenes/${sceneId}`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(getResponse.status).toBe(404);
+  });
+
+  it("blocks viewer access from deleting a scene", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Scene Owner",
+      email: "scene-owner-delete-viewer@example.com"
+    });
+    const viewerSession = await createAuthenticatedSession({
+      name: "Scene Viewer",
+      email: "scene-viewer-delete@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+    await shareHomeAccess(
+      createAuthHeaders(ownerSession),
+      homeId,
+      "viewer",
+      createAuthHeaders(viewerSession, { homeId })
+    );
+
+    const createResponse = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Viewer Cannot Delete",
+        status: "active",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [{ type: "notification", message: "Protected" }]
+      });
+
+    const sceneId = createResponse.body.data.sceneId as string;
+
+    const deleteResponse = await request(createApp())
+      .delete(`/api/v1/scenes/${sceneId}`)
+      .set(createAuthHeaders(viewerSession, { homeId }));
+
+    expect(deleteResponse.status).toBe(403);
+    expect(deleteResponse.body.error).toContain("Viewer access");
+  });
+
   it("runs a scene manually when telemetry conditions match", async () => {
     const ownerSession = await createAuthenticatedSession({
       name: "Scene Owner",

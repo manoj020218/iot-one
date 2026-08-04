@@ -20,6 +20,7 @@ import {
   appendDemoSceneDispatches,
   listDemoScenes,
   listDemoSceneDispatches,
+  removeDemoScene,
   resetDemoScenes,
   setDemoSceneDispatches,
   setDemoScenes,
@@ -228,6 +229,18 @@ function updateFallbackScene(
   return nextScene;
 }
 
+function deleteFallbackScene(session: AuthSession, sceneId: string): { sceneId: string } {
+  const currentHome = getCurrentHome(session);
+  const scenes = listDemoScenes(session.user.userId, currentHome.homeId);
+
+  if (!scenes.some((scene) => scene.sceneId === sceneId)) {
+    throw new Error(`Scene not found: ${sceneId}`);
+  }
+
+  removeDemoScene(session.user.userId, currentHome.homeId, sceneId);
+  return { sceneId };
+}
+
 function runFallbackScene(
   session: AuthSession,
   sceneId: string,
@@ -400,6 +413,32 @@ export async function updateScene(
     }
 
     return updateFallbackScene(session, sceneId, patch);
+  }
+}
+
+export async function deleteScene(
+  session: AuthSession,
+  sceneId: string
+): Promise<{ sceneId: string }> {
+  const currentHome = getCurrentHome(session);
+
+  try {
+    return await fetchAuthenticatedJson<{ sceneId: string }>(
+      `${sceneEndpoint}/${encodeURIComponent(sceneId)}`,
+      session,
+      {
+        method: "DELETE",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return deleteFallbackScene(session, sceneId);
   }
 }
 

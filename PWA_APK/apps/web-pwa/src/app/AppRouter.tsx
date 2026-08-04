@@ -13,6 +13,9 @@ import { BleProvisioningPage } from "../features/provisioning/ble/BleProvisionin
 import { SceneBuilderPage } from "../features/scenes/SceneBuilderPage";
 import { SceneListPage } from "../features/scenes/SceneListPage";
 import { AppUpdatePage } from "../features/settings/AppUpdatePage";
+import { HomeDetailPage } from "../features/settings/HomeDetailPage";
+import { HomeManagementPage } from "../features/settings/HomeManagementPage";
+import { HomeMembersPage } from "../features/settings/HomeMembersPage";
 import { SettingsHomePage } from "../features/settings/SettingsHomePage";
 import { UserProfilePage } from "../features/settings/UserProfilePage";
 import { AuthenticatedAppFrame } from "./layout/AuthenticatedAppFrame";
@@ -46,6 +49,9 @@ export function AppRouter() {
         <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
         <Route path="/settings" element={<SettingsHomePage />} />
         <Route path="/settings/profile" element={<UserProfilePage />} />
+        <Route path="/settings/homes" element={<HomeManagementPage />} />
+        <Route path="/settings/homes/:homeId" element={<HomeDetailPage />} />
+        <Route path="/settings/homes/:homeId/members" element={<HomeMembersPage />} />
         <Route path="/settings/app" element={<AppUpdatePage />} />
       </Route>
       <Route

@@ -713,6 +713,24 @@ export async function patchScene(
   return saved;
 }
 
+export async function deleteScene(
+  sceneId: string,
+  context: SceneRequestContext
+): Promise<{ sceneId: string }> {
+  const resolvedContext = await resolveContext(context);
+  const actorId = requireActorId(resolvedContext);
+  const existing = assertAccess(
+    await requireScene(sceneId),
+    resolvedContext,
+    "write"
+  );
+
+  await sceneRepository.remove(existing.sceneId);
+  await writeAudit(existing.sceneId, actorId, "scene.deleted");
+
+  return { sceneId: existing.sceneId };
+}
+
 export async function runSceneManually(
   sceneId: string,
   payload: ManualRunPayload,

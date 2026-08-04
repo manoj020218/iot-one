@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AuthSession } from "@jenix/shared";
 
@@ -25,18 +25,20 @@ const session: AuthSession = {
 };
 
 describe("SceneBuilderPage", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     sceneApiTesting.reset();
   });
 
-  it("creates a scene and lands on the editable detail route", async () => {
+  it("creates a tap-to-run scene and lands on the editable detail route", async () => {
     render(
       <MemoryRouter
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true
         }}
-        initialEntries={["/scenes/new"]}
+        initialEntries={["/scenes/new?kind=run"]}
       >
         <AuthSessionProvider initialSession={session}>
           <Routes>
@@ -53,7 +55,7 @@ describe("SceneBuilderPage", () => {
     fireEvent.change(screen.getByLabelText("Message"), {
       target: { value: "Notify the operator when the tank is high." }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Scene" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     await waitFor(() => {
       expect(
@@ -61,6 +63,80 @@ describe("SceneBuilderPage", () => {
       ).toBeInTheDocument();
     });
     expect(await screen.findByDisplayValue("High Tank Alert")).toBeInTheDocument();
+  });
+
+  it("deletes a scene after a confirming second tap, returning to the scene list", async () => {
+    sceneApiTesting.seedDemoScenes("user-scene-builder", "home-user-scene-builder", [
+      sceneApiTesting.createDemoScene({
+        sceneId: "scene-to-delete",
+        userId: "user-scene-builder",
+        homeId: "home-user-scene-builder",
+        name: "Scene To Delete",
+        status: "active"
+      })
+    ]);
+
+    render(
+      <MemoryRouter
+        future={{
+          v7_relativeSplatPath: true,
+          v7_startTransition: true
+        }}
+        initialEntries={["/scenes/scene-to-delete"]}
+      >
+        <AuthSessionProvider initialSession={session}>
+          <Routes>
+            <Route path="/scenes" element={<div>Scenes list</div>} />
+            <Route path="/scenes/new" element={<SceneBuilderPage />} />
+            <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
+          </Routes>
+        </AuthSessionProvider>
+      </MemoryRouter>
+    );
+
+    const deleteButton = await screen.findByRole("button", { name: "Delete scene" });
+    fireEvent.click(deleteButton);
+    expect(await screen.findByRole("button", { name: "Tap again to delete" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tap again to delete" }));
+
+    expect(await screen.findByText("Scenes list")).toBeInTheDocument();
+  });
+
+  it("creates an automation with a schedule trigger", async () => {
+    render(
+      <MemoryRouter
+        future={{
+          v7_relativeSplatPath: true,
+          v7_startTransition: true
+        }}
+        initialEntries={["/scenes/new?kind=automation"]}
+      >
+        <AuthSessionProvider initialSession={session}>
+          <Routes>
+            <Route path="/scenes/new" element={<SceneBuilderPage />} />
+            <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
+          </Routes>
+        </AuthSessionProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.change(await screen.findByLabelText("Scene Name"), {
+      target: { value: "Night Siren Arm" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Arming the siren for the night." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Save Changes" })
+      ).toBeInTheDocument();
+    });
+    expect(await screen.findByDisplayValue("Night Siren Arm")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
   it("shows failed dispatch history and replays a failed job from the scene page", async () => {

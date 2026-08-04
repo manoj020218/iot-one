@@ -6,6 +6,7 @@ import {
   deleteHomeController,
   getHomeDashboardController,
   getHomeUiBootstrapController,
+  leaveHomeController,
   listHomeMembersController,
   listHomesController,
   listHomeShareCodesController,
@@ -26,6 +27,7 @@ homeRouter.get("/:homeId/ui-bootstrap", getHomeUiBootstrapController);
 homeRouter.get("/:homeId/members", listHomeMembersController);
 homeRouter.patch("/:homeId", updateHomeController);
 homeRouter.delete("/:homeId", deleteHomeController);
+homeRouter.post("/:homeId/leave", leaveHomeController);
 homeRouter.patch("/:homeId/members/:userId", updateHomeMemberRoleController);
 homeRouter.patch("/:homeId/members/:userId/access", updateHomeMemberAccessController);
 homeRouter.delete("/:homeId/members/:userId", revokeHomeMemberController);

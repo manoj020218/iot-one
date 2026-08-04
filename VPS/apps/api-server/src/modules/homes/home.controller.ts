@@ -7,6 +7,7 @@ import {
   deleteHome,
   getHomeDashboard,
   getHomeUiBootstrap,
+  leaveHome,
   listHomeMembers,
   listHomes,
   listHomeShareCodes,
@@ -229,6 +230,16 @@ export function revokeHomeMemberController(request: Request, response: Response)
     request.params.userId ?? "",
     readContext(request)
   )
+    .then((data) => {
+      response.status(200).json({ data });
+    })
+    .catch((error) => {
+      sendError(response, error);
+    });
+}
+
+export function leaveHomeController(request: Request, response: Response) {
+  leaveHome(request.params.homeId ?? "", readContext(request))
     .then((data) => {
       response.status(200).json({ data });
     })

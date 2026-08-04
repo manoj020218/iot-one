@@ -276,6 +276,62 @@ describe("home routes", () => {
     expect(deleteResponse.body.data[0].name).toBe("My Home");
   });
 
+  it("lets a non-owner member leave a shared HOME", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner-leave@example.com"
+    });
+    const memberSession = await createAuthenticatedSession({
+      name: "Member One",
+      email: "member-leave@example.com"
+    });
+    const homesResponse = await request(createApp())
+      .get("/api/v1/homes")
+      .set(createAuthHeaders(ownerSession));
+    const homeId = homesResponse.body.data[0].homeId as string;
+
+    const shareCodeResponse = await request(createApp())
+      .post(`/api/v1/homes/${encodeURIComponent(homeId)}/share-codes`)
+      .set(createAuthHeaders(ownerSession))
+      .send({ role: "member", expiresInHours: 24 });
+
+    await request(createApp())
+      .post("/api/v1/homes/redeem")
+      .set(createAuthHeaders(memberSession))
+      .send({ code: shareCodeResponse.body.data.code });
+
+    const leaveResponse = await request(createApp())
+      .post(`/api/v1/homes/${encodeURIComponent(homeId)}/leave`)
+      .set(createAuthHeaders(memberSession, { homeId }));
+
+    expect(leaveResponse.status).toBe(200);
+    expect(
+      leaveResponse.body.data.some((home: { homeId: string }) => home.homeId === homeId)
+    ).toBe(false);
+
+    const remainingMembersResponse = await request(createApp())
+      .get(`/api/v1/homes/${encodeURIComponent(homeId)}/members`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(remainingMembersResponse.body.data).toHaveLength(1);
+    expect(remainingMembersResponse.body.data[0].role).toBe("owner");
+  });
+
+  it("blocks the HOME owner from leaving", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Owner One",
+      email: "owner-leave-blocked@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    const leaveResponse = await request(createApp())
+      .post(`/api/v1/homes/${encodeURIComponent(homeId)}/leave`)
+      .set(createAuthHeaders(ownerSession));
+
+    expect(leaveResponse.status).toBe(409);
+    expect(leaveResponse.body.error).toContain("delete the HOME instead");
+  });
+
   it("returns a deduped UI bootstrap for a HOME", async () => {
     const ownerSession = await createAuthenticatedSession({
       name: "Owner One",

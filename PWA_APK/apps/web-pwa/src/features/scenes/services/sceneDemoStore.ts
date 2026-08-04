@@ -37,6 +37,15 @@ export function upsertDemoScene(userId: string, homeId: string, scene: SceneReco
   setDemoScenes(userId, homeId, nextScenes);
 }
 
+export function removeDemoScene(userId: string, homeId: string, sceneId: string) {
+  const scenes = listDemoScenes(userId, homeId);
+  setDemoScenes(
+    userId,
+    homeId,
+    scenes.filter((scene) => scene.sceneId !== sceneId)
+  );
+}
+
 export function listDemoSceneDispatches(sceneId: string): SceneActionDispatchRecord[] {
   return clone(sortNewestDispatchFirst(sceneDispatchDemoStore.get(sceneId) ?? []));
 }

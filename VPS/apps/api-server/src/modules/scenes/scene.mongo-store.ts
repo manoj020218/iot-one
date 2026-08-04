@@ -204,6 +204,9 @@ export async function createMongoScenePersistenceStore(
 
         return record;
       },
+      async remove(sceneId) {
+        await sceneCollection.deleteOne({ sceneId });
+      },
       async reset() {
         await sceneCollection.deleteMany({});
       }

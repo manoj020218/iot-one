@@ -6,6 +6,7 @@ import {
 } from "../../infrastructure/http/request-auth";
 import {
   createScene,
+  deleteScene,
   evaluateScheduledScenes,
   evaluateScenesByTelemetry,
   getScene,
@@ -127,6 +128,16 @@ export async function patchSceneController(request: Request, response: Response)
   try {
     response.status(200).json({
       data: await patchScene(request.params.sceneId ?? "", payload, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function deleteSceneController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await deleteScene(request.params.sceneId ?? "", readContext(request))
     });
   } catch (error) {
     sendError(response, error);

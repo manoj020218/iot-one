@@ -337,6 +337,24 @@ export function deleteDemoHome(input: {
   return listDemoHomes({ userId: input.userId });
 }
 
+export function leaveDemoHome(input: {
+  homeId: string;
+  userId: string;
+}): HomeRecord[] {
+  const membership = requireMembership(input.homeId, input.userId);
+
+  if (membership.role === "owner") {
+    throw new Error("The HOME owner cannot leave — delete the HOME instead");
+  }
+
+  const nextMembers = listHomeMembersInternal(input.homeId).filter(
+    (member) => member.membershipId !== membership.membershipId
+  );
+  homeMemberStore.set(input.homeId, nextMembers);
+
+  return listDemoHomes({ userId: input.userId });
+}
+
 export function getDemoHomeDashboard(input: {
   homeId: string;
   userId: string;

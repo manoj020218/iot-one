@@ -21,6 +21,11 @@ import type {
   SceneUpdateInput
 } from "./sceneApi";
 
+export interface SceneDeviceOption {
+  deviceId: string;
+  label: string;
+}
+
 export interface SceneBuilderTriggerDraft {
   triggerId: string;
   type: SceneTriggerType;
@@ -133,10 +138,12 @@ function formatPayload(payload: Record<string, unknown> | undefined): string {
   return JSON.stringify(payload, null, 2);
 }
 
-export function createEmptyTriggerDraft(): SceneBuilderTriggerDraft {
+export function createEmptyTriggerDraft(
+  type: SceneTriggerType = "manual"
+): SceneBuilderTriggerDraft {
   return {
     triggerId: createClientId("trigger"),
-    type: "manual",
+    type,
     deviceId: "",
     metricKey: "",
     comparator: "gte",
@@ -165,12 +172,13 @@ export function createEmptyActionDraft(): SceneBuilderActionDraft {
 }
 
 export function createInitialSceneDraft(
+  kind: "run" | "automation" = "run",
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || defaultTimezone
 ): SceneBuilderDraft {
   return {
     name: "",
-    status: "draft",
-    triggers: [createEmptyTriggerDraft()],
+    status: "active",
+    triggers: [createEmptyTriggerDraft(kind === "automation" ? "device_threshold" : "manual")],
     conditions: [],
     actions: [createEmptyActionDraft()],
     schedule: {

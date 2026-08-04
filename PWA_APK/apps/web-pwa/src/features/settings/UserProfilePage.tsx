@@ -1,12 +1,18 @@
-import { AppShell, StatusPill } from "@jenix/ui";
+import { AppShell } from "@jenix/ui";
 import { ensureDefaultHome, getCurrentHome as getSelectedHome } from "@jenix/shared";
+import { useState } from "react";
+import { FiArrowLeft } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
+import { Sheet } from "../../app/components/Sheet";
 import { useAuth } from "../auth/hooks/useAuth";
+import { HomeListRow } from "./components/HomeListRow";
+import { avatarColorFor, initials } from "./utils/avatar";
 
 export function UserProfilePage() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   if (!session) {
     throw new Error("UserProfilePage requires an authenticated session");
@@ -21,61 +27,64 @@ export function UserProfilePage() {
 
   return (
     <AppShell
-      eyebrow="Profile"
-      title="User Profile"
-      description="Your account identity and the homes you have access to."
-      aside={<StatusPill label={currentHome.role.toUpperCase()} tone="neutral" />}
+      eyebrow="Settings"
+      title="Profile"
+      aside={<span className="role-pill" data-role={currentHome.role}>{currentHome.role}</span>}
     >
-      <section className="tabs-strip">
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => navigate("/settings")}
-        >
-          Manage Homes
-        </button>
-        <button className="text-button" type="button" onClick={logout}>
-          Logout
-        </button>
-      </section>
-      <section className="panel">
-        <dl className="summary-grid">
-          <div>
-            <dt>Name</dt>
-            <dd>{session.user.name}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{session.user.email}</dd>
-          </div>
-          <div>
-            <dt>Provider</dt>
-            <dd>{session.user.provider}</dd>
-          </div>
-          <div>
-            <dt>Current Home</dt>
-            <dd>{currentHome.name}</dd>
-          </div>
-          <div>
-            <dt>Role</dt>
-            <dd>{currentHome.role}</dd>
-          </div>
-          <div>
-            <dt>Accessible Homes</dt>
-            <dd>{homes.length}</dd>
-          </div>
-        </dl>
-      </section>
-      <section className="home-member-list">
+      <button className="editor-back" onClick={() => navigate("/settings")} type="button">
+        <FiArrowLeft size={16} />
+        Settings
+      </button>
+
+      <div className="panel" style={{ display: "grid", gap: 14, justifyItems: "center", marginBottom: 16, textAlign: "center" }}>
+        <span className="avatar avatar-lg" style={{ background: avatarColorFor(session.user.userId) }}>
+          {initials(session.user.name)}
+        </span>
+        <div>
+          <h2 style={{ margin: 0 }}>{session.user.name}</h2>
+          <p className="hint-text" style={{ margin: "4px 0 0" }}>{session.user.email}</p>
+        </div>
+        <span className="status-chip">{session.user.provider}</span>
+      </div>
+
+      <span className="eyebrow">Your homes</span>
+      <div style={{ display: "grid", gap: 10, marginTop: 8, marginBottom: 20 }}>
         {homes.map((home) => (
-          <article key={home.homeId} className="home-member-card">
-            <div className="home-member-actions">
-              <strong>{home.name}</strong>
-              <span>{home.role}</span>
-            </div>
-          </article>
+          <HomeListRow home={home} key={home.homeId} onClick={() => navigate(`/settings/homes/${home.homeId}`)} />
         ))}
-      </section>
+      </div>
+
+      <button className="danger-link" onClick={() => setLogoutOpen(true)} type="button">
+        Log Out
+      </button>
+
+      <Sheet
+        actions={
+          <>
+            <button className="secondary-button" onClick={() => setLogoutOpen(false)} type="button">
+              Cancel
+            </button>
+            <button
+              className="danger-button"
+              onClick={() => {
+                setLogoutOpen(false);
+                logout();
+              }}
+              type="button"
+            >
+              Log Out
+            </button>
+          </>
+        }
+        onClose={() => setLogoutOpen(false)}
+        open={logoutOpen}
+        subtitle="You'll need to sign in again to access your homes."
+        title="Log out of Jenix One?"
+      >
+        <p className="hint-text" style={{ margin: 0 }}>
+          Signed in as {session.user.email}
+        </p>
+      </Sheet>
     </AppShell>
   );
 }

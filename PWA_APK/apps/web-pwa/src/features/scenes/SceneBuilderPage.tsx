@@ -1,7 +1,8 @@
-import type { SceneActionDispatchRecord, SceneTelemetrySnapshot } from "@jenix/shared";
-import { AppShell, StatusPill } from "@jenix/ui";
+import type { SceneActionDispatchRecord, SceneStatus, SceneTelemetrySnapshot } from "@jenix/shared";
+import { AppShell } from "@jenix/ui";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { FiArrowLeft } from "react-icons/fi";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
 import {
@@ -9,31 +10,27 @@ import {
   getDashboardDevices,
   type DashboardDevice
 } from "../dashboard/services/dashboardApi";
-import { SceneActionEditor } from "./components/SceneActionEditor";
-import { SceneConditionEditor } from "./components/SceneConditionEditor";
 import { SceneDispatchHistoryPanel } from "./components/SceneDispatchHistoryPanel";
-import { SceneScheduleEditor } from "./components/SceneScheduleEditor";
-import { SceneStatusBadge } from "./components/SceneStatusBadge";
-import {
-  type SceneDeviceOption,
-  SceneTriggerEditor
-} from "./components/SceneTriggerEditor";
-import {
-  createScene,
-  getScene,
-  listSceneDispatches,
-  replaySceneDispatch,
-  runSceneManually,
-  updateScene
-} from "./services/sceneApi";
+import { SceneFlowEditor } from "./components/SceneFlowEditor";
 import {
   createInitialSceneDraft,
   draftToCreateInput,
   draftToUpdateInput,
   sceneRecordToDraft,
   validateSceneDraft,
-  type SceneBuilderDraft
+  type SceneBuilderDraft,
+  type SceneDeviceOption
 } from "./services/sceneBuilder";
+import {
+  createScene,
+  deleteScene,
+  getScene,
+  listSceneDispatches,
+  replaySceneDispatch,
+  runSceneManually,
+  updateScene
+} from "./services/sceneApi";
+import { classifySceneDraft, getSceneDraftVisual, type SceneKind } from "./services/sceneKind";
 
 function buildDeviceOptions(devices: DashboardDevice[]): SceneDeviceOption[] {
   return devices.map((device) => ({
@@ -82,12 +79,21 @@ function optionalTelemetry(
   return { telemetry };
 }
 
+const kindLabel: Record<SceneKind, string> = {
+  run: "Tap-to-Run scene",
+  automation: "Automation"
+};
+
 export function SceneBuilderPage() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const { sceneId } = useParams<{ sceneId: string }>();
+  const [searchParams] = useSearchParams();
   const isCreateMode = !sceneId;
-  const [draft, setDraft] = useState<SceneBuilderDraft>(() => createInitialSceneDraft());
+  const requestedKind: SceneKind = searchParams.get("kind") === "automation" ? "automation" : "run";
+  const [draft, setDraft] = useState<SceneBuilderDraft>(() =>
+    createInitialSceneDraft(requestedKind)
+  );
   const [deviceOptions, setDeviceOptions] = useState<SceneDeviceOption[]>([]);
   const [dispatches, setDispatches] = useState<SceneActionDispatchRecord[]>([]);
   const [loading, setLoading] = useState(!isCreateMode);
@@ -99,6 +105,9 @@ export function SceneBuilderPage() {
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [runBusy, setRunBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!session) {
     throw new Error("SceneBuilderPage requires an authenticated session");
@@ -106,7 +115,9 @@ export function SceneBuilderPage() {
 
   const authSession = session;
   const currentHome = getCurrentHome(authSession);
-  const hasScheduleTrigger = draft.triggers.some((trigger) => trigger.type === "schedule");
+  const kind = isCreateMode ? requestedKind : classifySceneDraft(draft);
+  const visual = getSceneDraftVisual(draft);
+  const isActive = draft.status === "active";
 
   async function refreshSceneDispatchState(targetSceneId: string) {
     setDispatches(await listSceneDispatches(authSession, targetSceneId));
@@ -135,7 +146,7 @@ export function SceneBuilderPage() {
         if (scene) {
           setDraft(sceneRecordToDraft(scene));
         } else {
-          setDraft(createInitialSceneDraft());
+          setDraft(createInitialSceneDraft(requestedKind));
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -157,7 +168,7 @@ export function SceneBuilderPage() {
     return () => {
       cancelled = true;
     };
-  }, [authSession, isCreateMode, sceneId]);
+  }, [authSession, isCreateMode, sceneId, requestedKind]);
 
   async function handleSave() {
     const errors = validateSceneDraft(draft);
@@ -186,7 +197,7 @@ export function SceneBuilderPage() {
         draftToUpdateInput(draft)
       );
       setDraft(sceneRecordToDraft(savedScene));
-      setSaveMessage("Scene saved.");
+      setSaveMessage("Saved.");
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Unable to save the scene."
@@ -216,8 +227,8 @@ export function SceneBuilderPage() {
       await refreshSceneDispatchState(sceneId);
       setRunMessage(
         result.matchedConditions
-          ? `Manual run executed ${result.executedActions.length} action(s).`
-          : "Manual run completed but conditions did not match."
+          ? `Ran ${result.executedActions.length} action(s).`
+          : "Run completed but conditions did not match."
       );
     } catch (manualRunError) {
       setRunError(
@@ -230,193 +241,175 @@ export function SceneBuilderPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!sceneId) {
+      return;
+    }
+
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 5000);
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await deleteScene(authSession, sceneId);
+      navigate("/scenes");
+    } catch (deleteErrorValue) {
+      setDeleteError(
+        deleteErrorValue instanceof Error
+          ? deleteErrorValue.message
+          : "Unable to delete this scene."
+      );
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AppShell
-      eyebrow="Scene Builder"
-      title={isCreateMode ? "Create an automation scene" : `Edit ${draft.name || "scene"}`}
-      description="Set up alerts, schedules, and manual test runs for this scene."
-      aside={<SceneStatusBadge status={draft.status} />}
+      eyebrow={kindLabel[kind]}
+      title={isCreateMode ? `New ${kindLabel[kind].toLowerCase()}` : draft.name || "Scene"}
     >
-      <section className="top-bar">
-        <button
-          className="text-button"
-          onClick={() => navigate("/scenes")}
-          type="button"
-        >
-          ← Back to Scenes
-        </button>
-        <StatusPill
-          label={`${deviceOptions.length} devices`}
-          tone={deviceOptions.length > 0 ? "success" : "warning"}
-        />
-      </section>
+      <button className="editor-back" onClick={() => navigate("/scenes")} type="button">
+        <FiArrowLeft size={16} />
+        Scenes
+      </button>
+
       {loading ? <section className="panel">Loading scene builder...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
+
       {!loading ? (
-        <div className="content-grid">
-          <section className="form-card">
-            <span className="eyebrow">Identity</span>
-            <h2>Scene metadata</h2>
-            <label className="field">
-              <span>Scene Name</span>
-              <input
-                placeholder="High Tank Alert"
-                value={draft.name}
-                onChange={(event) =>
+        <div style={{ display: "grid", gap: 20 }}>
+          <div className="editor-hero">
+            <span className="rule-icon" style={{ background: visual.color }}>
+              <visual.icon size={22} color="#fff" />
+            </span>
+            <input
+              aria-label="Scene Name"
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              placeholder={kind === "run" ? "Fill Alert Test" : "High Tank Alert"}
+              value={draft.name}
+            />
+          </div>
+
+          {kind === "automation" ? (
+            <div className="editor-status-row">
+              <span>{isActive ? "Active" : "Paused"}</span>
+              <button
+                aria-label={isActive ? "Pause automation" : "Activate automation"}
+                className="switch"
+                data-on={isActive}
+                onClick={() =>
                   setDraft((current) => ({
                     ...current,
-                    name: event.target.value
+                    status: (current.status === "active" ? "paused" : "active") as SceneStatus
                   }))
                 }
+                type="button"
               />
-            </label>
-            <label className="field">
-              <span>Status</span>
-              <select
-                value={draft.status}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    status: event.target.value as SceneBuilderDraft["status"]
-                  }))
-                }
-              >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-              </select>
-            </label>
+            </div>
+          ) : null}
+
+          {validationErrors.length > 0 ? (
+            <section className="panel">
+              <h2>Resolve these before saving</h2>
+              <ul className="instruction-list">
+                {validationErrors.map((validationError) => (
+                  <li key={validationError}>{validationError}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <SceneFlowEditor
+            deviceOptions={deviceOptions}
+            draft={draft}
+            kind={kind}
+            onChange={setDraft}
+          />
+
+          {deviceOptions.length === 0 ? (
             <p className="hint-text">
-              Draft scenes are safe for builder work. Active scenes are ready for real
-              triggers. Paused scenes stay stored but manual runs are blocked by the API.
+              No registered devices were found for this home yet. You can still type a
+              device ID manually.
             </p>
-          </section>
-          <section className="panel">
-            <span className="eyebrow">Builder Notes</span>
-            <h2>Operator guidance</h2>
-            <ul className="instruction-list">
-              <li>Use manual triggers first to validate the action chain.</li>
-              <li>Use threshold triggers only after metric keys are stable.</li>
-              <li>
-                Prefer notifications during rollout, then graduate to device commands when
-                recovery paths are verified.
-              </li>
-            </ul>
-            {deviceOptions.length === 0 ? (
-              <p className="provisioning-note">
-                No registered devices were found for this home yet. You can still enter
-                device IDs manually, but provisioning a device first will make the builder
-                safer.
-              </p>
-            ) : null}
-          </section>
-        </div>
-      ) : null}
-      {!loading && validationErrors.length > 0 ? (
-        <section className="panel">
-          <h2>Resolve these items before saving</h2>
-          <ul className="instruction-list">
-            {validationErrors.map((validationError) => (
-              <li key={validationError}>{validationError}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {!loading ? (
-        <>
-          <SceneTriggerEditor
-            deviceOptions={deviceOptions}
-            triggers={draft.triggers}
-            onChange={(triggers) =>
-              setDraft((current) => ({
-                ...current,
-                triggers
-              }))
-            }
-          />
-          <SceneConditionEditor
-            conditions={draft.conditions}
-            onChange={(conditions) =>
-              setDraft((current) => ({
-                ...current,
-                conditions
-              }))
-            }
-          />
-          <SceneActionEditor
-            actions={draft.actions}
-            deviceOptions={deviceOptions}
-            onChange={(actions) =>
-              setDraft((current) => ({
-                ...current,
-                actions
-              }))
-            }
-          />
-          <SceneScheduleEditor
-            hasScheduleTrigger={hasScheduleTrigger}
-            schedule={draft.schedule}
-            onChange={(schedule) =>
-              setDraft((current) => ({
-                ...current,
-                schedule
-              }))
-            }
-          />
+          ) : null}
+
           <section className="panel scene-section">
             <div className="scene-section-head">
               <div>
                 <span className="eyebrow">Save</span>
-                <h2>Commit the current builder state</h2>
+                <h2>{isCreateMode ? `Create the ${kind === "run" ? "scene" : "automation"}` : "Save changes"}</h2>
               </div>
-              <button
-                className="primary-button"
-                disabled={saving}
-                onClick={handleSave}
-                type="button"
-              >
-                {saving ? "Saving..." : isCreateMode ? "Create Scene" : "Save Changes"}
+              <button className="primary-button" disabled={saving} onClick={handleSave} type="button">
+                {saving ? "Saving..." : isCreateMode ? "Create" : "Save Changes"}
               </button>
             </div>
             {saveMessage ? <p className="provisioning-note">{saveMessage}</p> : null}
           </section>
+
           {!isCreateMode ? (
             <section className="panel scene-section">
               <div className="scene-section-head">
                 <div>
-                  <span className="eyebrow">Manual Test Run</span>
-                  <h2>Run the scene against sample telemetry</h2>
-                  <p className="hint-text">
-                    This uses the backend manual-run route when available and the local
-                    evaluator otherwise.
-                  </p>
+                  <span className="eyebrow">Danger zone</span>
+                  <h2>Delete this {kind === "run" ? "scene" : "automation"}</h2>
+                  <p className="hint-text">This can't be undone.</p>
                 </div>
-                <button
-                  className="secondary-button"
-                  disabled={runBusy}
-                  onClick={handleManualRun}
-                  type="button"
-                >
-                  {runBusy ? "Running..." : "Run Manual Test"}
+                <button className="danger-button" disabled={deleting} onClick={handleDelete} type="button">
+                  {deleting
+                    ? "Deleting..."
+                    : confirmDelete
+                      ? "Tap again to delete"
+                      : `Delete ${kind === "run" ? "scene" : "automation"}`}
                 </button>
               </div>
-              <label className="field">
-                <span>Telemetry JSON</span>
-                <textarea
-                  className="textarea-field"
-                  rows={7}
-                  value={telemetryText}
-                  onChange={(event) => setTelemetryText(event.target.value)}
-                />
-              </label>
+              {deleteError ? <p className="inline-error">{deleteError}</p> : null}
+            </section>
+          ) : null}
+
+          {!isCreateMode ? (
+            <section className="panel scene-section">
+              <div className="scene-section-head">
+                <div>
+                  <span className="eyebrow">Test</span>
+                  <h2>{kind === "run" ? "Run this scene now" : "Run against sample telemetry"}</h2>
+                  {draft.conditions.length > 0 ? (
+                    <p className="hint-text">
+                      Uses the telemetry below to check the extra conditions on this
+                      automation.
+                    </p>
+                  ) : null}
+                </div>
+                <button className="secondary-button" disabled={runBusy} onClick={handleManualRun} type="button">
+                  {runBusy ? "Running..." : "Run Now"}
+                </button>
+              </div>
+              {draft.conditions.length > 0 ? (
+                <label className="field">
+                  <span>Telemetry JSON</span>
+                  <textarea
+                    className="textarea-field"
+                    onChange={(event) => setTelemetryText(event.target.value)}
+                    rows={5}
+                    value={telemetryText}
+                  />
+                </label>
+              ) : null}
               {runMessage ? <p className="provisioning-note">{runMessage}</p> : null}
               {runError ? <p className="inline-error">{runError}</p> : null}
             </section>
           ) : null}
+
           {!isCreateMode ? (
             <SceneDispatchHistoryPanel
-              dispatches={dispatches}
               canReplay={currentHome.role !== "viewer"}
+              dispatches={dispatches}
               onReplay={async (jobId) => {
                 const replayed = await replaySceneDispatch(authSession, sceneId, jobId);
                 await refreshSceneDispatchState(sceneId);
@@ -425,7 +418,7 @@ export function SceneBuilderPage() {
               onRefresh={() => refreshSceneDispatchState(sceneId)}
             />
           ) : null}
-        </>
+        </div>
       ) : null}
     </AppShell>
   );

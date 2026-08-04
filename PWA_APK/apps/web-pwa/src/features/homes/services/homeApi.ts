@@ -17,6 +17,7 @@ import {
   deleteDemoHome,
   getDemoHomeDashboard,
   homeDemoStoreTesting,
+  leaveDemoHome,
   listDemoHomeMembers,
   listDemoHomes,
   listDemoHomeShareCodes,
@@ -368,6 +369,31 @@ export async function deleteHome(
     }
 
     return deleteDemoHome({
+      homeId,
+      userId: session.user.userId
+    });
+  }
+}
+
+export async function leaveHome(
+  session: AuthSession,
+  homeId: string
+): Promise<HomeRecord[]> {
+  try {
+    return await fetchAuthenticatedJson<HomeRecord[]>(
+      `${homeEndpoint}/${encodeURIComponent(homeId)}/leave`,
+      session,
+      {
+        method: "POST",
+        headers: createAuthenticatedHeaders(session)
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return leaveDemoHome({
       homeId,
       userId: session.user.userId
     });
