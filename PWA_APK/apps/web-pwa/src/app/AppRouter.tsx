@@ -6,12 +6,14 @@ import { AuthSignupPage } from "../features/auth/AuthSignupPage";
 import { useAuth } from "../features/auth/hooks/useAuth";
 import { HomeDashboardPage } from "../features/home/HomeDashboardPage";
 import { DeviceDetailPage } from "../features/devices/DeviceDetailPage";
+import { NotificationCenterPage } from "../features/notifications/NotificationCenterPage";
 import { DeviceManagementPage } from "../features/devices/DeviceManagementPage";
 import { ProvisioningHomePage } from "../features/provisioning/ProvisioningHomePage";
 import { ApProvisioningPage } from "../features/provisioning/ap/ApProvisioningPage";
 import { BleProvisioningPage } from "../features/provisioning/ble/BleProvisioningPage";
 import { SceneBuilderPage } from "../features/scenes/SceneBuilderPage";
 import { SceneListPage } from "../features/scenes/SceneListPage";
+import { StreamerRoute } from "../features/streamer/StreamerRoute";
 import { AppUpdatePage } from "../features/settings/AppUpdatePage";
 import { HomeDetailPage } from "../features/settings/HomeDetailPage";
 import { HomeManagementPage } from "../features/settings/HomeManagementPage";
@@ -41,12 +43,14 @@ export function AppRouter() {
         <Route path="/homes" element={<Navigate replace to="/settings" />} />
         <Route path="/devices" element={<DeviceManagementPage />} />
         <Route path="/devices/:deviceId" element={<DeviceDetailPage />} />
+        <Route path="/notifications" element={<NotificationCenterPage />} />
         <Route path="/provisioning" element={<ProvisioningHomePage />} />
         <Route path="/provisioning/ble" element={<BleProvisioningPage />} />
         <Route path="/provisioning/ap" element={<ApProvisioningPage />} />
         <Route path="/scenes" element={<SceneListPage />} />
         <Route path="/scenes/new" element={<SceneBuilderPage />} />
         <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
+        <Route path="/streamer/*" element={<StreamerRoute />} />
         <Route path="/settings" element={<SettingsHomePage />} />
         <Route path="/settings/profile" element={<UserProfilePage />} />
         <Route path="/settings/homes" element={<HomeManagementPage />} />

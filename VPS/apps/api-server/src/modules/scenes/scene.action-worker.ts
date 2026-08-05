@@ -1,6 +1,8 @@
 import { getRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
+import { createNotification } from "../notifications/notification.write";
 import {
   sceneActionDispatchRepository,
+  sceneRepository,
   type ClaimSceneActionDispatchJobsInput
 } from "./scene.model";
 import type { SceneActionDispatchJob } from "./scene.types";
@@ -65,6 +67,17 @@ async function dispatchSceneAction(
         ...(job.action.payload ? { payload: job.action.payload } : {})
       });
     }
+
+    const scene = await sceneRepository.get(job.sceneId);
+    await createNotification({
+      homeId: job.homeId,
+      category: "alarm",
+      severity: "warning",
+      title: scene?.name ?? "Automation alert",
+      body: job.action.message ?? "Scene notification",
+      sourceType: "scene",
+      sourceId: job.sceneId
+    });
 
     return {
       status: "completed"

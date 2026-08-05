@@ -5,6 +5,7 @@ export * from "./types/device";
 export * from "./types/device-ui-runtime";
 export * from "./types/home";
 export * from "./types/matter";
+export * from "./types/notification";
 export * from "./types/ota";
 export * from "./types/platform";
 export * from "./types/provisioning";

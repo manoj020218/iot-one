@@ -27,6 +27,7 @@ export interface AppConfig {
   otaPersistenceMode: "memory" | "mongodb";
   apiAccessPersistenceMode: "memory" | "mongodb";
   scenePersistenceMode: "memory" | "mongodb";
+  notificationPersistenceMode: "memory" | "mongodb";
   sceneSchedulerEnabled: boolean;
   sceneSchedulerCoordinationMode: "local" | "mongodb-lock";
   sceneSchedulerInstanceId?: string;
@@ -206,6 +207,11 @@ export function readAppConfig(): AppConfig {
     Boolean(mongodbUri),
     "SCENE_PERSISTENCE_MODE"
   );
+  const notificationPersistenceMode = parsePersistenceMode(
+    process.env.NOTIFICATION_PERSISTENCE_MODE,
+    Boolean(mongodbUri),
+    "NOTIFICATION_PERSISTENCE_MODE"
+  );
   const sceneSchedulerCoordinationMode = parseSceneSchedulerCoordinationMode(
     process.env.SCENE_SCHEDULER_COORDINATION_MODE,
     scenePersistenceMode
@@ -286,6 +292,10 @@ export function readAppConfig(): AppConfig {
 
   if (scenePersistenceMode === "mongodb" && !mongodbUri) {
     throw new Error("SCENE_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
+  }
+
+  if (notificationPersistenceMode === "mongodb" && !mongodbUri) {
+    throw new Error("NOTIFICATION_PERSISTENCE_MODE=mongodb requires MONGODB_URI");
   }
 
   if (pidPersistenceMode === "mongodb" && !mongodbUri) {
@@ -374,6 +384,7 @@ export function readAppConfig(): AppConfig {
     otaPersistenceMode,
     apiAccessPersistenceMode,
     scenePersistenceMode,
+    notificationPersistenceMode,
     sceneSchedulerEnabled: parseBooleanEnv(
       process.env.SCENE_SCHEDULER_ENABLED,
       true

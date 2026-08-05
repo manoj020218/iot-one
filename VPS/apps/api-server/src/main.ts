@@ -52,6 +52,8 @@ import { createMongoP10DisplayPersistenceStore } from "./modules/p10-display/p10
 import { p10DisplayRawSubscriptions } from "./modules/p10-display/p10-display.service";
 import { useSosSirenPersistenceStore } from "./modules/sos-siren/sos-siren.model";
 import { createMongoSosSirenPersistenceStore } from "./modules/sos-siren/sos-siren.mongo-store";
+import { useNotificationPersistenceStore } from "./modules/notifications/notification.model";
+import { createMongoNotificationPersistenceStore } from "./modules/notifications/notification.mongo-store";
 import { useProvisioningRepository } from "./modules/provisioning/provisioning.model";
 import { createMongoProvisioningRepository } from "./modules/provisioning/provisioning.mongo-store";
 import { useScenePersistenceStore } from "./modules/scenes/scene.model";
@@ -89,6 +91,7 @@ async function bootstrap() {
     config.otaPersistenceMode === "mongodb" ||
     config.apiAccessPersistenceMode === "mongodb" ||
     config.scenePersistenceMode === "mongodb" ||
+    config.notificationPersistenceMode === "mongodb" ||
     config.sceneSchedulerCoordinationMode === "mongodb-lock"
   ) {
     database = await getMongoDb(config.mongodbUri!);
@@ -219,6 +222,15 @@ async function bootstrap() {
     console.log("[api-server] scene persistence driver: mongodb");
   } else {
     console.log("[api-server] scene persistence driver: memory");
+  }
+
+  if (config.notificationPersistenceMode === "mongodb") {
+    useNotificationPersistenceStore(
+      await createMongoNotificationPersistenceStore(database!)
+    );
+    console.log("[api-server] notification persistence driver: mongodb");
+  } else {
+    console.log("[api-server] notification persistence driver: memory");
   }
 
   const schedulerCoordinator =

@@ -23,6 +23,7 @@ import {
 } from "@jenix/shared";
 
 import { deviceRepository } from "../devices/device.model";
+import { createNotification } from "../notifications/notification.write";
 import { sceneRepository } from "../scenes/scene.model";
 import {
   homeAuditRepository,
@@ -572,8 +573,19 @@ export async function leaveHome(
     );
   }
 
+  const home = await requireHome(homeId);
+
   await homeMemberRepository.remove(homeId, membership.membershipId);
   await writeAudit(homeId, userId, "home.member.left");
+  await createNotification({
+    homeId,
+    category: "home",
+    severity: "info",
+    title: "Member left",
+    body: `${membership.name} left ${home.name}.`,
+    sourceType: "home",
+    sourceId: homeId
+  });
 
   return listHomesForUserId(userId);
 }
@@ -791,6 +803,15 @@ export async function redeemHomeShareCode(
     role: shareCode.role,
     code: shareCode.code
   });
+  await createNotification({
+    homeId: home.homeId,
+    category: "home",
+    severity: "info",
+    title: "New member joined",
+    body: `${profile.name} joined ${home.name} as ${shareCode.role}.`,
+    sourceType: "home",
+    sourceId: home.homeId
+  });
 
   return {
     home: mapHomeForRole(home, shareCode.role, true),
@@ -833,6 +854,16 @@ export async function updateHomeMemberRole(
   await writeAudit(homeId, userId, "home.member.role_updated", {
     targetUserId,
     role: payload.role
+  });
+  const home = await requireHome(homeId);
+  await createNotification({
+    homeId,
+    category: "home",
+    severity: "info",
+    title: "Member role updated",
+    body: `${targetMembership.name}'s role in ${home.name} changed to ${payload.role}.`,
+    sourceType: "home",
+    sourceId: homeId
   });
 
   return listHomeMembers(homeId, context);
@@ -909,6 +940,16 @@ export async function revokeHomeMember(
   await homeMemberRepository.remove(homeId, targetMembership.membershipId);
   await writeAudit(homeId, userId, "home.member.revoked", {
     targetUserId
+  });
+  const home = await requireHome(homeId);
+  await createNotification({
+    homeId,
+    category: "home",
+    severity: "warning",
+    title: "Member removed",
+    body: `${targetMembership.name} was removed from ${home.name} by ${actorMembership.name}.`,
+    sourceType: "home",
+    sourceId: homeId
   });
 
   return listHomeMembers(homeId, context);

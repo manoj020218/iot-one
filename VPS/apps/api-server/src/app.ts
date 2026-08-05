@@ -12,6 +12,7 @@ import { deviceRouter } from "./modules/devices/device.routes";
 import { healthRouter } from "./modules/health/health.routes";
 import { homeRouter } from "./modules/homes/home.routes";
 import { matterRouter } from "./modules/matter/matter.routes";
+import { notificationRouter } from "./modules/notifications/notification.routes";
 import { nurseCallReceiverRouter } from "./modules/nurse-call-receiver/nurse-call-receiver.routes";
 import { p10DisplayRouter } from "./modules/p10-display/p10-display.routes";
 import { smartRfTransmitterRouter } from "./modules/smart-rf-transmitter/smart-rf-transmitter.routes";
@@ -39,6 +40,7 @@ export function createApp(): Express {
   app.use("/api/v1/devices", p10DisplayRouter);
   app.use("/api/v1/devices", sosSirenRouter);
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
+  app.use("/api/v1/notifications", requireAuthenticatedUser, notificationRouter);
   app.use("/api/v1/public", publicApiRouter);
   app.use("/api/v1/pids", publicPidRouter);
   // SEC-01 — admin surface is gated by a shared secret (x-admin-key) on top of

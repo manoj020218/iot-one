@@ -1131,3 +1131,33 @@ button, input, select, textarea { font: inherit; }
 }
 .pending-row strong { font-size: 0.82rem; letter-spacing: 0.04em; }
 .pending-row span { color: var(--muted); font-size: 0.74rem; }
+
+/* ── Notification Center ── */
+.notification-row { align-items: center; display: flex; gap: 4px; padding: 6px; }
+.notification-row .settings-row { flex: 1; padding: 8px 10px; }
+.notification-row-icon[data-severity="critical"] { background: var(--danger-tint); color: var(--danger); }
+.notification-row-icon[data-severity="warning"] { background: var(--warning-tint); color: var(--warning); }
+.notification-row-icon[data-severity="info"] { background: var(--info-tint); color: var(--info); }
+.notification-row-dot {
+  background: var(--danger); border-radius: 50%; display: inline-block;
+  height: 7px; margin-right: 7px; width: 7px;
+}
+.notification-row[data-unread="false"] .settings-row-label strong { color: var(--muted); font-weight: 600; }
+.notification-row-time {
+  color: var(--faint); flex-shrink: 0; font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+}
+.notification-row-delete {
+  background: transparent; border: 0; color: var(--faint); cursor: pointer;
+  flex-shrink: 0; padding: 10px;
+}
+.notification-row-delete:hover { color: var(--danger); }
+
+.notification-bell-button {
+  align-items: center; background: transparent; border: 0; color: var(--text); cursor: pointer;
+  display: grid; height: 40px; place-items: center; position: relative; width: 40px;
+}
+.notification-bell-badge {
+  align-items: center; background: var(--danger); border: 2px solid var(--bg); border-radius: 999px;
+  color: #fff; display: grid; font-size: 0.62rem; font-weight: 800; height: 18px;
+  justify-content: center; min-width: 18px; padding: 0 3px; position: absolute; right: 0; top: 0;
+}

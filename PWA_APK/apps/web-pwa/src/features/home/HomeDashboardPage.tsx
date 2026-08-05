@@ -1,10 +1,11 @@
 import { AppShell } from "@jenix/ui";
 import { useState } from "react";
-import { FiChevronDown } from "react-icons/fi";
+import { FiBell, FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
 import { getCurrentHome } from "../dashboard/services/dashboardApi";
+import { useNotifications } from "../notifications/hooks/useNotifications";
 import { HomeDeviceSection } from "./components/HomeDeviceSection";
 import { StatStrip } from "./components/StatStrip";
 import { useDashboardDevices } from "../dashboard/hooks/useDashboardDevices";
@@ -26,6 +27,7 @@ export function HomeDashboardPage() {
   const { devices } = useDashboardDevices(activeSession);
   const { error } = useHomeDashboard(activeSession);
   const { metrics, togglePump } = useLiveMetrics(devices);
+  const { unreadCount } = useNotifications(activeSession);
   const { toast, show } = useToast();
   const [filter, setFilter] = useState<HomeFilter>("all");
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -56,6 +58,21 @@ export function HomeDashboardPage() {
         >
           Home
           <FiChevronDown size={20} />
+        </button>
+      }
+      aside={
+        <button
+          aria-label="Notifications"
+          className="notification-bell-button"
+          onClick={() => navigate("/notifications")}
+          type="button"
+        >
+          <FiBell size={20} />
+          {unreadCount > 0 ? (
+            <span className="notification-bell-badge">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          ) : null}
         </button>
       }
     >
