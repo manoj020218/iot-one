@@ -15,7 +15,7 @@
 
 .showcase-shell {
   position: relative;
-  margin-top: -0.75rem;
+  margin-top: 1.5rem;
   padding: 0 0 clamp(1.6rem, 4vw, 2.6rem);
   overflow: hidden;
 }
@@ -51,7 +51,7 @@
   );
 }
 
-.showcase-shell > * { position: relative; z-index: 1; }
+.showcase-shell > *:not(.showcase-glow) { position: relative; z-index: 1; }
 
 .showcase-swipe-hint {
   display: none;
