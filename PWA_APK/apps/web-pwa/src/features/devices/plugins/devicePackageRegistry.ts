@@ -90,9 +90,16 @@ function loadRemoteScript(packageKey: string, entryPath: string): Promise<void> 
   return promise;
 }
 
-export async function resolveDevicePackageComponent(
-  record: HomeUiBootstrapPackageRecord
-): Promise<DevicePackageComponent> {
+/**
+ * Generic over the resolved component's prop shape: per-device packages
+ * (Tank Guard etc.) export a DevicePackageComponent, while product-level
+ * packages (full routed plugins, see RemoteProductMount) export a
+ * RemoteProductPackageComponent. The resolution mechanism — script-load,
+ * host registration, named export lookup — is identical either way.
+ */
+export async function resolveDevicePackageComponent<
+  T = DevicePackageComponent
+>(record: HomeUiBootstrapPackageRecord): Promise<T> {
   const packageKey = createUiPackageKey(record.packageId, record.version);
   const host = getWindowHost();
 
@@ -107,7 +114,7 @@ export async function resolveDevicePackageComponent(
     throw new Error(`Device package export not found: ${record.exportName}`);
   }
 
-  return exported as DevicePackageComponent;
+  return exported as T;
 }
 
 export const devicePackageRegistryTesting = {

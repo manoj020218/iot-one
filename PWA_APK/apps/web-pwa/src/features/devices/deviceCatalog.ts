@@ -9,10 +9,11 @@ import {
   FiMonitor,
   FiRadio,
   FiShield,
+  FiVideo,
   FiZap
 } from "react-icons/fi";
 
-export type DeviceCategoryId = "sense" | "automate" | "operate" | "protect";
+export type DeviceCategoryId = "sense" | "automate" | "operate" | "protect" | "broadcast";
 export type DeviceCategoryFilter = DeviceCategoryId | "all";
 
 export interface DeviceCategory {
@@ -32,7 +33,8 @@ export const deviceCategories: DeviceCategory[] = [
   { id: "sense", label: "Sense & Alert", icon: FiActivity },
   { id: "automate", label: "Automate & Control", icon: FiZap },
   { id: "operate", label: "Queue Operations", icon: FiClipboard },
-  { id: "protect", label: "Protect & Warn", icon: FiShield }
+  { id: "protect", label: "Protect & Warn", icon: FiShield },
+  { id: "broadcast", label: "Broadcast & Stream", icon: FiVideo }
 ];
 
 export const deviceCatalog: DeviceCatalogEntry[] = [
@@ -41,5 +43,6 @@ export const deviceCatalog: DeviceCatalogEntry[] = [
   { pid: "JNX-SRR433-C3-STX01", name: "Smart RF Bridge", category: "automate", icon: FiRadio },
   { pid: "JNX-TD-C3-01", name: "Token Dispenser", category: "operate", icon: FiHash },
   { pid: "JNX-P10-C3-01", name: "Token Display", category: "operate", icon: FiMonitor },
-  { pid: "JNX-SOS-C3-001", name: "SOS Siren", category: "protect", icon: FiAlertTriangle }
+  { pid: "JNX-SOS-C3-001", name: "SOS Siren", category: "protect", icon: FiAlertTriangle },
+  { pid: "JNX-SS-P4-001", name: "Smart Streamer", category: "broadcast", icon: FiVideo }
 ];

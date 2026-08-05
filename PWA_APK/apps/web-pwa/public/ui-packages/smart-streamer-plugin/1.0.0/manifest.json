@@ -1,0 +1,15 @@
+{
+  "packageId": "smart-streamer-plugin",
+  "version": "1.0.0",
+  "entryPath": "/ui-packages/smart-streamer-plugin/1.0.0/remoteEntry.js",
+  "exportName": "SmartStreamerApp",
+  "templateId": "smart-streamer-plugin-v1",
+  "dynamicPages": [],
+  "capabilities": {
+    "runtime": [
+      "session",
+      "home"
+    ],
+    "commands": []
+  }
+}

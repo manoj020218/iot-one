@@ -155,3 +155,56 @@ export const foundationPidBlueprint: CreatePidInput = {
     dynamicPages: ["tank-level", "thresholds"]
   }
 };
+
+export const smartStreamerPidRecord: PidIdentity = {
+  pid: "JNX-SS-P4-001",
+  productName: "Smart Streamer",
+  productCategory: "Live Streaming",
+  productLine: "Smart Streamer",
+  status: "draft",
+  matterMode: "NONE"
+};
+
+export const smartStreamerPidBlueprint: CreatePidInput = {
+  ...smartStreamerPidRecord,
+  brand: "JENIX",
+  description:
+    "Streams one assigned IP CCTV camera to one selected platform (YouTube, " +
+    "Facebook, or Instagram) at a time. Video never transits the Jenix VPS.",
+  hardware: {
+    mcu: "ESP32-P4",
+    hardwareRevision: "HW1.0",
+    hasRs485: false,
+    hasBle: true,
+    hasWifi: true,
+    hasMatter: false,
+    hasThread: false,
+    hasEthernet: false
+  },
+  firmware: {
+    firmwareFamily: "smart-streamer",
+    otaChannel: "beta",
+    betaVersion: "1.0.0",
+    rollbackAllowed: true
+  },
+  matter: {
+    enabled: false,
+    mode: "NONE",
+    certificationStatus: "not_required",
+    bridgeSupported: false
+  },
+  api: {
+    enabled: false,
+    sellable: false,
+    allowedScopes: []
+  },
+  ui: {
+    uiMode: "remote-package",
+    uiPackageId: "smart-streamer-plugin",
+    uiPackageVersion: "1.0.0"
+  },
+  dashboard: {
+    templateId: "smart-streamer-default",
+    dynamicPages: []
+  }
+};

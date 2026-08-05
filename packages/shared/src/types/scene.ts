@@ -50,7 +50,9 @@ export type SceneActionCommand =
   | "start_learning"
   | "restart"
   | "trigger_alarm"
-  | "stop_alarm";
+  | "stop_alarm"
+  | "start_stream"
+  | "stop_stream";
 
 export interface SceneAction {
   actionId: string;
