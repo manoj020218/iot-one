@@ -12,6 +12,7 @@ import {
 } from "../dashboard/services/dashboardApi";
 import { SceneDispatchHistoryPanel } from "./components/SceneDispatchHistoryPanel";
 import { SceneFlowEditor } from "./components/SceneFlowEditor";
+import { useScenePidAutomationCommands } from "./hooks/useScenePidAutomationCommands";
 import {
   createInitialSceneDraft,
   draftToCreateInput,
@@ -35,7 +36,8 @@ import { classifySceneDraft, getSceneDraftVisual, type SceneKind } from "./servi
 function buildDeviceOptions(devices: DashboardDevice[]): SceneDeviceOption[] {
   return devices.map((device) => ({
     deviceId: device.deviceId,
-    label: `${device.displayName} (${device.deviceId})`
+    label: `${device.displayName} (${device.deviceId})`,
+    pid: device.pid
   }));
 }
 
@@ -95,6 +97,7 @@ export function SceneBuilderPage() {
     createInitialSceneDraft(requestedKind)
   );
   const [deviceOptions, setDeviceOptions] = useState<SceneDeviceOption[]>([]);
+  const pidAutomationCommands = useScenePidAutomationCommands(deviceOptions);
   const [dispatches, setDispatches] = useState<SceneActionDispatchRecord[]>([]);
   const [loading, setLoading] = useState(!isCreateMode);
   const [saving, setSaving] = useState(false);
@@ -331,6 +334,7 @@ export function SceneBuilderPage() {
             draft={draft}
             kind={kind}
             onChange={setDraft}
+            pidAutomationCommands={pidAutomationCommands}
           />
 
           {deviceOptions.length === 0 ? (

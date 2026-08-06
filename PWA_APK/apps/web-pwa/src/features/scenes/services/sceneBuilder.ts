@@ -1,16 +1,17 @@
-import type {
-  SceneAction,
-  SceneActionCommand,
-  SceneActionType,
-  SceneCondition,
-  SceneConditionOperator,
-  ScenePrimitiveValue,
-  SceneRecord,
-  SceneSchedule,
-  SceneStatus,
-  SceneThresholdComparator,
-  SceneTrigger,
-  SceneTriggerType
+import {
+  allSceneActionCommands,
+  type SceneAction,
+  type SceneActionCommand,
+  type SceneActionType,
+  type SceneCondition,
+  type SceneConditionOperator,
+  type ScenePrimitiveValue,
+  type SceneRecord,
+  type SceneSchedule,
+  type SceneStatus,
+  type SceneThresholdComparator,
+  type SceneTrigger,
+  type SceneTriggerType
 } from "@jenix/shared";
 
 import type {
@@ -24,6 +25,7 @@ import type {
 export interface SceneDeviceOption {
   deviceId: string;
   label: string;
+  pid: string;
 }
 
 export interface SceneBuilderTriggerDraft {
@@ -94,16 +96,13 @@ export const sceneActionTypeOptions: SceneActionType[] = [
   "notification"
 ];
 
-export const sceneActionCommandOptions: SceneActionCommand[] = [
-  "refresh",
-  "sync",
-  "set_relay",
-  "notify",
-  "factory_reset",
-  "ota_force",
-  "matter_commission",
-  "matter_bridge_sync"
-];
+/**
+ * Fallback command list shown when the selected device's PID hasn't
+ * declared an `automation.commands` profile (see SCHEDULE.md). Sourced
+ * from the shared canonical list so it can't drift out of sync with the
+ * SceneActionCommand union the way a hand-maintained array did before.
+ */
+export const sceneActionCommandOptions: SceneActionCommand[] = allSceneActionCommands;
 
 export const sceneStatusOptions: SceneStatus[] = ["draft", "active", "paused"];
 

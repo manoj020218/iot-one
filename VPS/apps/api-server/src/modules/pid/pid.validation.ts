@@ -3,13 +3,14 @@ import {
   type CreatePidInput,
   type MatterCertificationStatus,
   type PidApiProfile,
+  type PidAutomationProfile,
   type PidDashboardProfile,
   type PidFirmwareProfile,
   type PidHardwareProfile,
   type PidMatterProfile,
   type PidUiProfile
 } from "@jenix/device-schemas";
-import type { ProductStatus } from "@jenix/shared";
+import { allSceneActionCommands, type ProductStatus, type SceneActionCommand } from "@jenix/shared";
 
 import type { PidPatchPayload, PidValidationResult } from "./pid.types";
 
@@ -490,6 +491,59 @@ function parseUiProfile(
   };
 }
 
+function parseAutomationProfile(
+  value: Record<string, unknown>,
+  errors: string[]
+): PidAutomationProfile | undefined {
+  const commandsValue = value.commands;
+
+  if (commandsValue === undefined || commandsValue === null) {
+    return { commands: [] };
+  }
+
+  if (!Array.isArray(commandsValue) || commandsValue.some((item) => !isRecord(item))) {
+    errors.push("automation.commands must be an array of objects");
+    return undefined;
+  }
+
+  const commands = commandsValue.map((item, index) => {
+    const record = item as Record<string, unknown>;
+    const command = readTrimmedString(
+      record,
+      "command",
+      `automation.commands[${index}].command`,
+      errors
+    );
+    const label = readTrimmedString(
+      record,
+      "label",
+      `automation.commands[${index}].label`,
+      errors
+    );
+    const restricted = readBoolean(
+      record,
+      "restricted",
+      `automation.commands[${index}].restricted`,
+      errors,
+      false
+    );
+
+    if (command && !allSceneActionCommands.includes(command as SceneActionCommand)) {
+      errors.push(
+        `automation.commands[${index}].command must be a known SceneActionCommand`
+      );
+    }
+
+    return {
+      command: command as SceneActionCommand,
+      label: label ?? "",
+      ...optionalProp("restricted", restricted)
+    };
+  });
+
+  return { commands };
+}
+
 export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePidInput> {
   const errors: string[] = [];
 
@@ -534,6 +588,7 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
   const apiValue = readObject(body, "api", "api", errors);
   const uiValue = readObject(body, "ui", "ui", errors);
   const dashboardValue = readObject(body, "dashboard", "dashboard", errors);
+  const automationValue = isRecord(body.automation) ? body.automation : undefined;
 
   const hardware = hardwareValue
     ? parseHardwareProfile(hardwareValue, errors)
@@ -549,8 +604,11 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
   const dashboard = dashboardValue
     ? parseDashboardProfile(dashboardValue, errors)
     : undefined;
+  const automation = automationValue
+    ? parseAutomationProfile(automationValue, errors)
+    : { commands: [] };
 
-  if (!hardware || !firmware || !matter || !api || !ui || !dashboard) {
+  if (!hardware || !firmware || !matter || !api || !ui || !dashboard || !automation) {
     return {
       ok: false,
       errors
@@ -622,6 +680,7 @@ export function parseCreatePidInput(body: unknown): PidValidationResult<CreatePi
       api,
       ui,
       dashboard,
+      automation,
       ...optionalProp("description", description),
       ...optionalProp("iconUrl", iconUrl),
       ...optionalProp("imageUrl", imageUrl)

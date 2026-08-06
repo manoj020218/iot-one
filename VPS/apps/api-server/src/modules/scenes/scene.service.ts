@@ -11,8 +11,10 @@ import {
   type SceneTrigger
 } from "@jenix/shared";
 
+import { deviceRepository } from "../devices/device.model";
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
+import { getPid } from "../pid/pid.service";
 import {
   sceneActionDispatchRepository,
   sceneAuditRepository,
@@ -179,6 +181,51 @@ function assertRestrictedActionPermission(
       403,
       `Restricted scene command requires owner/admin access: ${restrictedAction.command}`
     );
+  }
+}
+
+/**
+ * Cross-checks device_command actions against the target device's declared
+ * PID automation.commands (see packages/device-schemas/src/pid/pid.types.ts
+ * and SCHEDULE.md). Devices that haven't declared an automation profile yet
+ * are skipped rather than rejected — this is an opt-in guardrail, not a
+ * migration gate, so undeclared devices keep working exactly as before.
+ */
+async function assertDeviceCommandCompatibility(actions: SceneAction[]) {
+  const deviceCommandActions = actions.filter(
+    (action): action is SceneAction & { deviceId: string; command: NonNullable<SceneAction["command"]> } =>
+      action.type === "device_command" && Boolean(action.deviceId) && Boolean(action.command)
+  );
+
+  for (const action of deviceCommandActions) {
+    const device = await deviceRepository.get(action.deviceId.trim().toUpperCase());
+
+    if (!device) {
+      continue;
+    }
+
+    let pidRecord;
+
+    try {
+      pidRecord = await getPid(device.pid);
+    } catch {
+      continue;
+    }
+
+    const declaredCommands = pidRecord.automation?.commands;
+
+    if (!declaredCommands || declaredCommands.length === 0) {
+      continue;
+    }
+
+    const allowed = declaredCommands.some((entry) => entry.command === action.command);
+
+    if (!allowed) {
+      throw new SceneModuleError(
+        422,
+        `Device ${device.deviceId} (${pidRecord.productName}) does not support the "${action.command}" command`
+      );
+    }
   }
 }
 
@@ -653,6 +700,7 @@ export async function createScene(
   const actions = payload.actions.map(toActionRecord);
 
   assertRestrictedActionPermission(actions, resolvedContext.homeRole);
+  await assertDeviceCommandCompatibility(actions);
 
   const timestamp = new Date().toISOString();
   const record: SceneRecord = {
@@ -694,6 +742,9 @@ export async function patchScene(
     : existing.actions;
 
   assertRestrictedActionPermission(nextActions, resolvedContext.homeRole);
+  if (patch.actions) {
+    await assertDeviceCommandCompatibility(nextActions);
+  }
 
   const updated: SceneRecord = {
     ...existing,

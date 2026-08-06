@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AuthSession } from "@jenix/shared";
 
 import { AuthSessionProvider } from "../../app/AuthSessionProvider";
+import { dashboardApiTesting } from "../dashboard/services/dashboardApi";
 import { SceneBuilderPage } from "./SceneBuilderPage";
 import { sceneApiTesting } from "./services/sceneApi";
 
@@ -29,6 +30,7 @@ describe("SceneBuilderPage", () => {
 
   beforeEach(() => {
     sceneApiTesting.reset();
+    dashboardApiTesting.resetDemoStore();
   });
 
   it("creates a tap-to-run scene and lands on the editable detail route", async () => {
@@ -187,5 +189,56 @@ describe("SceneBuilderPage", () => {
 
     expect(await screen.findByText(/Replay queued as dispatch-local-/)).toBeInTheDocument();
     expect(await screen.findByText("Replay of dispatch-failed")).toBeInTheDocument();
+  });
+
+  it("narrows the device command picker to the selected device's PID-declared commands", async () => {
+    dashboardApiTesting.seedDemoDevices("user-scene-builder", "home-user-scene-builder", [
+      dashboardApiTesting.createDemoDevice({
+        deviceId: "JNX-TG-C3-A7F2",
+        ownerUserId: "user-scene-builder",
+        homeId: "home-user-scene-builder"
+      })
+    ]);
+
+    render(
+      <MemoryRouter
+        future={{
+          v7_relativeSplatPath: true,
+          v7_startTransition: true
+        }}
+        initialEntries={["/scenes/new?kind=automation"]}
+      >
+        <AuthSessionProvider initialSession={session}>
+          <Routes>
+            <Route path="/scenes/new" element={<SceneBuilderPage />} />
+            <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
+          </Routes>
+        </AuthSessionProvider>
+      </MemoryRouter>
+    );
+
+    await screen.findByLabelText("Scene Name");
+    fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Device command" }));
+    fireEvent.change(screen.getByLabelText("Device"), {
+      target: { value: "JNX-TG-C3-A7F2" }
+    });
+
+    const commandSelect = await screen.findByLabelText("Command");
+    await waitFor(() => {
+      expect(screen.getByText("Turn pump on")).toBeInTheDocument();
+    });
+
+    const optionLabels = Array.from(commandSelect.querySelectorAll("option")).map(
+      (option) => option.textContent
+    );
+
+    expect(optionLabels).toEqual([
+      "Refresh reading",
+      "Zero calibrate sensor",
+      "Turn pump on",
+      "Turn pump off",
+      "Test alarm"
+    ]);
   });
 });

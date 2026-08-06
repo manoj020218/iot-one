@@ -1,11 +1,12 @@
-import type {
-  SceneActionCommand,
-  SceneConditionOperator,
-  ScenePrimitiveValue,
-  SceneSchedule,
-  SceneStatus,
-  SceneThresholdComparator,
-  SceneTriggerType
+import {
+  allSceneActionCommands,
+  type SceneActionCommand,
+  type SceneConditionOperator,
+  type ScenePrimitiveValue,
+  type SceneSchedule,
+  type SceneStatus,
+  type SceneThresholdComparator,
+  type SceneTriggerType
 } from "@jenix/shared";
 
 import type {
@@ -122,15 +123,9 @@ function parseTelemetrySnapshot(
 function parseSceneActionCommand(
   value: unknown
 ): SceneActionCommand | undefined {
-  return value === "refresh" ||
-    value === "sync" ||
-    value === "set_relay" ||
-    value === "notify" ||
-    value === "factory_reset" ||
-    value === "ota_force" ||
-    value === "matter_commission" ||
-    value === "matter_bridge_sync"
-    ? value
+  return typeof value === "string" &&
+    allSceneActionCommands.includes(value as SceneActionCommand)
+    ? (value as SceneActionCommand)
     : undefined;
 }
 

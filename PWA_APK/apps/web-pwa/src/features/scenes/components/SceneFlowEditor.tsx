@@ -1,13 +1,15 @@
+import type { PidAutomationCommandDescriptor } from "@jenix/device-schemas";
 import type { ReactNode } from "react";
 import type { IconType } from "react-icons";
 import { FiPlus, FiX } from "react-icons/fi";
 
-import type {
-  SceneActionCommand,
-  SceneActionType,
-  SceneConditionOperator,
-  SceneThresholdComparator,
-  SceneTriggerType
+import {
+  describeSceneActionCommand,
+  type SceneActionCommand,
+  type SceneActionType,
+  type SceneConditionOperator,
+  type SceneThresholdComparator,
+  type SceneTriggerType
 } from "@jenix/shared";
 
 import type {
@@ -32,11 +34,39 @@ import {
   getActionVisual,
   getTriggerVisual
 } from "../services/sceneKind";
+
 export interface SceneFlowEditorProps {
   kind: "run" | "automation";
   draft: SceneBuilderDraft;
   deviceOptions: SceneDeviceOption[];
+  pidAutomationCommands: Map<string, PidAutomationCommandDescriptor[]>;
   onChange: (draft: SceneBuilderDraft) => void;
+}
+
+interface CommandOption {
+  value: SceneActionCommand;
+  label: string;
+}
+
+function resolveCommandOptions(
+  deviceId: string,
+  deviceOptions: SceneDeviceOption[],
+  pidAutomationCommands: Map<string, PidAutomationCommandDescriptor[]>
+): CommandOption[] {
+  const device = deviceOptions.find((option) => option.deviceId === deviceId);
+  const declared = device ? pidAutomationCommands.get(device.pid) : undefined;
+
+  if (declared && declared.length > 0) {
+    return declared.map((descriptor) => ({
+      value: descriptor.command,
+      label: descriptor.label
+    }));
+  }
+
+  return sceneActionCommandOptions.map((command) => ({
+    value: command,
+    label: describeSceneActionCommand(command)
+  }));
 }
 
 const scheduleDays = [
@@ -82,7 +112,13 @@ function FlowChip({ icon: Icon, color, title, subtitle, onRemove, children }: Fl
   );
 }
 
-export function SceneFlowEditor({ kind, draft, deviceOptions, onChange }: SceneFlowEditorProps) {
+export function SceneFlowEditor({
+  kind,
+  draft,
+  deviceOptions,
+  pidAutomationCommands,
+  onChange
+}: SceneFlowEditorProps) {
   const automationTrigger = findAutomationTriggerDraft(draft.triggers);
 
   function updateAutomationTrigger(patch: Partial<SceneBuilderTriggerDraft>) {
@@ -396,9 +432,13 @@ export function SceneFlowEditor({ kind, draft, deviceOptions, onChange }: SceneF
                       }
                       value={action.command}
                     >
-                      {sceneActionCommandOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option.replace(/_/g, " ")}
+                      {resolveCommandOptions(
+                        action.deviceId,
+                        deviceOptions,
+                        pidAutomationCommands
+                      ).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>

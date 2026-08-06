@@ -1,12 +1,27 @@
+import { foundationPidBlueprint } from "@jenix/device-schemas";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { authTesting } from "../auth/auth.service";
+import { deviceTesting } from "../devices/device.service";
 import { homeTesting } from "../homes/home.service";
+import { pidTesting } from "../pid/pid.service";
 import { createSceneActionDispatchWorker } from "./scene.action-worker";
 import { sceneTesting } from "./scene.service";
 import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
+
+const developerHeaders = {
+  "x-role": "JENIX_DEVELOPER",
+  "x-actor-id": "scene-tests"
+};
+
+async function createPid() {
+  await request(createApp())
+    .post("/api/v1/admin/pids")
+    .set(developerHeaders)
+    .send(foundationPidBlueprint);
+}
 
 async function shareHomeAccess(
   ownerHeaders: Record<string, string>,
@@ -36,6 +51,8 @@ describe("scene routes", () => {
     await authTesting.reset();
     await homeTesting.reset();
     await sceneTesting.reset();
+    await pidTesting.reset();
+    await deviceTesting.reset();
   });
 
   it("creates and lists scenes for the current HOME", async () => {
@@ -616,5 +633,103 @@ describe("scene routes", () => {
     expect(dispatches).toHaveLength(2);
     expect(dispatches[1]?.status).toBe("queued");
     expect(dispatches[1]?.replayedFromJobId).toBe(failedJob?.jobId);
+  });
+
+  it("rejects a device_command action the target device's PID does not declare", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Command Compat Owner",
+      email: "command-compat-owner@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-compat-1",
+      pid: foundationPidBlueprint.pid,
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Mismatched Command Scene",
+        status: "draft",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-COMPAT-1",
+            command: "trigger_alarm"
+          }
+        ]
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error).toContain("trigger_alarm");
+  });
+
+  it("accepts a device_command action the target device's PID declares", async () => {
+    await createPid();
+    const ownerSession = await createAuthenticatedSession({
+      name: "Command Compat Owner 2",
+      email: "command-compat-owner-2@example.com"
+    });
+    const homeId = ownerSession.activeHomeId!;
+
+    await request(createApp()).post("/api/v1/devices/register").send({
+      deviceId: "jnx-tg-compat-2",
+      pid: foundationPidBlueprint.pid,
+      homeId,
+      ownerUserId: ownerSession.user.userId
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Matching Command Scene",
+        status: "draft",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-TG-COMPAT-2",
+            command: "motor_on"
+          }
+        ]
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.actions[0].command).toBe("motor_on");
+  });
+
+  it("allows any command for a device whose PID declares no automation profile", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Undeclared Automation Owner",
+      email: "undeclared-automation-owner@example.com"
+    });
+
+    const response = await request(createApp())
+      .post("/api/v1/scenes")
+      .set(createAuthHeaders(ownerSession))
+      .send({
+        name: "Undeclared Device Scene",
+        status: "draft",
+        triggers: [{ type: "manual" }],
+        conditions: [],
+        actions: [
+          {
+            type: "device_command",
+            deviceId: "JNX-UNKNOWN-DEVICE",
+            command: "restart"
+          }
+        ]
+      });
+
+    expect(response.status).toBe(201);
   });
 });

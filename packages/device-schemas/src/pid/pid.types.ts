@@ -1,4 +1,4 @@
-import type { ProductStatus } from "@jenix/shared";
+import type { ProductStatus, SceneActionCommand } from "@jenix/shared";
 
 import type { MatterMode } from "../matter/matter.types";
 
@@ -84,6 +84,23 @@ export interface PidDashboardProfile {
   cardLayout?: string;
 }
 
+/**
+ * One command this device type accepts through a scene/schedule action.
+ * `command` must be one of the shared platform's SceneActionCommand values
+ * (see packages/shared/src/types/scene.ts) — a new device-specific command
+ * name has to be added there first, then referenced here. See SCHEDULE.md
+ * for the full "how does my device plug into the platform schedule" guide.
+ */
+export interface PidAutomationCommandDescriptor {
+  command: SceneActionCommand;
+  label: string;
+  restricted?: boolean;
+}
+
+export interface PidAutomationProfile {
+  commands: PidAutomationCommandDescriptor[];
+}
+
 export interface CreatePidInput extends PidIdentity {
   brand: PidBrand;
   description?: string;
@@ -95,6 +112,14 @@ export interface CreatePidInput extends PidIdentity {
   api: PidApiProfile;
   ui: PidUiProfile;
   dashboard: PidDashboardProfile;
+  /**
+   * Optional: which scene/schedule commands this device type supports. When
+   * absent, the Scene builder falls back to the full platform command list
+   * (today's behavior) instead of showing nothing — declaring this is
+   * opt-in but recommended so users only see commands your device actually
+   * understands.
+   */
+  automation?: PidAutomationProfile;
 }
 
 export interface ProductPidRecord extends CreatePidInput {
@@ -153,6 +178,15 @@ export const foundationPidBlueprint: CreatePidInput = {
   dashboard: {
     templateId: "tank-guard-default",
     dynamicPages: ["tank-level", "thresholds"]
+  },
+  automation: {
+    commands: [
+      { command: "refresh", label: "Refresh reading" },
+      { command: "zero_calibrate", label: "Zero calibrate sensor" },
+      { command: "motor_on", label: "Turn pump on" },
+      { command: "motor_off", label: "Turn pump off" },
+      { command: "alarm_test", label: "Test alarm" }
+    ]
   }
 };
 
@@ -206,5 +240,11 @@ export const smartStreamerPidBlueprint: CreatePidInput = {
   dashboard: {
     templateId: "smart-streamer-default",
     dynamicPages: []
+  },
+  automation: {
+    commands: [
+      { command: "start_stream", label: "Start stream" },
+      { command: "stop_stream", label: "Stop stream" }
+    ]
   }
 };
