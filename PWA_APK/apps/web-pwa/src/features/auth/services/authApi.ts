@@ -5,6 +5,8 @@ import {
   type TokenPair
 } from "@jenix/shared";
 
+import { ApiResponseError, shouldUseDemoFallback } from "../../../app/authenticatedRequest";
+
 const authEndpoint = "/api/v1/auth";
 
 function createUserId(email: string): string {
@@ -45,7 +47,7 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init);
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw new ApiResponseError(response.status);
   }
 
   const payload = (await response.json()) as { data: T };
@@ -64,8 +66,11 @@ export async function loginWithEmail(payload: {
       },
       body: JSON.stringify(payload)
     });
-  } catch {
-    void payload.password;
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     const name = payload.email.split("@")[0] ?? "Jenix User";
     return createSession(payload.email, name, "email");
   }
@@ -84,8 +89,11 @@ export async function signupWithEmail(payload: {
       },
       body: JSON.stringify(payload)
     });
-  } catch {
-    void payload.password;
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     return createSession(payload.email, payload.name, "email");
   }
 }
@@ -111,7 +119,11 @@ export async function loginWithProvider(provider: AuthProvider) {
         token: provider
       })
     });
-  } catch {
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
     const email = `${provider}@jenix.local`;
     const name = `${provider[0]!.toUpperCase()}${provider.slice(1)} User`;
     return createSession(email, name, provider);
