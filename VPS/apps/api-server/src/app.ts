@@ -1,3 +1,8 @@
+import {
+  IP_SPEAKER_INTERNAL_KEY,
+  createIpSpeakerDeviceActionRouter,
+  createIpSpeakerRouter
+} from "@jenix/ip-speaker-backend";
 import express, { type Express } from "express";
 
 import { requireAuthenticatedUser } from "./infrastructure/http/request-auth";
@@ -20,6 +25,7 @@ import { sosSirenRouter } from "./modules/sos-siren/sos-siren.routes";
 import { tokenDispenserRouter } from "./modules/token-dispenser/token-dispenser.routes";
 import { publicPidRouter } from "./modules/pid/pid.public.routes";
 import { pidRouter } from "./modules/pid/pid.routes";
+import * as platformApi from "./platform-api";
 import { provisioningRouter } from "./modules/provisioning/provisioning.routes";
 import { sceneRouter } from "./modules/scenes/scene.routes";
 import { otaRouter } from "./modules/ota/ota.routes";
@@ -39,6 +45,11 @@ export function createApp(): Express {
   app.use("/api/v1/devices", tokenDispenserRouter);
   app.use("/api/v1/devices", p10DisplayRouter);
   app.use("/api/v1/devices", sosSirenRouter);
+  app.use(
+    "/api/v1/devices",
+    requireAuthenticatedUser,
+    createIpSpeakerDeviceActionRouter(platformApi)
+  );
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/notifications", requireAuthenticatedUser, notificationRouter);
   app.use("/api/v1/public", publicApiRouter);
@@ -51,6 +62,11 @@ export function createApp(): Express {
   app.use("/api/v1/admin/ui-packages", requireAdminApiKey, uiPackageRouter);
   app.use("/api/v1/provisioning", requireAuthenticatedUser, provisioningRouter);
   app.use("/api/v1/scenes", requireAuthenticatedUser, sceneRouter);
+  app.use(
+    `/api/v1/${IP_SPEAKER_INTERNAL_KEY}`,
+    requireAuthenticatedUser,
+    createIpSpeakerRouter(platformApi)
+  );
   app.use("/api/v1", healthRouter);
 
   return app;

@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@jenix/shared": ["../../../packages/shared/src/index.ts"],
+      "@jenix/device-schemas": ["../../../packages/device-schemas/src/index.ts"]
+    },
+    "noEmit": true
+  },
+  "include": ["src"]
+}

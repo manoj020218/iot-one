@@ -2,3 +2,4 @@ packages:
   - "VPS/apps/*"
   - "PWA_APK/apps/*"
   - "packages/*"
+  - "IOT_Device/Smart IP speaker/backend"

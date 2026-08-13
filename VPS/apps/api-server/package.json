@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@jenix/device-schemas": "workspace:*",
+    "@jenix/ip-speaker-backend": "workspace:*",
     "@jenix/shared": "workspace:*",
     "express": "^4.21.1",
     "mongodb": "^6.8.0",
