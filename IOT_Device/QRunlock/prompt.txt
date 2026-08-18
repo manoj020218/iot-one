@@ -1,0 +1,761 @@
+# Codex Prompt — QRUnlock Smart RF Door-Lock Power Supply Firmware
+
+You are implementing **production firmware only** for a QRUnlock smart electronic-door-lock power-supply controller.
+
+This is a real commercial product intended for long-term deployment and eventual integration into the **ONE IoT Platform**.
+
+Work efficiently. Avoid unnecessary refactoring, over-engineering, long explanations, generated documentation, or speculative features. Complete one working firmware deliverable.
+
+## 1. Hardware
+
+MCU:
+
+* ESP32-C3 Super Mini
+* ESP-IDF preferred unless the existing repository already uses another established ESP32 framework
+* Wi-Fi required
+* BLE may be used for provisioning only if already supported cleanly by the existing architecture
+
+RF receiver:
+
+* RX480-E-WQ or compatible learning RF receiver
+* RF remote operates the door-lock relay
+
+GPIO requirements:
+
+### GPIO3 — Relay Control
+
+* GPIO3 = relay command output
+* Active HIGH
+* GPIO3 HIGH must switch an NPN transistor
+* transistor drives relay coil
+* proposed base resistor = 330 O
+* firmware must initialize GPIO3 LOW before normal startup
+* relay must NEVER pulse accidentally during:
+
+  * boot
+  * reset
+  * OTA
+  * Wi-Fi provisioning
+  * watchdog restart
+  * brownout recovery
+
+Use a configurable relay pulse duration.
+
+Default:
+
+`1000 ms`
+
+Allow safe configuration range:
+
+`200–5000 ms`
+
+Never allow relay to remain ON indefinitely because of firmware failure.
+
+---
+
+## 2. GPIO2 — RF VT / Learning Interface
+
+GPIO2 needs special treatment.
+
+Desired behavior:
+
+### Normal mode
+
+GPIO2 should monitor the RF receiver VT signal.
+
+When a valid learned RF remote is received:
+
+`VT -> HIGH`
+
+Firmware detects the HIGH signal and activates the relay.
+
+Use debounce / minimum valid pulse filtering so noise cannot unlock the door.
+
+### RF-learning mode
+
+The current hardware concept requires ESP32 GPIO2 to temporarily provide a HIGH signal for approximately 10 seconds to place the RF module into learning mode.
+
+During this learning window:
+
+1. trigger RF learning mode
+2. wait for a remote transmission
+3. detect confirmation / VT state change
+4. determine whether remote learning succeeded
+5. stop learning immediately after success
+6. otherwise timeout after 10 seconds
+7. return GPIO2 safely to input-monitoring mode
+
+### IMPORTANT ELECTRICAL VALIDATION
+
+Do NOT blindly configure GPIO2 as push-pull HIGH while it is directly connected to an output pin of the RF receiver.
+
+First inspect the RX480-E-WQ interface assumptions and determine whether VT is:
+
+* push-pull output
+* open collector
+* open drain
+* internally pulled
+* bidirectional
+* or whether a different LEARN pin is actually intended
+
+Avoid GPIO output contention.
+
+Prefer a safe implementation such as:
+
+* open-drain drive where electrically valid
+* input mode during normal RF monitoring
+* carefully controlled direction switching
+* transistor/diode isolation recommendation if required
+
+If the proposed single-wire design is electrically unsafe, DO NOT fake a software solution.
+
+Instead:
+
+1. implement the safest firmware abstraction possible
+2. document the exact minimal hardware correction required
+3. keep the firmware API compatible with the intended behavior
+
+Do not change GPIO assignments unnecessarily.
+
+---
+
+## 3. GPIO4 — Status LED
+
+GPIO4 = status LED.
+
+Implement clear patterns without blocking delays.
+
+Suggested states:
+
+* boot = short pulse
+* normal online = slow heartbeat
+* AP/provisioning = periodic fast blink
+* RF learning = rapid blink
+* RF remote successfully learned = confirmation flashes
+* OTA = distinct pattern
+* error = error pattern
+
+LED handling must be non-blocking.
+
+---
+
+## 4. GPIO6 — Multifunction Button
+
+GPIO6 = physical multifunction button input.
+
+Use appropriate pull-up/pull-down according to hardware.
+
+Required actions:
+
+### Short press
+
+Do not erase configuration.
+
+Can be reserved for local status/action if useful.
+
+### Provisioning press
+
+Provide behavior similar to common Tuya devices.
+
+For example:
+
+hold approximately 5 seconds:
+
+* enter provisioning/AP mode
+* indicate provisioning mode through LED
+
+### Factory reset
+
+Longer hold, for example approximately 10 seconds:
+
+* erase Wi-Fi credentials
+* erase ONE IoT binding/configuration
+* retain immutable manufacturing identity
+* reboot into provisioning mode
+
+Protect against accidental factory reset.
+
+Use state-machine/timer logic, not blocking delays.
+
+---
+
+# 5. Provisioning
+
+Device must support a professional commissioning process.
+
+Required:
+
+* first boot with no Wi-Fi -> provisioning mode
+* AP fallback must always remain available through physical-button action
+* provisioning credentials stored safely in NVS
+* failed Wi-Fi connection must not permanently lock device
+* automatic reconnection
+* exponential/reasonable reconnect backoff
+* no reboot loops when internet is unavailable
+
+Architecture must allow later integration into ONE IoT Platform.
+
+Do NOT tightly couple firmware to a temporary server URL.
+
+Keep platform communication behind a small service/interface layer.
+
+---
+
+# 6. Device Identity / PID
+
+Implement product identity suitable for ONE IoT Platform.
+
+Required fields:
+
+* PID
+* unique device ID
+* MAC-derived hardware ID
+* model
+* hardware revision
+* firmware version
+* build identifier if useful
+
+Example product family:
+
+`QRUNLOCK-PSU-RF`
+
+PID must not be hard-coded separately throughout the project.
+
+Use one source of truth.
+
+Support future PID formats such as:
+
+`TR-XXXX`
+
+and
+
+`PD-XXXX`
+
+without architecture changes.
+
+---
+
+# 7. Firmware Versioning
+
+Use semantic firmware versioning.
+
+Example:
+
+`1.0.0`
+
+Provide API/functions to report:
+
+* firmware version
+* model
+* hardware revision
+* device ID
+* PID
+* uptime
+* reset reason
+* Wi-Fi state
+* RSSI
+* RF status
+* relay status
+* provisioning state
+
+Keep build/version constants centralized.
+
+---
+
+# 8. OTA
+
+Implement robust OTA architecture suitable for production.
+
+Requirements:
+
+* OTA firmware version checking
+* reject invalid image
+* prevent downgrade unless explicitly enabled
+* verify firmware integrity
+* safe reboot after successful OTA
+* retain working firmware when OTA fails
+* watchdog-compatible OTA
+* do not activate relay during OTA
+
+If ESP-IDF partition rollback support is practical, use it.
+
+Architecture should support HTTPS OTA.
+
+Do not hard-code credentials or secrets in source.
+
+---
+
+# 9. Relay Safety
+
+Door unlocking is security-sensitive.
+
+Implement:
+
+* single controlled relay task/service
+* pulse relay only
+* automatic OFF timer
+* maximum pulse duration
+* boot default OFF
+* watchdog default OFF behavior where possible
+* reject repeated RF triggers during active pulse
+* configurable cooldown
+
+Suggested default cooldown:
+
+`1500 ms`
+
+Do not allow network flooding or RF bouncing to hold relay continuously ON.
+
+---
+
+# 10. RF Event Processing
+
+RF trigger logic must be robust.
+
+Implement:
+
+* edge/event detection
+* debounce/noise filtering
+* minimum valid HIGH duration if appropriate
+* duplicate trigger suppression
+* relay cooldown
+* learning-state separation
+
+Do not use long blocking loops.
+
+Use event-driven/state-machine logic.
+
+---
+
+# 11. RF Learning API
+
+Create a small reusable RF service.
+
+Conceptual functions may resemble:
+
+```c
+rf_init();
+rf_start_learning();
+rf_cancel_learning();
+rf_is_learning();
+rf_remote_triggered();
+```
+
+Actual design can differ if cleaner.
+
+Learning timeout:
+
+`10 seconds`
+
+When learning succeeds:
+
+* LED confirms
+* learning exits immediately
+* state/event is reported
+* device returns to normal RF monitoring
+
+If the RF module itself stores RF remote IDs internally, DO NOT duplicate unnecessary RF-code storage in ESP32.
+
+ESP32 should manage workflow/state only unless RF code storage is genuinely required.
+
+---
+
+# 12. ONE IoT Platform Integration
+
+Do NOT build the full ONE platform now.
+
+Create clean integration points for later use.
+
+Device commands should be abstracted around actions such as:
+
+* `unlock`
+* `start_rf_learning`
+* `cancel_rf_learning`
+* `enter_provisioning`
+* `restart`
+* `factory_reset`
+* `check_update`
+* `install_update`
+
+Telemetry/state examples:
+
+* online
+* relay
+* RF activity
+* RF learning
+* Wi-Fi RSSI
+* firmware version
+* uptime
+* last reset reason
+
+Keep transport separate from business logic so MQTT/HTTP can be changed later.
+
+---
+
+# 13. Local Web UI
+
+Keep it lightweight.
+
+Provisioning/local maintenance UI should provide only necessary functions:
+
+* device information
+* Wi-Fi configuration
+* RF Learn
+* relay test
+* relay pulse duration
+* firmware version
+* PID/device ID
+* OTA/update status
+* reboot
+* factory reset
+
+Do not build a large frontend.
+
+Minimize flash/RAM usage.
+
+Never expose secrets unnecessarily.
+
+---
+
+# 14. Reliability — 10-Year Product Goal
+
+Design for unattended operation.
+
+Firmware must tolerate:
+
+* Wi-Fi outage
+* router reboot
+* internet outage
+* server outage
+* RF noise
+* repeated RF presses
+* rapid power cycling
+* brownout
+* OTA failure
+* corrupted configuration
+* malformed network data
+* memory allocation failure where practical
+
+Requirements:
+
+* no intentional memory leaks
+* no uncontrolled task creation
+* no recursive retry loops
+* no frequent NVS writes
+* no unnecessary flash wear
+* no unnecessary reboot cycles
+* watchdog where appropriate
+* recover automatically from temporary faults
+
+Store configuration only when changed.
+
+Avoid writing counters/events continuously to flash.
+
+---
+
+# 15. Code Structure
+
+STRICT REQUIREMENT:
+
+**Every source file should remain below approximately 200 lines.**
+
+Do not cheat by creating giant headers or minified code.
+
+Split by responsibility.
+
+Suggested structure:
+
+```text
+main/
+  app_main.c
+  app_config.h
+
+components/
+  board/
+  relay/
+  rf/
+  button/
+  status_led/
+  provisioning/
+  device_identity/
+  ota/
+  storage/
+  connectivity/
+  platform/
+```
+
+Keep modules small and testable.
+
+Avoid excessive abstraction.
+
+No file should become a dumping ground.
+
+---
+
+# 16. State Machine
+
+Use explicit device states where helpful.
+
+Possible states:
+
+```text
+BOOT
+NORMAL
+PROVISIONING
+RF_LEARNING
+OTA
+ERROR
+```
+
+Relay operation should remain an independent controlled service.
+
+Avoid blocking one subsystem because another is busy.
+
+---
+
+# 17. Security
+
+Implement sensible embedded-product security.
+
+At minimum:
+
+* validate incoming commands
+* no arbitrary command execution
+* no credentials in logs
+* protect OTA path
+* validate OTA firmware
+* factory reset only via controlled path
+* local configuration endpoint validation
+* buffer length checking
+* defensive JSON/network parsing
+* avoid unsafe string functions
+
+Do not invent complicated crypto protocols.
+
+Use standard ESP-IDF facilities wherever possible.
+
+---
+
+# 18. Logging
+
+Use concise structured logs.
+
+Important events only:
+
+* boot
+* reset reason
+* Wi-Fi connected/disconnected
+* provisioning start/end
+* RF learning start
+* RF learning success
+* RF learning timeout
+* RF trigger
+* relay pulse
+* OTA start/result
+* serious errors
+
+Do not flood serial logs continuously.
+
+---
+
+# 19. Tests
+
+Add focused tests for the risky logic only.
+
+At minimum test:
+
+* button timing
+* RF-learning timeout
+* RF trigger debounce
+* relay pulse timeout
+* relay cooldown
+* state transitions
+* configuration bounds
+
+Do not spend large amounts of tokens creating an excessive test framework.
+
+---
+
+# 20. Resource Constraints
+
+Optimize for ESP32-C3.
+
+Prefer:
+
+* static allocation where sensible
+* small buffers
+* minimal number of FreeRTOS tasks
+* event/timer driven architecture
+* reuse of system tasks
+* no unnecessary JSON copies
+* no large third-party dependencies
+
+Before finishing, report:
+
+* firmware binary size
+* free flash
+* approximate runtime heap usage
+* minimum observed free heap
+
+---
+
+# 21. Codex Working Rules — IMPORTANT
+
+This task must be completed with low token consumption.
+
+### Do:
+
+1. Inspect the repository first.
+2. Reuse existing working architecture.
+3. Identify the smallest required implementation.
+4. Implement one subsystem at a time.
+5. Compile after meaningful changes.
+6. Fix compiler warnings/errors immediately.
+7. Add only necessary tests.
+8. Keep files under 200 lines.
+9. Finish the product firmware.
+
+### Do NOT:
+
+* repeatedly summarize the entire project
+* rewrite already-working modules without reason
+* create dozens of planning documents
+* continuously update README files
+* generate huge architecture documents
+* repeatedly inspect unchanged files
+* perform broad refactors
+* add frameworks without clear need
+* create placeholder code and call it complete
+* spend large token budgets discussing what could be implemented later
+
+If something works, leave it alone unless the current requirement needs a change.
+
+---
+
+# 22. Development Order
+
+Follow this exact order unless the repository already provides part of it:
+
+### Phase 1 — Hardware foundation
+
+Implement and verify:
+
+* board GPIO definitions
+* safe relay control
+* LED
+* button
+* RF VT detection
+* safe RF-learning GPIO behavior
+
+Compile.
+
+### Phase 2 — State logic
+
+Implement:
+
+* relay pulse safety
+* button actions
+* RF learning state
+* debounce
+* timeout
+* cooldown
+
+Compile and test.
+
+### Phase 3 — Storage / identity
+
+Implement:
+
+* NVS configuration
+* PID
+* device ID
+* firmware version
+
+Compile.
+
+### Phase 4 — Provisioning
+
+Implement:
+
+* Wi-Fi
+* AP provisioning
+* reconnect/fallback
+
+Compile and test.
+
+### Phase 5 — OTA
+
+Implement production OTA flow.
+
+Compile.
+
+### Phase 6 — Platform abstraction
+
+Add minimal ONE IoT command/telemetry interface.
+
+Do not build unrelated cloud components.
+
+### Phase 7 — Final verification
+
+Run:
+
+* clean build
+* tests
+* static/compiler warnings
+* firmware-size report
+
+Then stop.
+
+---
+
+# 23. Definition of Done
+
+Do NOT declare completion until all applicable points below are complete:
+
+* firmware clean-builds
+* GPIO3 relay is safe at boot
+* relay automatically turns OFF
+* GPIO2 RF trigger works
+* GPIO2 learning strategy is electrically safe
+* 10-second RF-learning timeout works
+* remote-learn success can be detected where supported by hardware
+* GPIO4 status LED works
+* GPIO6 provisioning/reset button works
+* Wi-Fi reconnect works
+* AP fallback works
+* PID/device identity works
+* firmware versioning works
+* OTA works
+* configuration bounds enforced
+* source files remain ~200 lines maximum
+* no obvious memory leak
+* no uncontrolled flash writes
+* tests for critical state logic pass
+* project builds without unresolved placeholders
+
+If hardware validation is required for a function, clearly label:
+
+`IMPLEMENTED — HARDWARE VERIFICATION REQUIRED`
+
+Do not label the entire project incomplete merely because physical hardware is unavailable.
+
+---
+
+# 24. Final Handoff
+
+At completion give ONLY a concise handoff containing:
+
+1. what was implemented
+2. GPIO mapping
+3. RF GPIO2 electrical conclusion
+4. build result
+5. tests result
+6. firmware binary size
+7. firmware version
+8. files/modules added
+9. exact flashing command
+10. hardware tests still required
+
+Do not write a long retrospective.
+
+The objective is a **small, robust, maintainable, production-ready QRUnlock RF door-lock power-supply firmware**, suitable for eventual ONE IoT Platform integration and designed for years of unattended operation.
