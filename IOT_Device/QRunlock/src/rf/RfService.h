@@ -25,7 +25,7 @@ class RfService {
  private:
   RfEvent TickLearning(uint32_t nowMs);
   void DriveLearningHigh();
-  void ReleaseForSampling();
+  void ReleaseForMonitoring();
   void ApplyNormalMode();
 
   systemlog::Logger& logger_;
@@ -37,7 +37,7 @@ class RfService {
   uint32_t learnValidHighMs_ = 40;
   uint32_t learnWindowMs_ = 10000;
   uint32_t learningExpiresAtMs_ = 0;
-  uint32_t phaseStartedAtMs_ = 0;
+  uint32_t learnPulseEndsAtMs_ = 0;
   uint32_t passiveHighSinceMs_ = 0;
 };
 

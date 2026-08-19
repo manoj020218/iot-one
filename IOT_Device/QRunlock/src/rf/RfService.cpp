@@ -3,8 +3,7 @@
 namespace rf {
 namespace {
 
-constexpr uint32_t kLearnDriveSliceMs = 18;
-constexpr uint32_t kLearnSampleSliceMs = 2;
+constexpr uint32_t kLearnPulseHighMs = 300;
 
 }
 
@@ -32,16 +31,17 @@ bool RfService::StartLearning(uint32_t nowMs) {
   if (learningActive_) return false;
   learningActive_ = true;
   learningExpiresAtMs_ = nowMs + learnWindowMs_;
-  phaseStartedAtMs_ = nowMs;
+  learnPulseEndsAtMs_ = nowMs + kLearnPulseHighMs;
   passiveHighSinceMs_ = 0;
   DriveLearningHigh();
   logger_.Warn(String("GPIO") + pin_ +
-               " one-wire RF learn started: driving HIGH for 10s with sample releases");
+               " one-wire RF learn started: driving a single 300ms HIGH pulse");
   return true;
 }
 
 void RfService::CancelLearning() {
   learningActive_ = false;
+  learnPulseEndsAtMs_ = 0;
   passiveHighSinceMs_ = 0;
   ApplyNormalMode();
   logger_.Info("RF learning cancelled");
@@ -57,9 +57,9 @@ void RfService::FillJson(JsonObject object, uint32_t nowMs) const {
   object["lineHigh"] = lineHigh_;
   object["learningActive"] = learningActive_;
   object["learningSecondsRemaining"] = LearningRemainingSec(nowMs);
-  object["monitorMode"] = learningActive_ ? (drivingHigh_ ? "OUTPUT_HIGH" : "INPUT_SAMPLE")
+  object["monitorMode"] = learningActive_ ? (drivingHigh_ ? "OUTPUT_HIGH" : "INPUT_WAIT")
                                           : "INPUT";
-  object["electricalMode"] = learningActive_ ? "one_wire_resistor_drive" : "input_only";
+  object["electricalMode"] = learningActive_ ? "single_pulse_then_input" : "input_only";
   object["hardwareNote"] =
       "Shared GPIO6/VT learn mode assumes 3.3V-only module and 1k series resistor.";
 }
@@ -67,6 +67,7 @@ void RfService::FillJson(JsonObject object, uint32_t nowMs) const {
 RfEvent RfService::TickLearning(uint32_t nowMs) {
   if (nowMs >= learningExpiresAtMs_) {
     learningActive_ = false;
+    learnPulseEndsAtMs_ = 0;
     passiveHighSinceMs_ = 0;
     ApplyNormalMode();
     logger_.Info(String("RF learning timeout on GPIO") + pin_);
@@ -75,9 +76,11 @@ RfEvent RfService::TickLearning(uint32_t nowMs) {
 
   if (drivingHigh_) {
     lineHigh_ = true;
-    if (nowMs - phaseStartedAtMs_ >= kLearnDriveSliceMs) {
-      ReleaseForSampling();
-      phaseStartedAtMs_ = nowMs;
+    if (nowMs >= learnPulseEndsAtMs_) {
+      ReleaseForMonitoring();
+      learnPulseEndsAtMs_ = 0;
+      logger_.Info(String("RF learn pulse complete on GPIO") + pin_ +
+                   ", monitoring VT input for success");
     }
     return {};
   }
@@ -87,19 +90,14 @@ RfEvent RfService::TickLearning(uint32_t nowMs) {
     if (passiveHighSinceMs_ == 0) passiveHighSinceMs_ = nowMs;
     if (nowMs - passiveHighSinceMs_ >= learnValidHighMs_) {
       learningActive_ = false;
+      learnPulseEndsAtMs_ = 0;
       passiveHighSinceMs_ = 0;
       ApplyNormalMode();
-      logger_.Info(String("RF learning success: receiver held GPIO") + pin_ +
-                   " HIGH during sample release");
+      logger_.Info(String("RF learning success: VT input on GPIO") + pin_ + " went HIGH");
       return {RfEventType::LearningSuccess};
     }
   } else {
     passiveHighSinceMs_ = 0;
-  }
-
-  if (nowMs - phaseStartedAtMs_ >= kLearnSampleSliceMs) {
-    DriveLearningHigh();
-    phaseStartedAtMs_ = nowMs;
   }
   return {};
 }
@@ -110,7 +108,7 @@ void RfService::DriveLearningHigh() {
   drivingHigh_ = true;
 }
 
-void RfService::ReleaseForSampling() {
+void RfService::ReleaseForMonitoring() {
   pinMode(pin_, INPUT);
   drivingHigh_ = false;
 }
