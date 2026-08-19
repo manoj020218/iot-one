@@ -41,7 +41,7 @@ void AppController::Begin() {
             config::kRfDuplicateSuppressMs, config::kRfLearnWindowMs,
             config::kRfLearnSettleMs);
   wifi_.Begin();
-  if (wifi_.AccessPointActive()) {
+  if (app::kBleProvisioningEnabled && wifi_.AccessPointActive()) {
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
     ble_.Begin(identity_);
     lastApActive_ = true;
@@ -55,14 +55,16 @@ void AppController::Tick() {
   const uint32_t nowMs = millis();
   wifi_.Tick(nowMs);
   const bool apActive = wifi_.AccessPointActive();
-  if (apActive && !lastApActive_) {
-    ArmBleProvisionWindow(nowMs, &bleWindowExpiresAtMs_);
-    ble_.Begin(identity_);
-  } else if (!apActive && lastApActive_) {
-    bleWindowExpiresAtMs_ = 0;
-    ble_.Stop();
-  } else if (apActive && bleWindowExpiresAtMs_ != 0 && nowMs >= bleWindowExpiresAtMs_) {
-    ble_.Stop();
+  if (app::kBleProvisioningEnabled) {
+    if (apActive && !lastApActive_) {
+      ArmBleProvisionWindow(nowMs, &bleWindowExpiresAtMs_);
+      ble_.Begin(identity_);
+    } else if (!apActive && lastApActive_) {
+      bleWindowExpiresAtMs_ = 0;
+      ble_.Stop();
+    } else if (apActive && bleWindowExpiresAtMs_ != 0 && nowMs >= bleWindowExpiresAtMs_) {
+      ble_.Stop();
+    }
   }
   lastApActive_ = apActive;
   ota_.Tick();
@@ -86,8 +88,10 @@ bool AppController::StartRfLearning() { return !ota_.Active() && rf_.StartLearni
 void AppController::CancelRfLearning() { rf_.CancelLearning(); }
 void AppController::EnterProvisioning() {
   wifi_.StartProvisioningAp(true);
-  ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
-  ble_.Begin(identity_);
+  if (app::kBleProvisioningEnabled) {
+    ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
+    ble_.Begin(identity_);
+  }
 }
 bool AppController::ApplyWifi(const String& ssid, const String& password) {
   return wifi_.SaveAndReconnect(ssid, password);
@@ -141,7 +145,8 @@ void AppController::FillStatus(JsonDocument& doc) const {
   system["freeSketchSpace"] = ESP.getFreeSketchSpace();
   system["cpuFreqMHz"] = getCpuFrequencyMhz();
   system["bleProvisionWindowRemainingMs"] =
-      (wifi_.AccessPointActive() && bleWindowExpiresAtMs_ > millis())
+      (app::kBleProvisioningEnabled && wifi_.AccessPointActive() &&
+       bleWindowExpiresAtMs_ > millis())
           ? (bleWindowExpiresAtMs_ - millis())
           : 0;
   wifi_.FillJson(doc.createNestedObject("wifi"));

@@ -13,5 +13,6 @@ inline constexpr char kMdnsPrefix[] = "jnx-qru";
 inline constexpr char kBleServiceUuid[] = "FF00";
 inline constexpr char kBleWriteUuid[] = "FF01";
 inline constexpr char kBleStatusUuid[] = "FF02";
+inline constexpr bool kBleProvisioningEnabled = false;
 
 }  // namespace app
