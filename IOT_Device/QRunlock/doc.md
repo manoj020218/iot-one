@@ -42,11 +42,14 @@ Attempted on August 19, 2026:
 - `pio test -e native`
 - Result: not runnable on this Windows machine because `gcc` and `g++` are not installed in `PATH`
 
-## Hardware check still required
+## Hardware verification
 
-- Trigger the relay from both button and RF paths.
-- Confirm the LED shows two quick flashes even when the normal LED state is steady ON.
-- Confirm the flashes are visible and brief, then the LED returns to the prior pattern.
+Verified on August 19, 2026 after flashing to `COM22`:
+
+- The relay trigger path is working on hardware.
+- The status LED shows two quick flashes on successful relay trigger.
+- The two-flash confirmation is visible even when the normal LED state is steady ON.
+- After the confirmation, the LED returns to the prior state pattern.
 
 ## Git scope
 
