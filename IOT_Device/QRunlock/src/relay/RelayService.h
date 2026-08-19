@@ -17,6 +17,7 @@ class RelayService {
   void Tick(uint32_t nowMs);
   bool Pulse(uint32_t nowMs, const String& reason);
   bool Active() const { return logic_.Active(); }
+  bool StateOn() const { return stateOn_; }
   uint16_t PulseMs() const { return logic_.PulseMs(); }
   uint16_t CooldownMs() const { return logic_.CooldownMs(); }
   void FillJson(JsonObject object) const;
@@ -29,6 +30,7 @@ class RelayService {
   uint8_t pin_ = 0;
   bool activeHigh_ = true;
   bool outputHigh_ = false;
+  bool stateOn_ = false;
   String lastReason_ = "boot";
 };
 

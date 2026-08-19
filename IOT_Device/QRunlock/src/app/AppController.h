@@ -37,6 +37,7 @@ class AppController : public platform::ControlApi {
   void FillStatus(JsonDocument& doc) const override;
 
  private:
+  void ClearWifiAndEnterProvisioning(const char* reason);
   void HandleButton(button::ButtonEvent event);
   void HandleRfEvent(const rf::RfEvent& event);
   void HandleDeferredRestart(uint32_t nowMs);
@@ -52,6 +53,7 @@ class AppController : public platform::ControlApi {
   statusled::StatusLedService led_{};
   button::ButtonService button_{};
   web::WebServerService web_{};
+  bool cloudConnected_ = false;
   uint32_t bleWindowExpiresAtMs_ = 0;
   uint32_t restartAtMs_ = 0;
   bool factoryResetPending_ = false;

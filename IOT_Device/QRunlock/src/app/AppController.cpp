@@ -72,7 +72,8 @@ void AppController::Tick() {
   HandleButton(button_.Tick(nowMs));
   HandleRfEvent(rf_.Tick(nowMs));
   HandleDeferredRestart(nowMs);
-  state_ = ResolveState({nowMs, wifi_.AccessPointActive(), rf_.LearningActive(),
+  state_ = ResolveState({nowMs, wifi_.AccessPointActive(), ble_.Started(),
+                         wifi_.Connected(), cloudConnected_, rf_.LearningActive(),
                          ota_.Active(), ota_.HasError()});
   led_.SetState(state_);
   led_.Tick(nowMs);
@@ -81,10 +82,17 @@ void AppController::Tick() {
 
 bool AppController::Unlock(const String& reason) {
   if (ota_.Active()) return false;
-  return relay_.Pulse(millis(), reason);
+  const uint32_t nowMs = millis();
+  if (!relay_.Pulse(nowMs, reason)) return false;
+  led_.RequestRelayTriggerFlash(nowMs);
+  return true;
 }
 
-bool AppController::StartRfLearning() { return !ota_.Active() && rf_.StartLearning(millis()); }
+bool AppController::StartRfLearning() {
+  if (ota_.Active()) return false;
+  led_.ClearRfLearnQuietHold();
+  return rf_.StartLearning(millis());
+}
 void AppController::CancelRfLearning() { rf_.CancelLearning(); }
 void AppController::EnterProvisioning() {
   wifi_.StartProvisioningAp(true);
@@ -121,6 +129,20 @@ void AppController::Restart() { restartAtMs_ = millis() + 500; }
 void AppController::FactoryReset() {
   factoryResetPending_ = true;
   restartAtMs_ = millis() + 500;
+}
+
+void AppController::ClearWifiAndEnterProvisioning(const char* reason) {
+  logger_.Warn(String("Clearing saved Wi-Fi and entering provisioning: ") + reason);
+  led_.ClearRfLearnQuietHold();
+  rf_.CancelLearning();
+  if (!wifi_.ClearSavedNetwork()) {
+    logger_.Error("Failed to clear saved Wi-Fi credentials");
+    return;
+  }
+  if (app::kBleProvisioningEnabled) {
+    ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
+    ble_.Begin(identity_);
+  }
 }
 
 void AppController::FillStatus(JsonDocument& doc) const {
@@ -160,14 +182,25 @@ void AppController::FillStatus(JsonDocument& doc) const {
 }
 
 void AppController::HandleButton(button::ButtonEvent event) {
-  if (event == button::ButtonEvent::ShortPress) Unlock("button_short");
-  if (event == button::ButtonEvent::ProvisioningHold) EnterProvisioning();
-  if (event == button::ButtonEvent::FactoryResetHold) FactoryReset();
+  if (event == button::ButtonEvent::ShortPress) {
+    Unlock(relay_.StateOn() ? "button_toggle_off" : "button_toggle_on");
+  }
+  if (event == button::ButtonEvent::RfLearnMultiPress) {
+    if (!StartRfLearning()) logger_.Warn("Button RF learn request ignored");
+  }
+  if (event == button::ButtonEvent::FactoryResetMultiPress) {
+    ClearWifiAndEnterProvisioning("button_10_click");
+  }
+  if (event == button::ButtonEvent::FactoryResetHold) {
+    ClearWifiAndEnterProvisioning("button_30s_hold");
+  }
 }
 
 void AppController::HandleRfEvent(const rf::RfEvent& event) {
   if (event.type == rf::RfEventType::Triggered) Unlock("rf_vt");
-  if (event.type == rf::RfEventType::LearningSuccess) led_.RequestConfirmFlash(millis());
+  if (event.type == rf::RfEventType::LearningSuccess) {
+    led_.RequestRfLearnQuietHold(millis());
+  }
 }
 
 void AppController::HandleDeferredRestart(uint32_t nowMs) {
