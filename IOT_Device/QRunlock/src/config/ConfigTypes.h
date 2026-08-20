@@ -18,4 +18,21 @@ struct NetworkConfig {
   char password[65];
 };
 
+// Binds this device to one Jenix One HOME and MQTT broker. `homeId` becomes
+// the `tenantId` segment of the canonical jnx/{tenantId}/{pid}/{deviceId}/
+// {suffix} topic scheme (packages/shared/src/utils/mqtt-topics.ts) — see
+// BRIDGE.md. mqttUsername/mqttPassword are optional (empty = anonymous
+// connect); today's broker runs open, but the fields exist so a future
+// per-device-credential rollout (MQTT_LICENSED_DEVICE_ACCESS_PLAN.md) is a
+// config change here, not a firmware rebuild.
+struct CloudConfig {
+  uint32_t schemaVersion;
+  uint8_t configured;
+  char homeId[48];
+  char mqttHost[64];
+  uint16_t mqttPort;
+  char mqttUsername[32];
+  char mqttPassword[64];
+};
+
 }  // namespace config

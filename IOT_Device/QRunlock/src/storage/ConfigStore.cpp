@@ -11,12 +11,15 @@ constexpr char kDeviceNs[] = "qru_dev";
 constexpr char kDeviceKey[] = "device";
 constexpr char kWifiNs[] = "qru_wifi";
 constexpr char kWifiKey[] = "network";
+constexpr char kCloudNs[] = "qru_cloud";
+constexpr char kCloudKey[] = "cloud";
 
 }  // namespace
 
 bool ConfigStore::Begin() {
   LoadDevice();
   LoadNetwork();
+  LoadCloud();
   return true;
 }
 
@@ -47,6 +50,18 @@ bool ConfigStore::SaveNetwork(const String& ssid, const String& password) {
   return true;
 }
 
+bool ConfigStore::SaveCloud(const config::CloudConfig& config) {
+  const config::CloudConfig next = config::SanitizeCloudConfig(config);
+  if (config::CloudConfigEquals(next, cloudConfig_)) return true;
+  Preferences prefs;
+  prefs.begin(kCloudNs, false);
+  const size_t written = prefs.putBytes(kCloudKey, &next, sizeof(next));
+  prefs.end();
+  if (written != sizeof(next)) return false;
+  cloudConfig_ = next;
+  return true;
+}
+
 void ConfigStore::FactoryReset() {
   Preferences prefs;
   prefs.begin(kDeviceNs, false);
@@ -55,8 +70,12 @@ void ConfigStore::FactoryReset() {
   prefs.begin(kWifiNs, false);
   prefs.clear();
   prefs.end();
+  prefs.begin(kCloudNs, false);
+  prefs.clear();
+  prefs.end();
   deviceConfig_ = config::DefaultDeviceConfig();
   networkConfig_ = config::DefaultNetworkConfig();
+  cloudConfig_ = config::DefaultCloudConfig();
 }
 
 void ConfigStore::LoadDevice() {
@@ -83,6 +102,22 @@ void ConfigStore::LoadNetwork() {
     prefs.getBytes(kWifiKey, &networkConfig_, sizeof(networkConfig_));
   }
   prefs.end();
+}
+
+void ConfigStore::LoadCloud() {
+  cloudConfig_ = config::DefaultCloudConfig();
+  Preferences prefs;
+  prefs.begin(kCloudNs, true);
+  if (prefs.getBytesLength(kCloudKey) == sizeof(cloudConfig_)) {
+    prefs.getBytes(kCloudKey, &cloudConfig_, sizeof(cloudConfig_));
+  }
+  prefs.end();
+  if (cloudConfig_.schemaVersion != config::kSchemaVersion) {
+    cloudConfig_ = config::DefaultCloudConfig();
+    SaveCloud(cloudConfig_);
+  } else {
+    cloudConfig_ = config::SanitizeCloudConfig(cloudConfig_);
+  }
 }
 
 }  // namespace storage

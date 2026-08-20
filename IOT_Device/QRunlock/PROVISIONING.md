@@ -304,8 +304,17 @@ This section is the direct gap list for the current `QRunlock` firmware.
   - current AP/BLE name format is like `JNX-QRU-0010`
   - the standard requires `JNXQRU` plus the last 6 uppercase hex digits of
     the STA MAC, with no separators
-- MQTT / VPS cloud connection is not yet part of provisioning, which is
-  correct, but the device still needs a clean post-Wi-Fi claim/bind step.
+- MQTT / VPS cloud connection is not yet part of *provisioning* (still
+  correct — see item 8), but the device now **can** connect to the platform
+  broker once Wi-Fi is up: `src/cloud/CloudBridgeService.*` implements the
+  canonical `jnx/{tenantId}/{pid}/{deviceId}/{suffix}` bridge end-to-end
+  (subscribes `cmd`, dispatches through the same `ControlApi::Unlock()`
+  every other input uses, publishes `cmd/ack` + `status` + `lwt`), built and
+  hardware-verified 2026-08-20. See `BRIDGE.md` — the full protocol and the
+  reuse pattern for future devices lives there now, not here. What's still
+  missing is only the *binding* step (item 8 below) — today `homeId` is set
+  via a local `/api/cloud` POST, a bench/pilot mechanism, not the real
+  provisioning-intent flow.
 
 ### Required firmware changes for QRunlock
 
@@ -356,11 +365,17 @@ This section is the direct gap list for the current `QRunlock` firmware.
      `deviceId`, `hardwareId`, and the provisioning intent/token expected by
      the ONE backend
    - this is not part of BLE or SoftAP provisioning and must stay separate
+   - **partial/interim version exists**: a local `POST /api/cloud` route
+     lets a bench operator set `homeId` directly (see `BRIDGE.md` §4) —
+     this is not the real bind flow (no auth, no provisioning-intent token,
+     purely local-network trust) and should be replaced by the real flow
+     above, not extended into one
 
-9. Wire actual cloud-connected state into firmware status:
-   - once MQTT/VPS connection exists in QRunlock firmware, map that real
-     state into the existing `cloudConnected_` state path
-   - this will make dashboard status and steady-ON LED behavior truthful
+9. ~~Wire actual cloud-connected state into firmware status~~ — **done,
+   2026-08-20**: `cloudConnected_` (`AppController.h`) now reads
+   `CloudBridgeService::Connected()` every tick instead of being hardcoded
+   `false`. Dashboard status and steady-ON LED behavior are truthful
+   whenever the device is actually bound (item 8) and connected.
 
 10. Review the partition and diagnostics layout:
    - add a `coredump` partition for cleaner crash analysis

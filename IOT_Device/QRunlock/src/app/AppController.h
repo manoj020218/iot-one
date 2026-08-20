@@ -4,6 +4,7 @@
 
 #include "app/AppState.h"
 #include "button/ButtonService.h"
+#include "cloud/CloudBridgeService.h"
 #include "connectivity/BleProvisioningService.h"
 #include "connectivity/WifiManager.h"
 #include "device_identity/DeviceIdentity.h"
@@ -32,6 +33,8 @@ class AppController : public platform::ControlApi {
                                  JsonDocument& response) override;
   bool SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs,
                     const String& otaUrl) override;
+  bool SaveCloudConfig(const String& homeId, const String& mqttHost, uint16_t mqttPort,
+                       const String& mqttUsername, const String& mqttPassword) override;
   bool RequestOta(const String& url, const String& targetVersion,
                   bool allowDowngrade) override;
   void Restart() override;
@@ -53,10 +56,10 @@ class AppController : public platform::ControlApi {
   connectivity::WifiManager wifi_{store_, identity_, logger_};
   connectivity::BleProvisioningService ble_{logger_};
   ota::OtaService ota_{logger_};
+  cloud::CloudBridgeService cloud_{store_, identity_, logger_};
   statusled::StatusLedService led_{};
   button::ButtonService button_{};
   web::WebServerService web_{};
-  bool cloudConnected_ = false;
   uint32_t bleWindowExpiresAtMs_ = 0;
   uint32_t restartAtMs_ = 0;
   bool factoryResetPending_ = false;

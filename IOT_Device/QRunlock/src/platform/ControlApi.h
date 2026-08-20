@@ -17,6 +17,13 @@ class ControlApi {
                                          JsonDocument& response) = 0;
   virtual bool SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs,
                             const String& otaUrl) = 0;
+  // Binds this device to a Jenix One HOME + MQTT broker (see BRIDGE.md).
+  // mqttHost/mqttPort/mqttUsername/mqttPassword may be empty — empty host
+  // falls back to the platform default, empty username means anonymous
+  // connect.
+  virtual bool SaveCloudConfig(const String& homeId, const String& mqttHost,
+                               uint16_t mqttPort, const String& mqttUsername,
+                               const String& mqttPassword) = 0;
   virtual bool RequestOta(const String& url, const String& targetVersion,
                           bool allowDowngrade) = 0;
   virtual void Restart() = 0;

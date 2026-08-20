@@ -58,6 +58,15 @@ void WebServerService::Begin(platform::ControlApi& api) {
     api_->ApplyWifi(doc["ssid"] | "", doc["password"] | "") ? SendOk()
                                                              : SendError("wifi_save_failed");
   });
+  server_.on("/api/cloud", HTTP_POST, [this]() {
+    StaticJsonDocument<512> doc;
+    if (!ParseJsonBody(doc)) return;
+    api_->SaveCloudConfig(doc["homeId"] | "", doc["mqttHost"] | "",
+                          doc["mqttPort"] | 0, doc["mqttUsername"] | "",
+                          doc["mqttPassword"] | "")
+        ? SendOk()
+        : SendError("cloud_save_failed");
+  });
   server_.on("/api/settings", HTTP_POST, [this]() {
     StaticJsonDocument<512> doc;
     if (!ParseJsonBody(doc)) return;

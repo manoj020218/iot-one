@@ -48,6 +48,7 @@ void AppController::Begin() {
     lastApActive_ = true;
   }
   web_.Begin(*this);
+  cloud_.Begin(*this);
   logger_.Info(String("Boot PID=") + app::kPid + " AP/BLE=" + identity_.BleName() +
                " CPU=" + getCpuFrequencyMhz() + "MHz");
 }
@@ -70,11 +71,12 @@ void AppController::Tick() {
   lastApActive_ = apActive;
   ota_.Tick();
   relay_.Tick(nowMs);
+  cloud_.Tick(nowMs, wifi_.Connected());
   HandleButton(button_.Tick(nowMs));
   HandleRfEvent(rf_.Tick(nowMs));
   HandleDeferredRestart(nowMs);
   state_ = ResolveState({nowMs, wifi_.AccessPointActive(), ble_.Started(),
-                         wifi_.Connected(), cloudConnected_, rf_.LearningActive(),
+                         wifi_.Connected(), cloud_.Connected(), rf_.LearningActive(),
                          ota_.Active(), ota_.HasError()});
   led_.SetState(state_);
   led_.Tick(nowMs);
@@ -144,7 +146,7 @@ void AppController::HandleProvisioningRequest(const JsonDocument& request,
     payload["ok"] = true;
     payload["cmd"] = "c";
     payload["wifi_connected"] = wifi_.Connected();
-    payload["mqtt_connected"] = cloudConnected_;
+    payload["mqtt_connected"] = cloud_.Connected();
     return;
   }
 
@@ -170,6 +172,25 @@ bool AppController::SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs
                                                               sizeof(config.otaUrl));
   if (!store_.SaveDevice(config)) return false;
   relay_.Configure(config.relayPulseMs, config.relayCooldownMs);
+  return true;
+}
+
+bool AppController::SaveCloudConfig(const String& homeId, const String& mqttHost,
+                                    uint16_t mqttPort, const String& mqttUsername,
+                                    const String& mqttPassword) {
+  config::CloudConfig config = store_.Cloud();
+  homeId.substring(0, sizeof(config.homeId) - 1).toCharArray(config.homeId, sizeof(config.homeId));
+  if (!mqttHost.isEmpty()) {
+    mqttHost.substring(0, sizeof(config.mqttHost) - 1)
+        .toCharArray(config.mqttHost, sizeof(config.mqttHost));
+  }
+  if (mqttPort != 0) config.mqttPort = mqttPort;
+  mqttUsername.substring(0, sizeof(config.mqttUsername) - 1)
+      .toCharArray(config.mqttUsername, sizeof(config.mqttUsername));
+  mqttPassword.substring(0, sizeof(config.mqttPassword) - 1)
+      .toCharArray(config.mqttPassword, sizeof(config.mqttPassword));
+  if (!store_.SaveCloud(config)) return false;
+  cloud_.ApplyConfig();
   return true;
 }
 
@@ -247,6 +268,7 @@ void AppController::FillStatus(JsonDocument& doc) const {
           ? (bleWindowExpiresAtMs_ - millis())
           : 0;
   wifi_.FillJson(doc.createNestedObject("wifi"));
+  cloud_.FillJson(doc.createNestedObject("cloud"));
   relay_.FillJson(doc.createNestedObject("relay"));
   rf_.FillJson(doc.createNestedObject("rf"), millis());
   ble_.FillJson(doc.createNestedObject("ble"));

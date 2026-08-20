@@ -1,5 +1,20 @@
 # QRunlock — One Device, Two Platforms: Integration Options
 
+## Status — firmware↔Jenix MQTT bridge built, 2026-08-20
+
+The gap this whole document was written to close — physical firmware had
+*zero* cloud connectivity at all (confirmed by reading `platformio.ini`'s
+`lib_deps` and `AppController.h`'s hardcoded `cloudConnected_ = false`) — is
+now closed on the firmware side: `src/cloud/CloudBridgeService.*` connects
+to Jenix One's own canonical MQTT scheme (`jnx/{tenantId}/{pid}/{deviceId}/
+{suffix}`, not the standalone Relay service's protocol described below,
+which remains a documented dead end per the "Decided" section). Full
+protocol + reuse pattern for future devices: `BRIDGE.md`. What's still
+missing before an app-tap genuinely moves the physical relay: the device
+needs to be bound to a real HOME (`homeId`) — today that's a bench-only
+local `/api/cloud` POST, not the real provisioning-intent flow (see
+`BRIDGE.md` §4 and `PROVISIONING.md` §9 item 8).
+
 ## Status — Option A built, 2026-08-20
 
 Originally written as a plan-only document (2026-08-19) recording what

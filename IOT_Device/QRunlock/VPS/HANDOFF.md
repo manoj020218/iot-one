@@ -324,20 +324,54 @@ Steps 1–2 below (previously "Next recommended steps") are done:
   reload clean, `https://qrunlock.com` and the API health endpoint both
   200 afterward).
 
+## Round 5 — firmware MQTT bridge, 2026-08-20
+
+User confirmed the flashed relay's local hardware path (Wi-Fi join +
+`/api/relay/pulse`) works on real hardware. The remaining gap — firmware had
+*no* cloud connectivity of any kind (verified by reading `platformio.ini`'s
+`lib_deps` and `AppController.h`'s permanently-`false` `cloudConnected_`) —
+is now closed: `src/cloud/CloudBridgeService.*` connects the device to
+Jenix One's own canonical MQTT scheme, subscribes `cmd`, dispatches through
+the exact same `ControlApi::Unlock()` every other input already uses, and
+acks on `cmd/ack`. Built as an explicitly reusable pattern for future
+devices — full protocol + reuse checklist in the new `BRIDGE.md`. Real
+ESP32-C3 build verified (`pio run -e esp32-c3-supermini` — 75.4% flash,
+16.1% RAM, links clean); native unit tests for the new pure logic
+(`CloudBridgeLogic`'s topic building + command parsing) were written but
+could not be executed on this machine (no gcc/g++ installed) — run
+`pio test -e native` before trusting them blindly, though the real-target
+build succeeding is strong secondary evidence the wiring compiles correctly.
+
+**Still not live end-to-end**: the device needs `homeId` before it will
+connect at all — see `BRIDGE.md` §4 for the local `POST /api/cloud` bench
+mechanism (use `home-user-qrunlock-vendor-jenix-internal`, the real vendor
+pool HOME from Round 3/4, for a first real test). Not yet flashed or tested
+against a live broker as of this note — that's the next action.
+
 ## Next recommended steps
 
-1. **QRunlock video-call project**: actually run the app and click
+1. **Flash + test the bridge**: build/upload the updated firmware, join it
+   to Wi-Fi, `POST /api/cloud` with the vendor pool `homeId` (see above),
+   confirm `GET /api/status`'s `cloud.connected` flips true, then fire a
+   real unlock through the vendor API smoke-tested in Round 4
+   (`POST /api/v1/public/devices/<deviceId>/commands {"command":"unlock"}`)
+   and confirm the physical relay actually pulses. This is the first
+   genuinely real end-to-end test since this device was flashed.
+2. **QRunlock video-call project**: actually run the app and click
    through the Relay device list/detail/unlock/settings pages against a
-   real or MQTT-simulated device — the vendor API itself is proven live
-   (see above), but the app's own UI against it is still unclicked. See
-   that project's own `HANDOFF.md` §0 "Not verified" list.
-2. **Firmware**: close the MQTT command/ack gap (PROVISIONING.md §9 item
-   9) — nothing above has a real device to talk to until this exists —
-   and decide whether `relayStateAfterPowerRestore`/`switchType` are
-   worth adding to `ConfigTypes.h`, or should be dropped from the API
+   real device — the vendor API itself is proven live, and now the
+   device-side bridge is too, but the app's own UI against a real device
+   is still unclicked. See that project's own `HANDOFF.md` §0
+   "Not verified" list.
+3. **Firmware**: decide whether `relayStateAfterPowerRestore`/`switchType`
+   are worth adding to `ConfigTypes.h`, or should be dropped from the API
    instead of staying permanently inert.
-3. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
+4. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
    end to end against a real unit, through **both** the PWA and the
-   QRunlock vendor path — neither has happened yet (blocked on item 2).
-4. Show the user the top-segmented-tabs deviation from the approved
+   QRunlock vendor path — neither has happened yet.
+5. Show the user the top-segmented-tabs deviation from the approved
    mockup (see above) before considering the PWA screen fully signed off.
+6. Replace the bench-only `/api/cloud` binding mechanism with the real
+   provisioning-intent bind flow (`PROVISIONING.md` §9 item 8) once that
+   exists — not urgent while there's a single bench unit, load-bearing
+   before any second device or a real customer.

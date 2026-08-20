@@ -1,7 +1,10 @@
 #include <unity.h>
 
+#include <cstring>
+
 #include "app/AppState.h"
 #include "button/ButtonLogic.h"
+#include "cloud/CloudBridgeLogic.h"
 #include "config/Defaults.h"
 #include "relay/RelayLogic.h"
 #include "rf/RfLogic.h"
@@ -85,12 +88,35 @@ void test_state_transitions_and_bounds() {
   TEST_ASSERT_EQUAL_UINT16(10000, config::ClampRelayCooldownMs(12000));
 }
 
+void test_cloud_bridge_topic_building() {
+  char topic[160];
+  const int written =
+      cloud::BuildTopic(topic, sizeof(topic), "home-abc123", "JNX-QRU-C3-001",
+                        "JNX-QRU-C3-A7F2", "cmd");
+  TEST_ASSERT_GREATER_THAN(0, written);
+  TEST_ASSERT_EQUAL_STRING("jnx/home-abc123/JNX-QRU-C3-001/JNX-QRU-C3-A7F2/cmd", topic);
+
+  char ackTopic[160];
+  cloud::BuildTopic(ackTopic, sizeof(ackTopic), "home-abc123", "JNX-QRU-C3-001",
+                    "JNX-QRU-C3-A7F2", "cmd/ack");
+  TEST_ASSERT_EQUAL_STRING("jnx/home-abc123/JNX-QRU-C3-001/JNX-QRU-C3-A7F2/cmd/ack", ackTopic);
+}
+
+void test_cloud_bridge_command_parsing() {
+  TEST_ASSERT_EQUAL(cloud::CommandKind::Unlock, cloud::ParseCommandKind("unlock"));
+  TEST_ASSERT_EQUAL(cloud::CommandKind::Unknown, cloud::ParseCommandKind("set_relay"));
+  TEST_ASSERT_EQUAL(cloud::CommandKind::Unknown, cloud::ParseCommandKind(""));
+  TEST_ASSERT_EQUAL(cloud::CommandKind::Unknown, cloud::ParseCommandKind(nullptr));
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_button_timing);
   RUN_TEST(test_relay_pulse_and_cooldown);
   RUN_TEST(test_rf_trigger_and_learning);
   RUN_TEST(test_state_transitions_and_bounds);
+  RUN_TEST(test_cloud_bridge_topic_building);
+  RUN_TEST(test_cloud_bridge_command_parsing);
   UNITY_END();
 }
 
