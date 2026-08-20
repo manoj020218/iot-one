@@ -14,7 +14,20 @@ void WebServerService::Begin(platform::ControlApi& api) {
     api_->FillStatus(doc);
     String payload;
     serializeJson(doc, payload);
-    server_.send(200, "application/json", payload);
+    SendPayload(200, "application/json", payload);
+  });
+  server_.on("/provision", HTTP_OPTIONS, [this]() {
+    ApplyCorsHeaders();
+    server_.send(204);
+  });
+  server_.on("/provision", HTTP_POST, [this]() {
+    StaticJsonDocument<512> request;
+    if (!ParseJsonBody(request, true)) return;
+    DynamicJsonDocument response(1024);
+    api_->HandleProvisioningRequest(request, response);
+    String payload;
+    serializeJson(response, payload);
+    SendPayload(200, "application/json", payload, true);
   });
   server_.on("/api/relay/pulse", HTTP_POST, [this]() {
     api_->Unlock("web");
@@ -66,22 +79,34 @@ void WebServerService::Begin(platform::ControlApi& api) {
 
 void WebServerService::Tick() { server_.handleClient(); }
 
-bool WebServerService::ParseJsonBody(StaticJsonDocument<512>& doc) {
+void WebServerService::ApplyCorsHeaders() {
+  server_.sendHeader("Access-Control-Allow-Origin", "*");
+  server_.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  server_.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+bool WebServerService::ParseJsonBody(StaticJsonDocument<512>& doc, bool cors) {
   const String body = server_.arg("plain");
   if (deserializeJson(doc, body)) {
-    SendError("invalid_json");
+    SendError("invalid_json", cors);
     return false;
   }
   return true;
 }
 
-void WebServerService::SendOk() {
-  server_.send(200, "application/json", "{\"ok\":true}");
+void WebServerService::SendPayload(int statusCode, const char* contentType,
+                                   const String& payload, bool cors) {
+  if (cors) ApplyCorsHeaders();
+  server_.send(statusCode, contentType, payload);
 }
 
-void WebServerService::SendError(const char* message) {
-  String payload = String("{\"ok\":false,\"error\":\"") + message + "\"}";
-  server_.send(400, "application/json", payload);
+void WebServerService::SendOk(bool cors) {
+  SendPayload(200, "application/json", "{\"ok\":true}", cors);
+}
+
+void WebServerService::SendError(const char* message, bool cors) {
+  const String payload = String("{\"ok\":false,\"error\":\"") + message + "\"}";
+  SendPayload(400, "application/json", payload, cors);
 }
 
 }  // namespace web

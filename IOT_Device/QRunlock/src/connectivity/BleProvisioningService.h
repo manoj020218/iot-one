@@ -5,15 +5,16 @@
 
 #include "connectivity/WifiManager.h"
 #include "device_identity/DeviceIdentity.h"
+#include "platform/ControlApi.h"
 #include "system/Logger.h"
 
 namespace connectivity {
 
 class BleProvisioningService {
  public:
-  BleProvisioningService(WifiManager& wifiManager, systemlog::Logger& logger)
-      : wifiManager_(wifiManager), logger_(logger) {}
+  explicit BleProvisioningService(systemlog::Logger& logger) : logger_(logger) {}
 
+  void AttachApi(platform::ControlApi& api) { api_ = &api; }
   bool Begin(const identity::DeviceIdentity& identity);
   void Stop();
   void FillJson(JsonObject object) const;
@@ -21,7 +22,7 @@ class BleProvisioningService {
   void ApplyPayload(const std::string& payload);
 
  private:
-  WifiManager& wifiManager_;
+  platform::ControlApi* api_ = nullptr;
   systemlog::Logger& logger_;
   bool initialized_ = false;
   bool started_ = false;

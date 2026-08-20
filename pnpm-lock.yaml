@@ -56,7 +56,58 @@ importers:
       vitest:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
+
+  IOT_Device/QRunlock/VPS:
+    dependencies:
+      '@jenix/device-schemas':
+        specifier: workspace:*
+        version: link:../../../packages/device-schemas
+      '@jenix/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+      express:
+        specifier: ^4.21.1
+        version: 4.22.2
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
+
   IOT_Device/Smart IP speaker/backend:
+    dependencies:
+      '@jenix/device-schemas':
+        specifier: workspace:*
+        version: link:../../../packages/device-schemas
+      '@jenix/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+      express:
+        specifier: ^4.21.1
+        version: 4.22.2
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
+
+  IOT_Device/Smart Streamer/VPS:
     dependencies:
       '@jenix/device-schemas':
         specifier: workspace:*
@@ -140,9 +191,15 @@ importers:
       '@jenix/ip-speaker-backend':
         specifier: workspace:*
         version: link:../../../IOT_Device/Smart IP speaker/backend
+      '@jenix/qrunlock-backend':
+        specifier: workspace:*
+        version: link:../../../IOT_Device/QRunlock/VPS
       '@jenix/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
+      '@jenix/smart-streamer-backend':
+        specifier: workspace:*
+        version: link:../../../IOT_Device/Smart Streamer/VPS
       express:
         specifier: ^4.21.1
         version: 4.22.2

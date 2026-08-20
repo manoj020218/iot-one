@@ -3,6 +3,20 @@ import {
   createIpSpeakerDeviceActionRouter,
   createIpSpeakerRouter
 } from "@jenix/ip-speaker-backend";
+import {
+  QRUNLOCK_PID,
+  createQrunlockDeviceActionRouter,
+  createQrunlockRouter,
+  getSettings as getQrunlockSettings,
+  listActivity as listQrunlockActivity,
+  unlockDevice as unlockQrunlockDevice,
+  updateSettings as updateQrunlockSettings,
+  type UpdateSettingsInput as QrunlockUpdateSettingsInput
+} from "@jenix/qrunlock-backend";
+import {
+  createSmartStreamerDeviceActionRouter,
+  createSmartStreamerRouter
+} from "@jenix/smart-streamer-backend";
 import express, { type Express } from "express";
 
 import { requireAuthenticatedUser } from "./infrastructure/http/request-auth";
@@ -12,7 +26,9 @@ import {
   apiKeyRouter,
   publicApiRouter
 } from "./modules/api-access/api-access.routes";
+import { registerPublicDeviceCapabilities } from "./modules/api-access/public-device-capabilities";
 import { authRouter } from "./modules/auth/auth.routes";
+import { billingDispenserRouter } from "./modules/billing-dispenser/billing-dispenser.routes";
 import { deviceRouter } from "./modules/devices/device.routes";
 import { healthRouter } from "./modules/health/health.routes";
 import { homeRouter } from "./modules/homes/home.routes";
@@ -43,13 +59,31 @@ export function createApp(): Express {
   app.use("/api/v1/devices", nurseCallReceiverRouter);
   app.use("/api/v1/devices", smartRfTransmitterRouter);
   app.use("/api/v1/devices", tokenDispenserRouter);
+  app.use("/api/v1/devices", billingDispenserRouter);
   app.use("/api/v1/devices", p10DisplayRouter);
   app.use("/api/v1/devices", sosSirenRouter);
+  // ===== PLUGIN MOUNT POINTS — device plugin developers =====
+  // Add your product's device-action router mount line(s) inside this
+  // block only, following the existing examples exactly. Do not add
+  // app.use() calls anywhere else in this file. See
+  // DEVICE_DEVELOPER_BOUNDARIES.md §3 — propose this as a diff for the
+  // platform lead to apply, do not merge it yourself.
+  app.use(
+    "/api/v1/devices",
+    requireAuthenticatedUser,
+    createSmartStreamerDeviceActionRouter(platformApi)
+  );
   app.use(
     "/api/v1/devices",
     requireAuthenticatedUser,
     createIpSpeakerDeviceActionRouter(platformApi)
   );
+  app.use(
+    "/api/v1/devices",
+    requireAuthenticatedUser,
+    createQrunlockDeviceActionRouter(platformApi)
+  );
+  // ===== END PLUGIN MOUNT POINTS (device-action routers) =====
   app.use("/api/v1/matter", requireAuthenticatedUser, matterRouter);
   app.use("/api/v1/notifications", requireAuthenticatedUser, notificationRouter);
   app.use("/api/v1/public", publicApiRouter);
@@ -62,12 +96,73 @@ export function createApp(): Express {
   app.use("/api/v1/admin/ui-packages", requireAdminApiKey, uiPackageRouter);
   app.use("/api/v1/provisioning", requireAuthenticatedUser, provisioningRouter);
   app.use("/api/v1/scenes", requireAuthenticatedUser, sceneRouter);
+  // ===== PLUGIN MOUNT POINTS — device plugin developers =====
+  // Add your product's tenant-scoped router mount line(s) inside this
+  // block only. See DEVICE_DEVELOPER_BOUNDARIES.md §3.
+  app.use(
+    "/api/v1/streamer",
+    requireAuthenticatedUser,
+    createSmartStreamerRouter(platformApi)
+  );
   app.use(
     `/api/v1/${IP_SPEAKER_INTERNAL_KEY}`,
     requireAuthenticatedUser,
     createIpSpeakerRouter(platformApi)
   );
+  app.use(
+    "/api/v1/qrunlock",
+    requireAuthenticatedUser,
+    createQrunlockRouter(platformApi)
+  );
+  // ===== END PLUGIN MOUNT POINTS (tenant-scoped routers) =====
   app.use("/api/v1", healthRouter);
+
+  // Vendor/public-API capabilities — lets a specific PID's own guarded
+  // service functions handle a vendor-triggered command/config/logs call
+  // instead of the generic scene-command dispatch. See
+  // modules/api-access/public-device-capabilities.ts and
+  // IOT_Device/QRunlock/RELAY_INTEGRATION_PLAN.md. `caller` is always
+  // supplied by executePublicDeviceCommand itself (never client input).
+  registerPublicDeviceCapabilities(QRUNLOCK_PID, {
+    async executeCommand(deviceId, homeId, command, payload, caller) {
+      if (command !== "unlock") {
+        // QRunlock is a RIM-lock PSU — inching/unlock only, deliberately
+        // no on/off/toggle (see ProductIdentity.h's kProductLine and
+        // lock/lock.service.ts's doc comment). Reject clearly rather than
+        // silently accepting a command the hardware doesn't support.
+        throw Object.assign(new Error(`QRunlock does not support command: ${command}`), {
+          statusCode: 400,
+          code: "UNSUPPORTED_COMMAND"
+        });
+      }
+
+      const reason = typeof payload.reason === "string" ? payload.reason : undefined;
+      const result = await unlockQrunlockDevice(
+        platformApi,
+        deviceId,
+        { homeId },
+        { ...(reason ? { reason } : {}) },
+        caller
+      );
+
+      return { ...result };
+    },
+    async getConfig(deviceId, homeId) {
+      return getQrunlockSettings(platformApi, deviceId, { homeId });
+    },
+    async patchConfig(deviceId, homeId, patch) {
+      return updateQrunlockSettings(
+        platformApi,
+        deviceId,
+        { homeId },
+        patch as QrunlockUpdateSettingsInput
+      );
+    },
+    async getLogs(deviceId, homeId, limit) {
+      const events = await listQrunlockActivity(platformApi, deviceId, { homeId });
+      return events.slice(0, limit);
+    }
+  });
 
   return app;
 }

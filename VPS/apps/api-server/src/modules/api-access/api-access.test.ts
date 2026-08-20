@@ -186,3 +186,174 @@ describe("api access routes", () => {
     expect(response.body.error).toMatch(/pid/i);
   });
 });
+
+describe("vendor device API (x-api-key only, no Jenix user session)", () => {
+  beforeEach(async () => {
+    await authTesting.reset();
+    await homeTesting.reset();
+    await apiAccessTesting.reset();
+    await deviceTesting.reset();
+    await pidTesting.reset();
+  });
+
+  async function setUpVendorPackage(pid: string, packageId: string, scopes: string[]) {
+    const ownerSession = await createAuthenticatedSession({
+      name: "Vendor Pool Owner",
+      email: `${packageId.toLowerCase()}-owner@example.com`
+    });
+    const homeOwnerHeaders = createAuthHeaders(ownerSession);
+    await createApiEnabledPid(pid, ["devices:read", "devices:write"]);
+    await createPackage(packageId, pid, scopes);
+    const secret = await createApiKey(homeOwnerHeaders, packageId, scopes);
+    return { ownerSession, homeOwnerHeaders, secret, homeId: ownerSession.activeHomeId! };
+  }
+
+  it("registers a device into the key's own HOME, and is idempotent on re-registration", async () => {
+    const { secret } = await setUpVendorPackage(
+      "JNX-VEN-C3-801",
+      "VEN-801-WRITE",
+      ["devices:read", "devices:write"]
+    );
+
+    const first = await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secret })
+      .send({ deviceId: "aa11bb22cc33", displayName: "Vendor Device" });
+
+    expect(first.status).toBe(201);
+    expect(first.body.data.deviceId).toBe("AA11BB22CC33");
+    expect(first.body.data.pid).toBe("JNX-VEN-C3-801");
+
+    const second = await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secret })
+      .send({ deviceId: "aa11bb22cc33" });
+
+    expect(second.status).toBe(201);
+    expect(second.body.data.deviceId).toBe("AA11BB22CC33");
+  });
+
+  it("rejects registering a deviceId that already belongs to a different HOME", async () => {
+    const { secret: secretA } = await setUpVendorPackage(
+      "JNX-VEN-C3-802",
+      "VEN-802-WRITE",
+      ["devices:read", "devices:write"]
+    );
+    const { secret: secretB } = await setUpVendorPackage(
+      "JNX-VEN-C3-802",
+      "VEN-802-WRITE-B",
+      ["devices:read", "devices:write"]
+    );
+
+    await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secretA })
+      .send({ deviceId: "dd44ee55ff66" });
+
+    const conflict = await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secretB })
+      .send({ deviceId: "dd44ee55ff66" });
+
+    expect(conflict.status).toBe(409);
+  });
+
+  it("lists only the key's own HOME devices for its own PID", async () => {
+    const { secret } = await setUpVendorPackage(
+      "JNX-VEN-C3-803",
+      "VEN-803-READ",
+      ["devices:read", "devices:write"]
+    );
+
+    await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secret })
+      .send({ deviceId: "112233445566" });
+
+    const response = await request(createApp())
+      .get("/api/v1/public/devices")
+      .set({ "x-api-key": secret });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.devices).toHaveLength(1);
+    expect(response.body.data.devices[0].deviceId).toBe("112233445566");
+  });
+});
+
+describe("vendor access to QRunlock — routes through the plugin's own guarded unlock, not a generic dispatch", () => {
+  beforeEach(async () => {
+    await authTesting.reset();
+    await homeTesting.reset();
+    await apiAccessTesting.reset();
+    await deviceTesting.reset();
+    await pidTesting.reset();
+  });
+
+  it("unlocks through the guarded path, then rejects a second immediate unlock with the plugin's own cooldown error", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "QRunlock Vendor Pool",
+      email: "qrunlock-vendor@example.com"
+    });
+    const homeOwnerHeaders = createAuthHeaders(ownerSession);
+    await createApiEnabledPid("JNX-QRU-C3-001", ["devices:read", "devices:write"]);
+    await createPackage("QRUNLOCK-VENDOR", "JNX-QRU-C3-001", ["devices:read", "devices:write"]);
+    const secret = await createApiKey(homeOwnerHeaders, "QRUNLOCK-VENDOR");
+
+    const registered = await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secret })
+      .send({ deviceId: "aabbccddeeff" });
+    expect(registered.status).toBe(201);
+    const deviceId = registered.body.data.deviceId as string;
+
+    const unlock = await request(createApp())
+      .post(`/api/v1/public/devices/${deviceId}/commands`)
+      .set({ "x-api-key": secret })
+      .send({ command: "unlock" });
+
+    expect(unlock.status).toBe(200);
+    expect(unlock.body.data.status).toBe("requested");
+    expect(unlock.body.data.deviceId).toBe(deviceId);
+
+    const secondUnlock = await request(createApp())
+      .post(`/api/v1/public/devices/${deviceId}/commands`)
+      .set({ "x-api-key": secret })
+      .send({ command: "unlock" });
+
+    expect(secondUnlock.status).toBe(409);
+    expect(secondUnlock.body.error.code).toBe("UNLOCK_COOLDOWN_ACTIVE");
+
+    const logs = await request(createApp())
+      .get(`/api/v1/public/devices/${deviceId}/logs`)
+      .set({ "x-api-key": secret });
+
+    expect(logs.status).toBe(200);
+    expect(logs.body.data[0].type).toBe("unlock");
+    expect(logs.body.data[0].source).toBe("api:QRUNLOCK-VENDOR");
+  });
+
+  it("rejects an unsupported command for QRunlock instead of silently accepting on/off", async () => {
+    const ownerSession = await createAuthenticatedSession({
+      name: "QRunlock Vendor Pool 2",
+      email: "qrunlock-vendor-2@example.com"
+    });
+    const homeOwnerHeaders = createAuthHeaders(ownerSession);
+    await createApiEnabledPid("JNX-QRU-C3-001", ["devices:read", "devices:write"]);
+    await createPackage("QRUNLOCK-VENDOR-2", "JNX-QRU-C3-001", ["devices:read", "devices:write"]);
+    const secret = await createApiKey(homeOwnerHeaders, "QRUNLOCK-VENDOR-2");
+
+    const registered = await request(createApp())
+      .post("/api/v1/public/devices/register")
+      .set({ "x-api-key": secret })
+      .send({ deviceId: "112211221122" });
+    const deviceId = registered.body.data.deviceId as string;
+
+    const response = await request(createApp())
+      .post(`/api/v1/public/devices/${deviceId}/commands`)
+      .set({ "x-api-key": secret })
+      .send({ command: "on" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("UNSUPPORTED_COMMAND");
+  });
+});

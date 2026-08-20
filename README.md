@@ -5,6 +5,8 @@ Jenix IoT Platform is a PNPM monorepo for the Jenix One PWA, Android APK shell, 
 ## Integration Guide
 
 - **New to this repo? Start with [HANDOFF.md](./HANDOFF.md)** — current state, VPS deploy gotchas, known open items.
+- Platform architecture and roles (who builds what, plugin pattern, worked example): [PLATFORM_ARCHITECTURE_AND_ROLES.md](./PLATFORM_ARCHITECTURE_AND_ROLES.md)
+- **Hand this to any device developer before they write code**: [DEVICE_DEVELOPER_BOUNDARIES.md](./DEVICE_DEVELOPER_BOUNDARIES.md)
 - Device developer handoff: [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md)
 - Dynamic package runtime and VPS deployment flow: [DEVICE_PACKAGE_RUNTIME.md](./DEVICE_PACKAGE_RUNTIME.md)
 - Licensed MQTT and third-party device access architecture plan: [MQTT_LICENSED_DEVICE_ACCESS_PLAN.md](./MQTT_LICENSED_DEVICE_ACCESS_PLAN.md)

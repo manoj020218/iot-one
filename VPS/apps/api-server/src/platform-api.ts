@@ -1,10 +1,10 @@
 /**
  * The internal API surface product-specific packages outside this app
- * (e.g. IOT_Device/Smart IP speaker/backend) are allowed to depend on.
- * Kept deliberately small - everything here is re-exported as-is, with
- * no new logic. If a product package needs something not listed here,
- * add it here explicitly rather than having that package reach into
- * api-server module files directly.
+ * (e.g. IOT_Device/Smart Streamer/VPS) are allowed to depend on. Kept
+ * deliberately small — everything here is re-exported as-is, no new
+ * logic. If a product package needs something not listed here, add it
+ * here explicitly rather than having that package reach into a module
+ * file directly.
  */
 export {
   requireAuthenticatedUser,

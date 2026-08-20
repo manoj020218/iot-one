@@ -1,0 +1,1203 @@
+# CODEX IMPLEMENTATION PROMPT
+
+## JENIX ONE IOT PLATFORM PLUGIN — SMART STREAMER
+
+Develop a production-grade plugin for the existing **Jenix One IoT Platform** named:
+
+```text
+Smart Streamer
+```
+
+The plugin manages ESP32-P4 devices that stream an IP CCTV camera directly to:
+
+```text
+YouTube
+Facebook
+Instagram
+```
+
+Each P4 device supports:
+
+```text
+One camera
+One destination
+One active stream
+at one time
+```
+
+A single Jenix One customer may own and manage multiple Smart Streamer devices.
+
+Multiple devices owned by one customer may stream simultaneously.
+
+The plugin must use the existing Jenix One:
+
+* User login.
+* Tenant model.
+* Role model.
+* Multi-device user flow.
+* Device registry.
+* Product ID system.
+* OTA system.
+* Audit logging.
+* Notification framework.
+* Plugin architecture.
+* Universal provisioning flow.
+
+Do not create a separate application, separate login, separate user database, or duplicate provisioning experience.
+
+---
+
+# 1. FIRST INSPECT THE EXISTING PLATFORM
+
+Before coding:
+
+1. Inspect the Jenix One repository.
+2. Locate plugin registration conventions.
+3. Locate the PID or product registry.
+4. Locate existing device onboarding.
+5. Locate multi-device ownership handling.
+6. Locate the universal provisioning file and provisioning UI.
+7. Locate user-role and permission logic.
+8. Locate OTA screens and APIs.
+9. Locate audit-log support.
+10. Locate notification support.
+11. Locate existing reusable forms, cards, tables, modals, and status components.
+12. Locate API-client conventions.
+13. Locate PWA and Capacitor compatibility requirements.
+14. Locate test patterns.
+
+Produce a short implementation plan before modifying code.
+
+Do not bypass established platform architecture.
+
+---
+
+# 2. PLUGIN IDENTITY
+
+Recommended plugin identity:
+
+```text
+Plugin name: Smart Streamer
+Plugin key: smart-streamer
+Product family: JENIX SMART STREAMER
+Suggested PID category: STREAMER
+Device prefix: JNX-P4
+```
+
+Use the actual existing Jenix One PID conventions.
+
+Do not invent incompatible PID behaviour.
+
+Provide plugin metadata:
+
+```text
+name
+description
+icon
+supported hardware
+minimum firmware
+API version
+plugin version
+capabilities
+permissions
+routes
+dashboard widgets
+```
+
+Suggested description:
+
+> Stream one IP CCTV camera directly to YouTube, Facebook, or Instagram using an assigned Jenix ESP32-P4 Smart Streamer device.
+
+---
+
+# 3. PRODUCT MODEL
+
+The UI must clearly represent:
+
+```text
+Customer
++-- Smart Streamer Device 01
+¦   +-- Camera profile
+¦   +-- Destination profiles
+¦   +-- Schedules
+¦   +-- Current stream session
++-- Smart Streamer Device 02
++-- Smart Streamer Device 03
+```
+
+Do not imply that a customer can have only one Smart Streamer.
+
+Each device card must operate independently.
+
+---
+
+# 4. PROVISIONING
+
+Use the existing universal provisioning file and UI flow.
+
+Do not create a Smart Streamer-specific BLE or AP provisioning implementation.
+
+The Smart Streamer onboarding flow should call the universal device flow and pass product-specific metadata only where required.
+
+Suggested flow:
+
+```text
+Add Device
+? Select Smart Streamer
+? Start universal provisioning
+? Discover or connect to P4
+? Configure Wi-Fi
+? Register product ID
+? Receive claim code
+? Claim device to current tenant
+? Name device
+? Configure camera
+? Configure first destination
+? Optional schedule
+? Test
+```
+
+Support:
+
+* QR claim.
+* Manual claim code.
+* Device serial display.
+* Product ID verification.
+* Firmware compatibility warning.
+* Existing-owner warning.
+* Provisioning retry.
+* Claim expiry.
+* Factory-reset guidance.
+* Offline or weak-network feedback.
+
+Do not expose device bootstrap secrets.
+
+---
+
+# 5. PRIMARY NAVIGATION
+
+The Smart Streamer plugin should contain:
+
+```text
+Overview
+Devices
+Cameras
+Destinations
+Schedules
+Live Sessions
+Diagnostics
+OTA
+Settings
+```
+
+On mobile, use a practical compact navigation pattern consistent with Jenix One.
+
+Avoid overcrowded screens.
+
+Do not make every setting visible on one long page.
+
+---
+
+# 6. OVERVIEW DASHBOARD
+
+Display:
+
+```text
+Total Smart Streamer devices
+Online devices
+Offline devices
+Currently streaming
+Scheduled today
+Devices needing attention
+Expired destination credentials
+Firmware updates available
+```
+
+Provide device summary cards.
+
+Each card should show:
+
+```text
+Friendly name
+Device ID
+Online or offline
+Assigned camera
+Current platform
+Stream state
+Current session duration
+Next schedule
+Wi-Fi strength
+Firmware version
+Last seen
+Primary action
+```
+
+Primary actions depend on state:
+
+```text
+Idle ? Start Stream
+Streaming ? View / Stop
+Offline ? Diagnose
+Needs credentials ? Update Destination
+Update available ? Review OTA
+```
+
+Use clear status labels:
+
+```text
+Online
+Offline
+Idle
+Preparing
+Connecting Camera
+Connecting Platform
+Live
+Stopping
+Error
+Credential Expired
+Schedule Conflict
+OTA Pending
+```
+
+Do not rely only on colour. Include text and icons.
+
+---
+
+# 7. DEVICE DETAIL PAGE
+
+Provide sections:
+
+```text
+Device summary
+Current stream
+Assigned camera
+Available destinations
+Next schedules
+Network status
+Health
+Recent activity
+Firmware
+Actions
+```
+
+Actions:
+
+```text
+Start stream
+Stop stream
+Restart streaming pipeline
+Restart device
+Test camera
+Test destination
+Edit camera
+Change destination
+View schedules
+Open diagnostics
+Assign OTA
+Release device
+Factory-reset instructions
+```
+
+Dangerous operations require confirmation.
+
+Force-stop, restart, release, and factory reset must be audit-logged.
+
+---
+
+# 8. CAMERA MANAGEMENT
+
+A customer may create reusable camera profiles, but each P4 may use only one active assigned camera at a time.
+
+Camera form:
+
+```text
+Friendly name
+IP address or hostname
+RTSP port
+RTSP path
+Username
+Password
+Main stream URL
+Optional sub-stream URL
+Video codec
+Audio codec
+Preferred profile
+Rotation
+RTSP transport
+Connection timeout
+```
+
+Do not display the saved password after submission.
+
+Use:
+
+```text
+••••••••
+```
+
+Provide:
+
+```text
+Test connection
+Test RTSP authentication
+Detect streams
+Detect codecs
+Check audio
+Check keyframe interval
+Estimate bitrate
+Assign to device
+```
+
+Show test progress as clear steps.
+
+Example:
+
+```text
+1. Camera reachable
+2. RTSP authentication successful
+3. H.264 video detected
+4. AAC audio detected
+5. Keyframe received
+6. Compatible with passthrough mode
+```
+
+Possible warning:
+
+```text
+The main stream may be too large for processing mode. Use the camera sub-stream when rotation or transcoding is required.
+```
+
+---
+
+# 9. DESTINATION MANAGEMENT
+
+Create destination profiles independent of devices.
+
+Supported destination types:
+
+```text
+YouTube
+Facebook
+Instagram
+```
+
+A profile can later be assigned to a device or schedule.
+
+## YouTube form
+
+Support:
+
+```text
+Profile name
+Channel name
+Reusable stream key mode
+OAuth-managed mode when available
+RTMPS server URL
+Stream key
+Credential status
+Last validation
+```
+
+Never display the complete saved stream key.
+
+## Facebook form
+
+Support:
+
+```text
+Profile name
+Page or destination name
+RTMPS server URL
+Stream key
+Persistent or temporary key
+Credential expiry
+Last validation
+```
+
+## Instagram form
+
+Support:
+
+```text
+Profile name
+Instagram account label
+Live Producer server URL
+Temporary stream key
+Credential expiry
+Last updated
+```
+
+Show a strong notice:
+
+> Instagram stream credentials may be temporary. Update and validate the server URL and stream key before the scheduled broadcast.
+
+Do not request or store:
+
+* Social-account password.
+* Browser cookies.
+* Private session data.
+
+Provide:
+
+```text
+Validate destination
+Update credentials
+Disable destination
+Delete destination
+View assignment usage
+```
+
+Deletion must be blocked or confirmed when schedules depend on the destination.
+
+---
+
+# 10. START STREAM FLOW
+
+Start-stream flow:
+
+```text
+Select device
+Confirm assigned camera
+Select destination
+Review compatibility
+Optional stop time
+Start
+```
+
+Before start, display:
+
+```text
+Device online status
+Camera test status
+Destination credential status
+Schedule conflict
+Current active session
+Estimated stream mode
+```
+
+The UI must prevent two active streams on the same device.
+
+If the server returns:
+
+```text
+DEVICE_ALREADY_STREAMING
+```
+
+show:
+
+```text
+This Smart Streamer is already live on YouTube.
+Stop the active session before starting another destination.
+```
+
+Do not silently stop an existing stream when the user starts another.
+
+Provide a separate explicit “Stop and Switch” action for authorized roles.
+
+---
+
+# 11. LIVE SESSION PAGE
+
+Show:
+
+```text
+Platform
+Destination profile
+Device
+Camera
+Start time
+Duration
+Trigger source
+Video mode
+Audio mode
+Connection status
+Reconnect count
+Current bitrate if reported
+Frames or packets if reported
+Last telemetry
+Planned stop time
+```
+
+Actions:
+
+```text
+Stop normally
+Force stop
+Extend stop time
+Open diagnostics
+```
+
+Do not attempt to display the live video through the VPS unless a separate safe preview architecture already exists.
+
+The Smart Streamer control plane does not carry video.
+
+Do not suggest that the PWA is receiving the live stream.
+
+A platform-link button may be shown where an official public or studio URL is available.
+
+---
+
+# 12. SCHEDULE MANAGEMENT
+
+Support:
+
+```text
+Schedule name
+Device
+Camera
+Destination
+Timezone
+Start time
+Stop time
+Days of week
+Start date
+End date
+Enabled
+Priority
+Missed-start policy
+```
+
+Default timezone:
+
+```text
+Asia/Kolkata
+```
+
+Temple-oriented examples:
+
+```text
+Morning Aarti
+Evening Aarti
+Sunday Pooja
+Festival Programme
+Special Live Event
+```
+
+Provide:
+
+* Calendar view.
+* List view.
+* Per-device schedule view.
+* Today view.
+* Upcoming seven days.
+* Enable or disable.
+* Duplicate schedule.
+* Run now.
+* Conflict detection.
+
+Reject overlapping schedules for the same P4.
+
+Example conflict message:
+
+```text
+This device is already scheduled for YouTube from 6:00 PM to 7:00 PM.
+Choose another device, destination, or time.
+```
+
+Allow different P4 devices to have overlapping schedules.
+
+---
+
+# 13. POWER-CUT RECOVERY STATUS
+
+The UI must explain device recovery after power restoration.
+
+Display states such as:
+
+```text
+Reconnecting after power restoration
+Waiting for time synchronization
+Startup delay active
+Fetching current schedule
+Resuming eligible live session
+Schedule window already ended
+```
+
+Show the randomized delay as a normal protective behaviour, not as an error.
+
+Suggested message:
+
+> The device is delaying reconnection briefly to prevent all deployed Smart Streamers from contacting the server simultaneously after a power outage.
+
+Do not allow the UI to force every offline device to reconnect at exactly the same moment.
+
+---
+
+# 14. MULTI-DEVICE BULK OPERATIONS
+
+Support carefully controlled bulk actions:
+
+```text
+Refresh device status
+Assign firmware rollout
+Export device list
+Enable selected schedules
+Disable selected schedules
+```
+
+Do not provide “Start all streams immediately” without staggered execution.
+
+If bulk start is required, the server must assign randomized start windows.
+
+Show:
+
+```text
+Devices will start gradually over the selected time window.
+```
+
+Require confirmation.
+
+---
+
+# 15. HEALTH AND DIAGNOSTICS
+
+Device health screen:
+
+```text
+Online status
+Last seen
+Uptime
+Reset reason
+Free heap
+Minimum free heap
+Largest free block
+PSRAM status
+Wi-Fi RSSI
+IP address
+Time synchronization
+Camera connection
+RTSP state
+RTMP state
+Current session
+Reconnect count
+Last error
+Firmware version
+Hardware revision
+```
+
+Use user-friendly explanations.
+
+Example:
+
+```text
+CAMERA_AUTH_FAILED
+Camera username or password was rejected.
+```
+
+Allow advanced technical details to expand separately.
+
+Provide sanitized diagnostic export.
+
+Never include:
+
+* Camera password.
+* Stream key.
+* Device signing key.
+* Wi-Fi password.
+* Complete authenticated RTSP URL.
+
+---
+
+# 16. NOTIFICATIONS
+
+Use the existing Jenix One notification framework.
+
+Support notifications for:
+
+```text
+Stream started
+Stream stopped
+Stream failed
+Camera disconnected
+Destination rejected stream
+Destination credential expired
+Schedule missed
+Device offline
+Device back online
+Repeated reboot
+Low-memory warning
+OTA succeeded
+OTA failed
+```
+
+Allow per-user notification preferences.
+
+Avoid repeated notification spam.
+
+Implement deduplication and cooldown.
+
+---
+
+# 17. ROLES AND PERMISSIONS
+
+Reuse existing Jenix One roles.
+
+Map permissions such as:
+
+```text
+smart_streamer.view
+smart_streamer.device.manage
+smart_streamer.camera.manage
+smart_streamer.destination.manage
+smart_streamer.schedule.manage
+smart_streamer.stream.start
+smart_streamer.stream.stop
+smart_streamer.stream.force_stop
+smart_streamer.diagnostics.view
+smart_streamer.ota.manage
+smart_streamer.device.release
+```
+
+Suggested behaviour:
+
+* Viewer: status only.
+* Operator: start and stop approved streams.
+* Tenant admin: manage devices, cameras, destinations, and schedules.
+* Vendor support: diagnostics according to existing support-access rules.
+* Vendor super admin: product and OTA management.
+
+Do not create role checks only in the frontend.
+
+The VPS must enforce permissions.
+
+---
+
+# 18. SECURITY AND PRIVACY
+
+Requirements:
+
+* Never store secrets in browser localStorage.
+* Prefer secure server-side storage.
+* Use existing access-token handling.
+* Mask camera and platform credentials.
+* Do not include secrets in analytics.
+* Do not include secrets in error reports.
+* Use CSRF protection where required by the existing authentication design.
+* Use tenant-isolated API calls.
+* Sanitize user-entered labels.
+* Confirm destructive actions.
+* Apply rate limiting to credential validation.
+* Audit secret changes without recording secret values.
+* Automatically clear sensitive form state after save or cancel.
+
+---
+
+# 19. API CLIENT
+
+Use the existing Jenix One API-client layer.
+
+Do not scatter direct `fetch()` calls throughout components.
+
+Create small service modules for:
+
+```text
+devices
+cameras
+destinations
+schedules
+sessions
+diagnostics
+OTA
+```
+
+Handle:
+
+* Authentication.
+* Request IDs.
+* Standard errors.
+* Retry policy.
+* Cancellation.
+* Offline detection.
+* Timeout.
+* Token expiry.
+
+Do not automatically retry destructive actions such as start, stop, delete, or credential update unless idempotency is guaranteed.
+
+---
+
+# 20. OFFLINE AND PWA BEHAVIOUR
+
+The Jenix One platform is a PWA and may also be packaged through Capacitor.
+
+Support:
+
+* Responsive mobile layout.
+* Android WebView compatibility.
+* Offline cached read-only device list where safe.
+* Clear offline indicator.
+* No false success while offline.
+* Deferred refresh after reconnect.
+* Pull-to-refresh where consistent with the app.
+* Accessible forms.
+* Touch-friendly controls.
+
+Do not cache stream keys or passwords for offline use.
+
+Disable start and stop operations when the server cannot be reached.
+
+---
+
+# 21. UI/UX DESIGN
+
+Use the existing Jenix One design language.
+
+The product should feel:
+
+```text
+Professional
+Industrial
+Reliable
+Simple for installers
+Clear for temple or organization operators
+Useful for technical support
+```
+
+Avoid:
+
+* Cartoon styling.
+* Excessive animation.
+* Unclear icon-only actions.
+* Very dense tables on mobile.
+* Long technical error dumps.
+* Hidden device state.
+* Ambiguous platform selection.
+
+Use concise status chips and progressive disclosure.
+
+Primary platform icons may be used, but platform names must also be written as text.
+
+---
+
+# 22. FILE SIZE LIMIT
+
+Every manually maintained file must remain under 200 lines.
+
+This includes:
+
+```text
+React components
+TypeScript services
+hooks
+schemas
+tests
+CSS modules
+route modules
+utility modules
+```
+
+Refactor before a file reaches approximately 180 lines.
+
+Do not bypass the limit by:
+
+* Minifying source code.
+* Creating giant generic components.
+* Packing multiple components into one file.
+* Removing accessibility.
+* Removing type safety.
+* Using unreadable one-line JSX.
+
+Suggested plugin structure:
+
+```text
+plugins/smart-streamer/
++-- index.ts
++-- manifest.ts
++-- routes/
++-- pages/
++-- components/
++-- forms/
++-- hooks/
++-- services/
++-- schemas/
++-- permissions/
++-- utils/
++-- constants/
++-- tests/
+```
+
+Follow existing platform conventions.
+
+---
+
+# 23. TYPE SAFETY
+
+Use strict TypeScript.
+
+Do not use `any` unless unavoidable and documented.
+
+Create typed models for:
+
+```text
+SmartStreamerDevice
+CameraProfile
+DestinationProfile
+StreamSchedule
+StreamSession
+DeviceHealth
+DeviceCommand
+PlatformType
+StreamState
+ErrorCode
+```
+
+Validate API data at runtime using the existing schema-validation library.
+
+Do not trust server responses blindly.
+
+---
+
+# 24. STATE MANAGEMENT
+
+Use existing Jenix One state-management conventions.
+
+Separate:
+
+* Server state.
+* Form state.
+* Local UI state.
+* Provisioning state.
+* Current stream state.
+
+Do not keep duplicated stale copies of device data in many components.
+
+Use invalidation or refresh after mutating operations.
+
+Handle simultaneous updates from:
+
+* Polling.
+* User action.
+* Notification.
+* App resume.
+* Device heartbeat.
+
+---
+
+# 25. STATUS REFRESH
+
+Use adaptive polling rather than aggressive constant polling.
+
+Suggested behaviour:
+
+```text
+Overview visible: moderate polling
+Device detail visible: faster polling
+Live-session page: 10–30 second polling
+Background tab: reduced polling
+App hidden: pause or greatly reduce
+Offline device: slow polling
+```
+
+Apply randomized jitter.
+
+Do not make every browser request status at the same exact interval.
+
+Reuse existing realtime capability if Jenix One already has a lightweight working mechanism.
+
+---
+
+# 26. OTA UI
+
+Reuse the existing Jenix One OTA framework.
+
+Show:
+
+```text
+Current firmware
+Available firmware
+Release date
+Release notes
+Minimum hardware revision
+Rollout group
+Update status
+Rollback status
+```
+
+Prevent normal OTA during an active stream.
+
+Show:
+
+```text
+Stop the active stream before updating firmware.
+```
+
+Support staged rollout:
+
+```text
+Pilot devices
+Selected devices
+Percentage rollout
+All compatible devices
+```
+
+Do not allow incompatible firmware assignment.
+
+---
+
+# 27. AUDIT LOG
+
+Show plugin-specific audit history:
+
+```text
+Device claimed
+Device renamed
+Camera changed
+Destination changed
+Credentials updated
+Schedule created
+Schedule changed
+Stream started
+Stream stopped
+Force stop
+Device restarted
+OTA assigned
+Device released
+```
+
+Display:
+
+```text
+Timestamp
+User
+Action
+Device
+Result
+Request ID
+```
+
+Do not display secret values.
+
+---
+
+# 28. TESTING
+
+Add tests for:
+
+* Plugin route registration.
+* Permission enforcement.
+* Multi-device rendering.
+* Device claim.
+* Camera assignment.
+* Destination creation.
+* Secret masking.
+* Start-stream flow.
+* Active-session conflict.
+* Stop-stream flow.
+* Schedule creation.
+* Schedule conflict.
+* Timezone handling.
+* Credential expiry.
+* Offline state.
+* API error handling.
+* Tenant isolation assumptions.
+* OTA blocking during live stream.
+* Responsive mobile layout.
+* Accessibility.
+* PWA resume refresh.
+* No secret persistence in localStorage.
+
+Add end-to-end scenarios:
+
+```text
+Customer claims first P4
+Customer claims multiple P4 devices
+P4-01 streams to YouTube
+P4-02 streams to Facebook simultaneously
+P4-03 is scheduled for Instagram
+Attempting a second stream on P4-01 is rejected
+Power restoration shows staggered recovery
+Expired Instagram credentials block scheduled start
+```
+
+---
+
+# 29. DOCUMENTATION
+
+Create plugin documentation:
+
+```text
+README.md
+PLUGIN_ARCHITECTURE.md
+USER_FLOW.md
+PROVISIONING_INTEGRATION.md
+API_CONTRACT.md
+PERMISSIONS.md
+PLATFORM_SETUP.md
+TEST_PLAN.md
+```
+
+Include administrator instructions for:
+
+```text
+Adding a Smart Streamer
+Adding a camera
+Adding YouTube
+Adding Facebook
+Adding Instagram
+Creating schedules
+Starting manually
+Stopping manually
+Updating firmware
+Reading diagnostics
+```
+
+---
+
+# 30. CODEX IMPLEMENTATION PROCESS
+
+Before coding:
+
+1. Inspect the repository.
+2. Locate the universal provisioning file.
+3. Locate existing device-list and device-detail patterns.
+4. Locate plugin registration.
+5. Locate existing login and tenant context.
+6. Locate OTA integration.
+7. Locate notifications and audit logging.
+8. Produce a gap analysis.
+9. Produce a file-by-file plan.
+10. Confirm all new files will remain below 200 lines.
+
+Implementation phases:
+
+```text
+Phase 1: Plugin manifest and routes
+Phase 2: Device list and detail
+Phase 3: Universal provisioning integration
+Phase 4: Camera profiles
+Phase 5: Destination profiles
+Phase 6: Manual stream control
+Phase 7: Schedules
+Phase 8: Diagnostics and notifications
+Phase 9: OTA integration
+Phase 10: Tests and documentation
+```
+
+Do not duplicate existing platform capabilities.
+
+---
+
+# 31. DEFINITION OF DONE
+
+The Smart Streamer plugin is complete only when:
+
+* It appears as a native Jenix One plugin.
+* Existing Jenix One login is reused.
+* Existing tenant and role flows are reused.
+* Universal provisioning is reused.
+* A user can claim multiple P4 devices.
+* Each P4 has an independent device page.
+* A camera can be configured and tested.
+* YouTube, Facebook, and Instagram destinations can be configured.
+* Credentials are masked and securely handled.
+* One device can run only one active stream.
+* Multiple devices can stream simultaneously.
+* Schedules support `Asia/Kolkata`.
+* Schedule conflicts are detected.
+* Power-cut recovery status is visible.
+* Device diagnostics are available.
+* OTA uses the existing Jenix One framework.
+* All actions are permission-controlled and audited.
+* Mobile PWA and Capacitor layouts work.
+* All maintained source files remain under 200 lines.
+* Automated tests pass.
+* Documentation is complete.

@@ -2,4 +2,6 @@ packages:
   - "VPS/apps/*"
   - "PWA_APK/apps/*"
   - "packages/*"
+  - "IOT_Device/Smart Streamer/VPS"
   - "IOT_Device/Smart IP speaker/backend"
+  - "IOT_Device/QRunlock/VPS"

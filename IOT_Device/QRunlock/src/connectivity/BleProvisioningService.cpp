@@ -7,7 +7,8 @@
 namespace connectivity {
 namespace {
 
-NimBLECharacteristic* gStatusCharacteristic = nullptr;
+NimBLECharacteristic* gProvisionCharacteristic = nullptr;
+NimBLECharacteristic* gLegacyStatusCharacteristic = nullptr;
 
 class ProvisionCallbacks : public NimBLECharacteristicCallbacks {
  public:
@@ -29,14 +30,16 @@ bool BleProvisioningService::Begin(const identity::DeviceIdentity& identity) {
     NimBLEDevice::init(identity.BleName().c_str());
     NimBLEServer* server = NimBLEDevice::createServer();
     NimBLEService* service = server->createService(app::kBleServiceUuid);
-    NimBLECharacteristic* writer =
-        service->createCharacteristic(app::kBleWriteUuid, NIMBLE_PROPERTY::WRITE |
-                                                             NIMBLE_PROPERTY::WRITE_NR);
-    gStatusCharacteristic =
+    gProvisionCharacteristic =
+        service->createCharacteristic(app::kBleWriteUuid, NIMBLE_PROPERTY::READ |
+                                                             NIMBLE_PROPERTY::WRITE |
+                                                             NIMBLE_PROPERTY::WRITE_NR |
+                                                             NIMBLE_PROPERTY::NOTIFY);
+    gLegacyStatusCharacteristic =
         service->createCharacteristic(app::kBleStatusUuid, NIMBLE_PROPERTY::READ |
                                                                 NIMBLE_PROPERTY::NOTIFY);
     if (gCallbacks == nullptr) gCallbacks = new ProvisionCallbacks(*this);
-    writer->setCallbacks(gCallbacks);
+    gProvisionCharacteristic->setCallbacks(gCallbacks);
     service->start();
     NimBLEService* info = server->createService("180A");
     info->createCharacteristic("2A24", NIMBLE_PROPERTY::READ)->setValue(app::kModel);
@@ -56,7 +59,7 @@ bool BleProvisioningService::Begin(const identity::DeviceIdentity& identity) {
   if (advertising == nullptr || !advertising->start()) return false;
   started_ = true;
   lastStatus_ = "ready";
-  lastMessage_ = "wifi_only";
+  lastMessage_ = "provisioning_ready";
   logger_.Info("BLE provisioning advertising started");
   return true;
 }
@@ -73,46 +76,46 @@ void BleProvisioningService::Stop() {
 void BleProvisioningService::FillJson(JsonObject object) const {
   object["started"] = started_;
   object["initialized"] = initialized_;
-  object["nameMode"] = "shared_ap_ble_name";
+  object["nameMode"] = "one_platform_provisioning_name";
   object["serviceUuid"] = app::kBleServiceUuid;
   object["lastStatus"] = lastStatus_;
   object["lastMessage"] = lastMessage_;
 }
 
 void BleProvisioningService::ApplyPayload(const std::string& payload) {
-  DynamicJsonDocument doc(512);
-  if (deserializeJson(doc, payload)) {
+  DynamicJsonDocument request(512);
+  DynamicJsonDocument response(1024);
+
+  if (deserializeJson(request, payload)) {
+    response["ok"] = false;
+    response["error"] = "invalid_json";
     lastStatus_ = "invalid";
     lastMessage_ = "json_parse_failed";
-  } else if ((doc["clearWifi"] | false) || (doc["apRecovery"] | false)) {
-    lastStatus_ = wifiManager_.ClearSavedNetwork() ? "applied" : "error";
-    lastMessage_ = lastStatus_ == "applied" ? "ap_recovery" : "ap_recovery_failed";
+  } else if (api_ == nullptr) {
+    response["ok"] = false;
+    response["error"] = "provisioning_api_unavailable";
+    lastStatus_ = "error";
+    lastMessage_ = "api_unavailable";
   } else {
-    const String ssid = doc["wifiSsid"].is<const char*>() ? doc["wifiSsid"].as<const char*>()
-                                                          : (doc["ssid"] | "");
-    const String password = doc["wifiPassword"].is<const char*>()
-                                ? doc["wifiPassword"].as<const char*>()
-                                : (doc["password"] | "");
-    if (ssid.isEmpty()) {
-      lastStatus_ = "invalid";
-      lastMessage_ = "missing_wifi_ssid";
-    } else if (wifiManager_.SaveAndReconnect(ssid, password)) {
-      logger_.Info(String("BLE Wi-Fi provisioning applied for SSID ") + ssid);
-      lastStatus_ = "applied";
-      lastMessage_ = "wifi_saved";
-    } else {
-      lastStatus_ = "error";
-      lastMessage_ = "wifi_save_failed";
-    }
+    api_->HandleProvisioningRequest(request, response);
+    const bool ok = response["ok"] | false;
+    lastStatus_ = ok ? "ok" : "error";
+    lastMessage_ = response["cmd"].is<const char*>()
+                       ? response["cmd"].as<const char*>()
+                       : (response["error"] | "completed");
   }
-  if (gStatusCharacteristic == nullptr) return;
-  DynamicJsonDocument status(192);
-  status["status"] = lastStatus_;
-  status["message"] = lastMessage_;
+
   String encoded;
-  serializeJson(status, encoded);
-  gStatusCharacteristic->setValue(encoded.c_str());
-  gStatusCharacteristic->notify();
+  serializeJson(response, encoded);
+
+  if (gProvisionCharacteristic != nullptr) {
+    gProvisionCharacteristic->setValue(encoded.c_str());
+    gProvisionCharacteristic->notify();
+  }
+  if (gLegacyStatusCharacteristic != nullptr) {
+    gLegacyStatusCharacteristic->setValue(encoded.c_str());
+    gLegacyStatusCharacteristic->notify();
+  }
 }
 
 }  // namespace connectivity

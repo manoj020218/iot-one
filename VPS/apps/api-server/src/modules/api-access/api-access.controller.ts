@@ -10,8 +10,13 @@ import {
   executePublicDeviceCommand,
   getApiPackage,
   getPublicDeviceState,
+  getVendorDeviceConfig,
+  getVendorDeviceLogs,
   listApiKeys,
   listApiPackages,
+  listVendorDevices,
+  patchVendorDeviceConfig,
+  registerVendorDevice,
   revokeApiKey
 } from "./api-access.service";
 import type {
@@ -22,7 +27,9 @@ import { ApiAccessModuleError } from "./api-access.types";
 import {
   parseApiKeyPayload,
   parseApiPackagePayload,
-  parsePublicCommandPayload
+  parsePublicCommandPayload,
+  parseRegisterVendorDeviceInput,
+  parseVendorConfigPatchPayload
 } from "./api-access.validation";
 
 const developerRoles = new Set(["JENIX_DEVELOPER", "JENIX_SUPER_ADMIN"]);
@@ -63,6 +70,29 @@ function sendError(response: Response, error: unknown) {
   if (error instanceof ApiAccessModuleError) {
     response.status(error.statusCode).json({
       error: error.message
+    });
+    return;
+  }
+
+  // A registered plugin capability's own guarded-path error (e.g.
+  // QrunlockLockError's UNLOCK_COOLDOWN_ACTIVE) — every plugin error
+  // class in this repo shares this shape (statusCode/code/message).
+  // Surfaced by duck-typing rather than importing every plugin's error
+  // class here, which would recreate exactly the coupling
+  // public-device-capabilities.ts exists to avoid. A vendor caller sees
+  // the same signal a first-party PWA caller would, per "same guarded
+  // path no matter who is calling."
+  if (
+    error instanceof Error &&
+    "statusCode" in error &&
+    typeof (error as { statusCode: unknown }).statusCode === "number"
+  ) {
+    const pluginError = error as Error & { statusCode: number; code?: string };
+    response.status(pluginError.statusCode).json({
+      error: {
+        code: pluginError.code ?? "PLUGIN_ERROR",
+        message: pluginError.message
+      }
     });
     return;
   }
@@ -208,6 +238,87 @@ export async function executePublicDeviceCommandController(
         request.params.deviceId ?? "",
         readHeaderValue(request.header("x-api-key")) ?? "",
         payload
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function registerVendorDeviceController(request: Request, response: Response) {
+  const payload = parseRegisterVendorDeviceInput(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid vendor device registration payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(201).json({
+      data: await registerVendorDevice(readHeaderValue(request.header("x-api-key")) ?? "", payload)
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function listVendorDevicesController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await listVendorDevices(readHeaderValue(request.header("x-api-key")) ?? "")
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function getVendorDeviceConfigController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await getVendorDeviceConfig(
+        request.params.deviceId ?? "",
+        readHeaderValue(request.header("x-api-key")) ?? ""
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function patchVendorDeviceConfigController(request: Request, response: Response) {
+  const payload = parseVendorConfigPatchPayload(request.body);
+
+  if (!payload) {
+    response.status(400).json({
+      error: "Invalid vendor config patch payload"
+    });
+    return;
+  }
+
+  try {
+    response.status(200).json({
+      data: await patchVendorDeviceConfig(
+        request.params.deviceId ?? "",
+        readHeaderValue(request.header("x-api-key")) ?? "",
+        payload
+      )
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function getVendorDeviceLogsController(request: Request, response: Response) {
+  const limit = Number.parseInt(String(request.query.limit ?? ""), 10);
+
+  try {
+    response.status(200).json({
+      data: await getVendorDeviceLogs(
+        request.params.deviceId ?? "",
+        readHeaderValue(request.header("x-api-key")) ?? "",
+        Number.isFinite(limit) && limit > 0 ? Math.min(limit, 100) : 20
       )
     });
   } catch (error) {

@@ -1,0 +1,17 @@
+{
+  "name": "smart-streamer-plugin",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Jenix One remote UI plugin for Smart Streamer, loaded on demand by the platform host (see PWA tool/UI_UX_PLAN.md and README.md in this folder).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs",
+    "build:min": "node build.mjs --minify"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  }
+}

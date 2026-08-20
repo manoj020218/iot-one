@@ -37,6 +37,26 @@ export interface CreateApiKeyInput {
 
 export interface PublicCommandPayload {
   command: string;
+  payload?: Record<string, unknown>;
+}
+
+/**
+ * Vendor-authenticated (x-api-key, no Jenix user session) — a QRunlock
+ * host, for example, never logs into Jenix One. The device is registered
+ * into the API key's own homeId (the "vendor pool HOME" — see
+ * RELAY_INTEGRATION_PLAN.md), which is what confines the key's blast
+ * radius to that vendor's own devices via the existing
+ * device.homeId === keyRecord.homeId check every other public route uses.
+ */
+export interface RegisterVendorDeviceInput {
+  deviceId: string;
+  displayName?: string;
+  hardwareRevision?: string;
+  firmwareVersion?: string;
+}
+
+export interface VendorConfigPatchPayload {
+  patch: Record<string, unknown>;
 }
 
 export interface PublicApiModuleState {
@@ -62,6 +82,8 @@ export class ApiAccessModuleError extends Error {
 export type ParsedApiPackagePayload = CreateApiPackageInput;
 export type ParsedApiKeyPayload = CreateApiKeyInput;
 export type ParsedPublicCommandPayload = PublicCommandPayload;
+export type ParsedRegisterVendorDeviceInput = RegisterVendorDeviceInput;
+export type ParsedVendorConfigPatchPayload = VendorConfigPatchPayload;
 
 export interface PublicApiStateResponse extends PublicDeviceState {
   packageId: string;
@@ -69,6 +91,11 @@ export interface PublicApiStateResponse extends PublicDeviceState {
 
 export interface PublicApiCommandResponse extends PublicDeviceCommandResult {
   packageId: string;
+}
+
+export interface VendorDeviceListResponse {
+  packageId: string;
+  devices: PublicDeviceState[];
 }
 
 export type ApiKeyCreateResponse = ApiKeyCreateResult;

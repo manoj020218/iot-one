@@ -1,7 +1,9 @@
 import type {
   ParsedApiKeyPayload,
   ParsedApiPackagePayload,
-  ParsedPublicCommandPayload
+  ParsedPublicCommandPayload,
+  ParsedRegisterVendorDeviceInput,
+  ParsedVendorConfigPatchPayload
 } from "./api-access.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -114,7 +116,49 @@ export function parsePublicCommandPayload(
     return null;
   }
 
+  const payload = isRecord(body.payload) ? body.payload : undefined;
+
   return {
-    command
+    command,
+    ...(payload ? { payload } : {})
   };
+}
+
+export function parseRegisterVendorDeviceInput(
+  body: unknown
+): ParsedRegisterVendorDeviceInput | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const deviceId = readTrimmedString(body, "deviceId");
+
+  if (!deviceId) {
+    return null;
+  }
+
+  const displayName = readTrimmedString(body, "displayName");
+  const hardwareRevision = readTrimmedString(body, "hardwareRevision");
+  const firmwareVersion = readTrimmedString(body, "firmwareVersion");
+
+  return {
+    deviceId,
+    ...(displayName ? { displayName } : {}),
+    ...(hardwareRevision ? { hardwareRevision } : {}),
+    ...(firmwareVersion ? { firmwareVersion } : {})
+  };
+}
+
+export function parseVendorConfigPatchPayload(
+  body: unknown
+): ParsedVendorConfigPatchPayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  // The patch shape itself is plugin-defined (e.g. QRunlock's
+  // relayCooldownMs/relayStateAfterPowerRestore/switchType) — this module
+  // only confirms it's a plain object and hands it through untouched to
+  // the registered capability, which validates its own fields.
+  return { patch: body };
 }

@@ -12,9 +12,12 @@ class WebServerService {
   void Tick();
 
  private:
-  bool ParseJsonBody(StaticJsonDocument<512>& doc);
-  void SendOk();
-  void SendError(const char* message);
+  void ApplyCorsHeaders();
+  bool ParseJsonBody(StaticJsonDocument<512>& doc, bool cors = false);
+  void SendPayload(int statusCode, const char* contentType, const String& payload,
+                   bool cors = false);
+  void SendOk(bool cors = false);
+  void SendError(const char* message, bool cors = false);
 
   WebServer server_{80};
   platform::ControlApi* api_ = nullptr;

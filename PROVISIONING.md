@@ -241,13 +241,32 @@ identical configuration described in this document.
 
 | Device | Chip | Build | Provisioning status |
 |---|---|---|---|
-| Tank Guard | ESP32-C3 | PlatformIO + Arduino | pilot device — implement first |
+| Tank Guard | ESP32-C3 | PlatformIO + Arduino | pending, after Token Dispenser pilot validates |
 | Nurse Call Receiver | ESP32-C3 | PlatformIO + Arduino | pending, after pilot validates |
 | Smart RF Bridge | ESP32-C3 | PlatformIO + Arduino | pending |
-| Token Dispenser | ESP32-C3 | PlatformIO + Arduino | pending |
+| Token Dispenser | ESP32-C3 | PlatformIO + Arduino | **active pilot** — implementing now, see notes below |
 | P10 Display | ESP32-C3 | PlatformIO + Arduino | pending |
 | SOS Siren | ESP32-C3 | PlatformIO + Arduino | pending — no BLE stack exists yet, clean implementation |
 | Smart Streamer | ESP32-P4 | native ESP-IDF | pending — simplest integration, already native ESP-IDF |
+
+**Token Dispenser pilot notes** — the Token Dispenser (not Tank Guard) became
+the de facto pilot, implemented in a separate `jenix-td-c3-prov2` PlatformIO
+environment (mixed `framework = arduino, espidf`, own partition table) so the
+tested, currently-shipping `jenix-td-c3` build is never touched while this
+validates on hardware. Two deliberate, called-out deviations from the letter
+of this standard during the pilot phase, both scoped to be revisited once
+validated:
+
+- **BLE transport only for now** — the 4MB flash chip didn't have headroom
+  left for both BLE and SoftAP transports plus the rest of the existing
+  firmware. SoftAP is a planned follow-up once the BLE + Security2 path is
+  proven on real hardware and the real flash cost is known.
+- **Auto-generated Proof-of-Possession** — Section 6 calls for a PoP assigned
+  at manufacturing/flashing time via Espressif's tooling. No manufacturing
+  pipeline for that exists yet, so the pilot firmware generates a random PoP
+  on first boot, persists it to NVS, and prints it to Serial + the event log
+  for bench testing. A real manufacturing-time burn step is still needed
+  before this ships to the field.
 
 ---
 

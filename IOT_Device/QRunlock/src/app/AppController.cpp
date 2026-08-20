@@ -40,6 +40,7 @@ void AppController::Begin() {
   rf_.Begin(board::kRfLinePin, config::kRfDebounceMs, config::kRfValidHighMs,
             config::kRfDuplicateSuppressMs, config::kRfLearnWindowMs,
             config::kRfLearnSettleMs);
+  ble_.AttachApi(*this);
   wifi_.Begin();
   if (app::kBleProvisioningEnabled && wifi_.AccessPointActive()) {
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
@@ -105,6 +106,61 @@ bool AppController::ApplyWifi(const String& ssid, const String& password) {
   return wifi_.SaveAndReconnect(ssid, password);
 }
 
+void AppController::HandleProvisioningRequest(const JsonDocument& request,
+                                              JsonDocument& response) {
+  const String cmd = request["cmd"] | "";
+  JsonObject payload = response.to<JsonObject>();
+
+  if (cmd.isEmpty() || cmd == "hello") {
+    FillProvisioningHello(payload);
+    return;
+  }
+
+  if (cmd == "set_wifi") {
+    const String ssid = request["ssid"].is<const char*>()
+                            ? request["ssid"].as<const char*>()
+                            : (request["wifiSsid"] | "");
+    const String password = request["password"].is<const char*>()
+                                ? request["password"].as<const char*>()
+                                : (request["wifiPassword"] | "");
+    if (ssid.isEmpty()) {
+      payload["ok"] = false;
+      payload["error"] = "ssid_required";
+      return;
+    }
+    if (!ApplyWifi(ssid, password)) {
+      payload["ok"] = false;
+      payload["error"] = "wifi_save_failed";
+      return;
+    }
+    payload["ok"] = true;
+    payload["cmd"] = "set_wifi";
+    payload["wifi_connected"] = wifi_.Connected();
+    if (wifi_.Connected()) payload["ip"] = wifi_.LocalIp();
+    return;
+  }
+
+  if (cmd == "c" || cmd == "cloud_status") {
+    payload["ok"] = true;
+    payload["cmd"] = "c";
+    payload["wifi_connected"] = wifi_.Connected();
+    payload["mqtt_connected"] = cloudConnected_;
+    return;
+  }
+
+  if (cmd == "clear_wifi" || (request["clearWifi"] | false) ||
+      (request["apRecovery"] | false)) {
+    ClearWifiAndEnterProvisioning("provisioning_protocol");
+    payload["ok"] = true;
+    payload["cmd"] = "clear_wifi";
+    payload["wifi_connected"] = false;
+    return;
+  }
+
+  payload["ok"] = false;
+  payload["error"] = "unsupported_cmd";
+}
+
 bool AppController::SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs,
                                  const String& otaUrl) {
   config::DeviceConfig config = store_.Device();
@@ -145,11 +201,30 @@ void AppController::ClearWifiAndEnterProvisioning(const char* reason) {
   }
 }
 
+void AppController::FillProvisioningHello(JsonObject object) const {
+  object["ok"] = true;
+  object["cmd"] = "hello";
+  object["device_id"] = identity_.DeviceId();
+  object["pid"] = app::kPid;
+  object["product_name"] = app::kProductName;
+  object["ble_name"] = identity_.BleName();
+  object["ap_ssid"] = identity_.ApSsid();
+  object["wifi_connected"] = wifi_.Connected();
+  if (wifi_.Connected()) object["ssid"] = wifi_.StationSsid();
+  const String ip = wifi_.LocalIp();
+  if (!ip.isEmpty()) object["ip"] = ip;
+  object["firmware_version"] = app::kFirmwareVersion;
+  object["hardware_revision"] = app::kHardwareRevision;
+  object["matter_enabled"] = app::kMatterEnabled;
+}
+
 void AppController::FillStatus(JsonDocument& doc) const {
   doc["state"] = ToString(state_);
   JsonObject device = doc.createNestedObject("device");
   device["pid"] = app::kPid;
   device["model"] = app::kModel;
+  device["productCategory"] = app::kProductCategory;
+  device["productLine"] = app::kProductLine;
   device["hardwareRevision"] = app::kHardwareRevision;
   device["firmwareVersion"] = app::kFirmwareVersion;
   device["buildId"] = app::kBuildId;

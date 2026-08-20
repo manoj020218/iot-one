@@ -12,7 +12,14 @@ import {
 export class ApiResponseError extends Error {
   constructor(
     public readonly status: number,
-    message = `Request failed with status ${status}`
+    message = `Request failed with status ${status}`,
+    // Populated from the response body's { error: { code, details } }
+    // when present (every plugin backend's error envelope — see e.g.
+    // IOT_Device/QRunlock/VPS/API_CONTRACT.md §7). Undefined for
+    // non-JSON error bodies or modules that haven't adopted the
+    // envelope, so callers must not assume these are always set.
+    public readonly code?: string,
+    public readonly details?: Record<string, unknown>
   ) {
     super(message);
   }
@@ -89,7 +96,21 @@ export async function fetchAuthenticatedJson<T>(
     }
   }
   if (!response.ok) {
-    throw new ApiResponseError(response.status);
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
+    let message: string | undefined;
+    try {
+      const body = (await response.json()) as {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> };
+      };
+      code = body.error?.code;
+      message = body.error?.message;
+      details = body.error?.details;
+    } catch {
+      // Error body wasn't JSON (or had no body) — fall through with the
+      // generic "Request failed with status N" message.
+    }
+    throw new ApiResponseError(response.status, message, code, details);
   }
   const payload = (await response.json()) as { data: T };
   return payload.data;

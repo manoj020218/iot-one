@@ -6,7 +6,9 @@
   "dependencies": {
     "@jenix/device-schemas": "workspace:*",
     "@jenix/ip-speaker-backend": "workspace:*",
+    "@jenix/qrunlock-backend": "workspace:*",
     "@jenix/shared": "workspace:*",
+    "@jenix/smart-streamer-backend": "workspace:*",
     "express": "^4.21.1",
     "mongodb": "^6.8.0",
     "mqtt": "^5.10.4",

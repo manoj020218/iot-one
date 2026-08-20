@@ -28,6 +28,8 @@ class AppController : public platform::ControlApi {
   void CancelRfLearning() override;
   void EnterProvisioning() override;
   bool ApplyWifi(const String& ssid, const String& password) override;
+  void HandleProvisioningRequest(const JsonDocument& request,
+                                 JsonDocument& response) override;
   bool SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs,
                     const String& otaUrl) override;
   bool RequestOta(const String& url, const String& targetVersion,
@@ -38,6 +40,7 @@ class AppController : public platform::ControlApi {
 
  private:
   void ClearWifiAndEnterProvisioning(const char* reason);
+  void FillProvisioningHello(JsonObject object) const;
   void HandleButton(button::ButtonEvent event);
   void HandleRfEvent(const rf::RfEvent& event);
   void HandleDeferredRestart(uint32_t nowMs);
@@ -48,7 +51,7 @@ class AppController : public platform::ControlApi {
   relay::RelayService relay_{logger_};
   rf::RfService rf_{logger_};
   connectivity::WifiManager wifi_{store_, identity_, logger_};
-  connectivity::BleProvisioningService ble_{wifi_, logger_};
+  connectivity::BleProvisioningService ble_{logger_};
   ota::OtaService ota_{logger_};
   statusled::StatusLedService led_{};
   button::ButtonService button_{};

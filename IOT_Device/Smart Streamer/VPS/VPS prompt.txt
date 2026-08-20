@@ -1,0 +1,1054 @@
+# CODEX IMPLEMENTATION PROMPT
+
+## JENIX SMART STREAMER — MULTI-TENANT VPS CONTROL PLANE
+
+You are working on a production-grade commercial product named **Jenix Smart Streamer**.
+
+Develop the VPS-side control-plane service for onboarding customers, registering ESP32-P4 Smart Streamer devices, managing cameras, storing streaming destinations, managing schedules, authorizing stream sessions, and receiving device health telemetry.
+
+This is not a prototype, hobby project, demonstration project, or child-level implementation. Build it as a maintainable sellable product intended to remain operational for at least 10 years.
+
+---
+
+# 1. PRODUCT BEHAVIOUR
+
+A customer may own multiple ESP32-P4 Smart Streamer devices.
+
+Each P4 device:
+
+* Is assigned to one customer or tenant.
+* Connects to one IP CCTV camera at a time.
+* Can stream to YouTube, Facebook, or Instagram.
+* Can stream to only one destination at a time.
+* Sends video directly to the selected platform.
+* Never sends video through the VPS.
+* Uses the VPS only for authentication, configuration, schedules, destination credentials, status, and orchestration.
+
+A single customer may run multiple simultaneous live streams by using multiple P4 devices.
+
+Example:
+
+```text
+Customer A
++-- P4-01 ? Camera 01 ? YouTube
++-- P4-02 ? Camera 02 ? Facebook
++-- P4-03 ? Camera 03 ? Instagram
+```
+
+Enforce:
+
+```text
+Maximum active stream per P4 device = 1
+Maximum assigned active camera per device = 1
+Maximum destination per stream session = 1
+```
+
+---
+
+# 2. CRITICAL ARCHITECTURE RULE
+
+The VPS is a lightweight control plane only.
+
+It must never:
+
+* Receive RTSP video.
+* Proxy RTMP or RTMPS video.
+* Buffer H.264 data.
+* Record video.
+* Transcode audio or video.
+* Accept video file uploads through the stream-control APIs.
+* Act as a media relay.
+
+Video flow must remain:
+
+```text
+IP CCTV Camera
+      ¦ RTSP
+      ?
+ESP32-P4
+      ¦ RTMPS
+      ?
+YouTube / Facebook / Instagram
+```
+
+Control flow:
+
+```text
+ESP32-P4
+      ¦ HTTPS JSON
+      ?
+Jenix VPS Control Plane
+```
+
+Reject unsupported binary or oversized payloads.
+
+---
+
+# 3. RESOURCE TARGET
+
+Target VPS:
+
+```text
+Linux VPS
+1 vCPU
+512 MB RAM
+Fixed DNS endpoint
+```
+
+Resource objectives:
+
+* Idle application memory target: below 50 MB where reasonably possible.
+* Active normal operation target: below 120 MB.
+* Do not require Redis.
+* Do not require RabbitMQ.
+* Do not require Kafka.
+* Do not use Kubernetes.
+* Do not use PostgreSQL for the first low-resource release unless the existing repository already depends on it.
+* Prefer SQLite in WAL mode for the first production deployment.
+* Keep migration support so PostgreSQL can be introduced later.
+* Do not create one operating-system thread per device.
+* Do not maintain permanent WebSocket connections unless already required by the platform.
+* Prefer device polling with randomized intervals for the initial release.
+* Avoid unnecessary third-party packages.
+
+Use:
+
+* Python 3.12 or currently supported stable Python version in the repository.
+* FastAPI.
+* Uvicorn.
+* Pydantic.
+* SQLite WAL.
+* Async database access.
+* Caddy or Nginx for TLS termination.
+* systemd for process supervision.
+
+Start with one Uvicorn worker on a 512 MB server.
+
+Do not blindly create two or more workers because each worker duplicates application memory and in-memory state.
+
+---
+
+# 4. CODE ORGANIZATION RULE
+
+Every manually maintained source-code file must remain under 200 lines.
+
+This includes:
+
+* Python files.
+* Configuration modules.
+* API route modules.
+* Service modules.
+* Database repository modules.
+* Test files.
+* Shell scripts.
+* Deployment files where practical.
+
+If a file approaches 180 lines, refactor it before adding more code.
+
+Do not bypass the limit by:
+
+* Compressing code onto unreadable lines.
+* Removing type annotations.
+* Removing error handling.
+* Combining unrelated responsibilities.
+* Using wildcard imports.
+* Generating giant utility modules.
+
+Use small, clear, single-responsibility modules.
+
+Suggested structure:
+
+```text
+smart-streamer-server/
++-- app/
+¦   +-- main.py
+¦   +-- config/
+¦   +-- api/
+¦   ¦   +-- users/
+¦   ¦   +-- devices/
+¦   ¦   +-- cameras/
+¦   ¦   +-- destinations/
+¦   ¦   +-- schedules/
+¦   ¦   +-- sessions/
+¦   ¦   +-- telemetry/
+¦   +-- auth/
+¦   +-- db/
+¦   +-- models/
+¦   +-- repositories/
+¦   +-- services/
+¦   +-- security/
+¦   +-- schemas/
+¦   +-- common/
++-- migrations/
++-- tests/
++-- deploy/
++-- scripts/
++-- README.md
+```
+
+Adjust the structure to match the existing repository conventions.
+
+---
+
+# 5. EXISTING PLATFORM AUTHENTICATION
+
+Jenix One IoT already has its own user-login and multi-device user flow.
+
+Do not create a duplicate customer login system when integrating with Jenix One.
+
+Implement an authentication adapter that can:
+
+* Validate the existing Jenix One access token or JWT.
+* Read the user ID.
+* Read the tenant, organization, or customer ID.
+* Read role and permission claims.
+* Enforce tenant isolation.
+* Reject expired or invalid tokens.
+* Support future token-key rotation.
+
+For development only, a minimal local admin authentication mode may be provided behind an explicit environment flag.
+
+Development authentication must be disabled by default in production.
+
+Never hard-code production users or passwords.
+
+---
+
+# 6. MULTI-TENANT DATA MODEL
+
+Implement at minimum:
+
+```text
+tenants
+users or external_user_links
+devices
+device_claim_tokens
+camera_profiles
+platform_accounts
+stream_destinations
+stream_schedules
+stream_sessions
+device_health
+device_commands
+audit_logs
+used_nonces
+```
+
+Recommended device fields:
+
+```text
+device_id
+tenant_id
+hardware_serial
+product_id
+friendly_name
+hardware_model
+firmware_version
+provisioning_status
+online_status
+last_seen_at
+assigned_camera_id
+active_session_id
+created_at
+updated_at
+revoked_at
+```
+
+Recommended camera fields:
+
+```text
+camera_id
+tenant_id
+friendly_name
+rtsp_host
+rtsp_port
+rtsp_path
+rtsp_username_encrypted
+rtsp_password_encrypted
+preferred_profile
+audio_codec
+video_codec
+rotation
+enabled
+```
+
+Recommended destination fields:
+
+```text
+destination_id
+tenant_id
+platform
+display_name
+credential_mode
+server_url_encrypted
+stream_key_encrypted
+oauth_reference_encrypted
+credential_expiry
+enabled
+```
+
+Recommended schedule fields:
+
+```text
+schedule_id
+tenant_id
+device_id
+camera_id
+destination_id
+timezone
+start_local_time
+stop_local_time
+days_of_week
+start_date
+end_date
+enabled
+priority
+```
+
+Recommended stream-session fields:
+
+```text
+session_id
+tenant_id
+device_id
+camera_id
+destination_id
+platform
+trigger_type
+status
+created_at
+authorized_at
+started_at
+stopped_at
+expires_at
+stop_reason
+error_code
+```
+
+All database queries must include tenant ownership checks.
+
+Never trust tenant IDs provided directly by the browser without validating them against the authenticated user.
+
+---
+
+# 7. USER AND DEVICE ONBOARDING
+
+Implement a secure device-claim workflow.
+
+Suggested flow:
+
+1. Manufacturing assigns:
+
+   * Hardware serial number.
+   * Product ID.
+   * Device ID.
+   * Device bootstrap secret or device certificate.
+
+2. P4 device completes universal Jenix provisioning.
+
+3. Device contacts VPS using its bootstrap identity.
+
+4. VPS creates a short-lived claim token or claim code.
+
+5. Authenticated Jenix One user selects “Add Smart Streamer”.
+
+6. User enters or scans the claim code.
+
+7. VPS atomically assigns the device to the user’s tenant.
+
+8. Device bootstrap credentials are rotated or upgraded to permanent device credentials.
+
+9. Claim token becomes unusable.
+
+Requirements:
+
+* Claim tokens must expire.
+* Claim tokens must be single-use.
+* Claim attempts must be rate-limited.
+* A claimed device cannot be silently claimed by another tenant.
+* Device transfer must require an explicit administrative release or factory-reset workflow.
+* Log every claim, release, revoke, and credential rotation operation.
+
+---
+
+# 8. DEVICE AUTHENTICATION
+
+Do not use a permanent plain `X-Access-Key` as the only device-security mechanism.
+
+Implement request signing.
+
+Recommended headers:
+
+```http
+X-Device-ID: JNX-P4-000101
+X-Timestamp: 1785684320
+X-Nonce: random-unique-value
+X-Signature: base64-hmac-sha256
+```
+
+Signature input must include:
+
+```text
+HTTP method
+request path
+timestamp
+nonce
+SHA-256 request-body hash
+```
+
+Requirements:
+
+* Reject timestamps outside the allowed clock window.
+* Reject reused nonces.
+* Use constant-time signature comparison.
+* Support credential rotation.
+* Support device revocation.
+* Do not log raw signatures or secrets.
+* Enforce HTTPS.
+* Allow a controlled time-synchronization recovery flow for devices with invalid clocks after prolonged power failure.
+* Add replay-protection tests.
+
+Design the authentication interface so hardware-backed certificates can be supported later.
+
+---
+
+# 9. SECRET STORAGE
+
+Encrypt sensitive fields at rest:
+
+* RTSP camera passwords.
+* YouTube stream keys.
+* Facebook stream keys.
+* Instagram temporary stream keys.
+* OAuth refresh tokens.
+* Platform account references.
+
+Use authenticated encryption such as AES-GCM through a well-maintained library.
+
+The master encryption key must:
+
+* Come from an environment secret or protected secret file.
+* Never be committed to Git.
+* Never be printed in logs.
+* Support future key rotation.
+
+Do not store browser cookies for Instagram.
+
+Do not ask customers for social-platform account passwords.
+
+---
+
+# 10. PLATFORM DESTINATION SUPPORT
+
+Implement a destination-provider abstraction.
+
+Example interface:
+
+```text
+DestinationProvider
++-- validate_configuration()
++-- prepare_session()
++-- refresh_credentials()
++-- revoke_session()
++-- sanitize_for_device()
+```
+
+Implement providers for:
+
+## YouTube
+
+Support:
+
+* Existing reusable RTMPS server URL and stream-key mode.
+* Existing working YouTube integration compatibility.
+* Future OAuth-managed broadcast and stream creation.
+* Separate destination and stream key per device where practical.
+
+Do not break existing YouTube workflows.
+
+## Facebook
+
+Initial production support:
+
+* Manual RTMPS server URL.
+* Manual persistent or temporary stream key.
+* Credential-expiry field.
+* Future official Graph API integration hooks.
+
+Do not use undocumented endpoints.
+
+## Instagram
+
+Initial production support:
+
+* Manual Live Producer server URL.
+* Manual temporary stream key.
+* Mandatory expiry or validity warning.
+* Optional manual “credentials refreshed” confirmation.
+* Feature flag to disable Instagram in deployments where it is not supported.
+
+Do not:
+
+* Store Instagram passwords.
+* Store Instagram browser-session cookies.
+* Reverse-engineer undocumented private APIs.
+* Claim automatic Instagram session creation unless implemented through an officially supported API.
+
+---
+
+# 11. SESSION AUTHORIZATION
+
+Implement an atomic device-session lock.
+
+A device may have only one active or starting session.
+
+Session states:
+
+```text
+REQUESTED
+AUTHORIZED
+DEVICE_CONNECTING
+STREAMING
+STOP_REQUESTED
+STOPPING
+STOPPED
+FAILED
+EXPIRED
+```
+
+When a second start request is made for a busy device, return:
+
+```http
+409 Conflict
+```
+
+Example:
+
+```json
+{
+  "error": {
+    "code": "DEVICE_ALREADY_STREAMING",
+    "active_session_id": "SES-20260803-0012",
+    "active_platform": "youtube"
+  }
+}
+```
+
+Also implement an optional destination lock to prevent two P4 devices from accidentally using the same destination stream key.
+
+All session state transitions must be validated.
+
+Do not allow impossible transitions such as:
+
+```text
+STOPPED ? STREAMING
+FAILED ? STREAMING
+```
+
+without creating a new session.
+
+---
+
+# 12. DEVICE SESSION API
+
+Implement an endpoint similar to:
+
+```http
+POST /api/v1/device/sessions/authorize
+```
+
+Signed device request:
+
+```json
+{
+  "request_id": "REQ-01K1P4",
+  "camera_id": "CAM-0001",
+  "destination_id": "DEST-00017",
+  "trigger": "schedule",
+  "firmware_version": "1.0.0",
+  "capabilities": {
+    "video_passthrough": true,
+    "audio_aac_passthrough": true,
+    "audio_transcode": true,
+    "max_transcode": "1920x1080@30",
+    "ppa_rotation": true
+  }
+}
+```
+
+Return only the minimum configuration needed by the assigned device:
+
+```json
+{
+  "session_id": "SES-20260803-0012",
+  "platform": "facebook",
+  "expires_at": "2026-08-03T08:00:00Z",
+  "ingest": {
+    "protocol": "rtmps",
+    "server_url": "rtmps://example-ingest/live",
+    "stream_key": "temporary-secret"
+  },
+  "pipeline": {
+    "video_mode": "h264_passthrough",
+    "audio_mode": "aac_passthrough",
+    "rotation": 0,
+    "keyframe_interval_seconds": 2
+  },
+  "planned_stop_at": "2026-08-03T07:45:00Z"
+}
+```
+
+Response requirements:
+
+```http
+Cache-Control: no-store
+Pragma: no-cache
+```
+
+Never expose credentials to an unrelated device or tenant.
+
+Never include secret values in normal logs, exceptions, telemetry, or audit descriptions.
+
+---
+
+# 13. SCHEDULE MANAGEMENT
+
+Support:
+
+* Timezone per schedule.
+* Default timezone `Asia/Kolkata`.
+* Day-of-week recurrence.
+* One-time events.
+* Date range.
+* Enabled or disabled status.
+* Manual start and stop.
+* Schedule priority.
+* Overlap validation.
+* Missed-event policy.
+* Early-start and late-stop tolerances.
+
+Every schedule must identify:
+
+```text
+device_id
+camera_id
+destination_id
+timezone
+start time
+stop time
+```
+
+Reject overlapping active schedules for the same P4 device.
+
+The VPS must not independently create thousands of simultaneous heavy jobs.
+
+Prefer one of these low-resource designs:
+
+1. Devices periodically fetch their next schedule using randomized polling.
+2. Maintain a compact in-memory min-heap of upcoming control events rebuilt from SQLite.
+3. Combine both, with device polling as the reliability fallback.
+
+Do not use one thread or one timer per schedule.
+
+---
+
+# 14. POWER-CUT AND THUNDERING-HERD PROTECTION
+
+After a widespread power failure, many P4 devices may reboot simultaneously.
+
+Design the server and API so this does not overload the VPS.
+
+Requirements:
+
+* Firmware applies randomized startup delay.
+* Server supports `Retry-After`.
+* Rate-limit per device and per IP.
+* Use bounded request queues.
+* Keep request processing short.
+* Avoid database table scans on every device poll.
+* Add indexes for device ID, tenant ID, session state, schedule time, and last-seen time.
+* Cache only non-sensitive, bounded data.
+* Do not hold database transactions while calling external APIs.
+* Use idempotency keys for session-start requests.
+
+Return controlled responses:
+
+```http
+429 Too Many Requests
+Retry-After: 37
+```
+
+or:
+
+```http
+503 Service Unavailable
+Retry-After: 45
+```
+
+Never allow all devices to retry at exactly the same fixed interval.
+
+---
+
+# 15. DEVICE POLLING
+
+Implement lightweight endpoints for:
+
+```text
+device bootstrap
+device claim status
+next configuration
+next schedule
+pending command
+session authorization
+session state update
+heartbeat
+health telemetry
+firmware metadata
+```
+
+Heartbeat payload must be compact.
+
+Example:
+
+```json
+{
+  "firmware": "1.0.0",
+  "uptime_s": 86200,
+  "free_heap": 183000,
+  "largest_block": 92000,
+  "wifi_rssi": -61,
+  "camera_connected": true,
+  "stream_state": "STREAMING",
+  "session_id": "SES-20260803-0012",
+  "last_error": null
+}
+```
+
+Do not send high-frequency telemetry unless streaming or troubleshooting.
+
+Suggested intervals:
+
+```text
+Idle heartbeat: 5 minutes with jitter
+Streaming heartbeat: 30–60 seconds with jitter
+Configuration poll: 1–5 minutes with jitter
+Pending-command poll: adaptive
+Failure retry: exponential backoff with jitter
+```
+
+Make intervals configurable from the server within safe minimum and maximum limits.
+
+---
+
+# 16. RATE LIMITING
+
+Implement low-memory token-bucket or sliding-window limits.
+
+At minimum:
+
+* Device bootstrap rate.
+* Device claim rate.
+* User login adapter rate.
+* Session authorization rate.
+* Heartbeat rate.
+* Invalid-signature rate.
+* Platform credential validation rate.
+
+Because the initial deployment uses one application worker, a bounded in-memory limiter is acceptable for fast-path protection.
+
+Security-critical claim attempts and failed authentication counts should also be persisted or audit-logged.
+
+Do not allow unbounded dictionaries that grow forever.
+
+Implement expiry cleanup.
+
+---
+
+# 17. EXTERNAL API CALLS
+
+When calling YouTube or future Facebook APIs:
+
+* Use one shared asynchronous HTTP client.
+* Configure connection pooling.
+* Set strict timeouts.
+* Set response-size limits where possible.
+* Retry only idempotent or explicitly safe operations.
+* Use exponential backoff with jitter.
+* Do not retry authentication failures indefinitely.
+* Use circuit-breaker behaviour.
+* Never hold a SQLite write transaction while waiting for an external API.
+* Preserve the original meaningful HTTP error instead of converting all errors to status 500.
+
+Do not use broad exception handling that accidentally swallows framework HTTP exceptions.
+
+---
+
+# 18. AUDIT LOGGING
+
+Audit:
+
+* Device claimed.
+* Device released.
+* Device revoked.
+* Device credential rotated.
+* Camera created or modified.
+* Destination created or modified.
+* Stream key changed.
+* Schedule created, modified, enabled, or disabled.
+* Manual stream started or stopped.
+* Session failed.
+* User permission changed.
+* OTA assigned.
+
+Do not record raw secrets.
+
+Use structured JSON logs.
+
+Implement log rotation.
+
+Do not allow logs to fill the VPS disk.
+
+---
+
+# 19. API RESPONSE FORMAT
+
+Use one consistent success and error format.
+
+Error example:
+
+```json
+{
+  "error": {
+    "code": "DESTINATION_CREDENTIAL_EXPIRED",
+    "message": "The destination credentials must be updated.",
+    "request_id": "REQ-01K1P4"
+  }
+}
+```
+
+Do not expose stack traces or internal file paths to clients.
+
+Include request IDs for support diagnostics.
+
+---
+
+# 20. HEALTH AND OPERATIONS
+
+Provide:
+
+```text
+GET /health/live
+GET /health/ready
+GET /metrics-lite
+```
+
+`metrics-lite` must return bounded lightweight operational statistics and must be protected if it exposes sensitive information.
+
+Track:
+
+* Process uptime.
+* Database readiness.
+* Current request count.
+* Active session count.
+* Recently online device count.
+* External platform circuit status.
+* Memory usage where safely available.
+
+Do not add a heavy monitoring stack as a mandatory dependency.
+
+---
+
+# 21. DATABASE RELIABILITY
+
+Configure SQLite with:
+
+```text
+WAL mode
+foreign keys enabled
+busy timeout
+bounded connection pool
+regular checkpoints
+transaction discipline
+```
+
+Implement:
+
+* Schema migrations.
+* Daily backup script.
+* Backup rotation.
+* Backup-integrity verification.
+* Restore instructions.
+* Corruption detection and safe startup behaviour.
+* Disk-space checks.
+
+Do not silently recreate a missing or damaged production database.
+
+---
+
+# 22. DEPLOYMENT
+
+Provide:
+
+```text
+systemd service
+environment example file
+Caddy or Nginx example
+TLS configuration notes
+SQLite directory permissions
+log rotation configuration
+backup script
+upgrade script
+rollback procedure
+```
+
+Recommended application startup:
+
+```bash
+uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --workers 1 \
+  --proxy-headers
+```
+
+The reverse proxy handles HTTPS.
+
+Set systemd restart limits to avoid an infinite rapid crash loop.
+
+Configure:
+
+```text
+Restart=on-failure
+RestartSec with controlled delay
+MemoryMax appropriate for 512 MB VPS
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem where compatible
+```
+
+Do not hard-code exact paths without configuration.
+
+---
+
+# 23. TESTING
+
+Add automated tests for:
+
+* Tenant isolation.
+* Device claim success.
+* Expired claim rejection.
+* Reused claim rejection.
+* Device-signature verification.
+* Nonce replay rejection.
+* Timestamp-window rejection.
+* Credential rotation.
+* Device revocation.
+* Single active session per device.
+* Destination-lock conflict.
+* Schedule-overlap rejection.
+* Idempotent start request.
+* User authorization.
+* Secret redaction.
+* Invalid platform.
+* Expired Instagram credential.
+* Database busy handling.
+* API rate limiting.
+* Large-body rejection.
+* Simultaneous reboot simulation.
+
+Add a load-test script that simulates at least:
+
+```text
+100 devices reconnecting with jitter
+500 devices reconnecting with jitter
+1000 heartbeat requests over a controlled period
+```
+
+The load test must not send video.
+
+Verify that no unbounded memory growth occurs.
+
+---
+
+# 24. FAILURE BEHAVIOUR
+
+The system must fail safely.
+
+Examples:
+
+* If the database is unavailable, do not authorize a new stream using guessed data.
+* If destination credentials are expired, return a clear error.
+* If an external API is unavailable, preserve existing reusable credentials where safe.
+* If the server restarts, active session records must remain recoverable.
+* If a device repeats an idempotent request, return the original session result where valid.
+* If time synchronization is temporarily invalid after power restoration, use the defined recovery process rather than disabling security globally.
+
+---
+
+# 25. DOCUMENTATION
+
+Create:
+
+```text
+README.md
+ARCHITECTURE.md
+SECURITY.md
+API.md
+DEPLOYMENT.md
+BACKUP_RESTORE.md
+DEVICE_ONBOARDING.md
+PLATFORM_DESTINATIONS.md
+TROUBLESHOOTING.md
+```
+
+Keep each document focused and reasonably sized.
+
+Document the exact statement:
+
+> The VPS does not carry, proxy, buffer, transcode, record, or store live video. Video travels directly from the ESP32-P4 device to the selected platform.
+
+---
+
+# 26. CODEX WORKFLOW
+
+Before coding:
+
+1. Inspect the existing repository.
+2. Identify reusable authentication, database, logging, and configuration modules.
+3. Identify the current Jenix One user and tenant model.
+4. Identify the existing YouTube implementation and API contracts.
+5. Produce a brief implementation plan.
+6. List files that will be created or modified.
+7. Preserve backward compatibility where reasonable.
+
+During implementation:
+
+* Make small, reviewable commits.
+* Run tests after each module group.
+* Do not leave placeholder security logic.
+* Do not put production secrets in examples.
+* Do not silently skip failed tests.
+* Do not replace working code without explaining why.
+
+---
+
+# 27. DEFINITION OF DONE
+
+The implementation is complete only when:
+
+* A Jenix One user can claim multiple P4 devices.
+* Tenant isolation is tested.
+* Each device can be assigned one camera.
+* YouTube, Facebook, and Instagram destination profiles can be stored securely.
+* A P4 can authorize only one active stream at a time.
+* Multiple P4 devices owned by one customer can stream concurrently.
+* Scheduling works with `Asia/Kolkata` as the default timezone.
+* Overlapping schedules for the same device are rejected.
+* Device credentials are signed, replay-protected, revocable, and rotatable.
+* Secrets are encrypted at rest.
+* The server never handles video traffic.
+* The service runs on a 1-vCPU, 512-MB VPS.
+* Reconnection bursts are controlled.
+* All maintained source files remain under 200 lines.
+* Tests pass.
+* Deployment, backup, restore, upgrade, and rollback instructions are present.

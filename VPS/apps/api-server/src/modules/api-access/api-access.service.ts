@@ -4,13 +4,14 @@ import {
   type ApiKeyCreateResult,
   type ApiKeyRecord,
   type ApiPackageRecord,
+  type DeviceRecord,
   type PublicDeviceCommandResult,
   type PublicDeviceState,
   type SceneActionCommand
 } from "@jenix/shared";
 
 import { DeviceModuleError } from "../devices/device.types";
-import { getDevice, listDevices } from "../devices/device.service";
+import { getDevice, listDevices, registerDevice } from "../devices/device.service";
 import { resolveHomeAccessContext } from "../homes/home.service";
 import { HomeModuleError } from "../homes/home.types";
 import { getPid } from "../pid/pid.service";
@@ -19,6 +20,7 @@ import {
   apiAccessKeySecretRepository,
   apiAccessPackageRepository
 } from "./api-access.model";
+import { getPublicDeviceCapabilities } from "./public-device-capabilities";
 import type {
   ApiKeyRequestContext,
   ApiPackageActorContext,
@@ -26,7 +28,10 @@ import type {
   CreateApiPackageInput,
   PublicApiAuthorizedContext,
   PublicApiModuleState,
-  PublicCommandPayload
+  PublicCommandPayload,
+  RegisterVendorDeviceInput,
+  VendorConfigPatchPayload,
+  VendorDeviceListResponse
 } from "./api-access.types";
 import {
   ApiAccessModuleError,
@@ -164,11 +169,20 @@ function translateDeviceError(error: unknown): never {
   throw error;
 }
 
-async function authorizePublicDeviceScope(
+/**
+ * The device-agnostic half of authorization: is this a valid, active,
+ * non-expired key, on an active package, with the required scope, for a
+ * PID that actually exposes that scope. Used both by device-specific
+ * routes (state/commands) and by vendor routes that don't target one
+ * device yet (register, list) — see RELAY_INTEGRATION_PLAN.md's "vendor
+ * pool HOME" model for why the device-scoping itself is a separate,
+ * simpler check (device.homeId === keyRecord.homeId) layered on top of
+ * this, not folded into it.
+ */
+async function authorizeApiKeyForScope(
   apiSecret: string,
-  deviceId: string,
   requiredScope: string
-): Promise<PublicApiAuthorizedContext & { deviceState: PublicDeviceState }> {
+): Promise<PublicApiAuthorizedContext> {
   const normalizedSecret = apiSecret.trim();
 
   if (!normalizedSecret) {
@@ -215,6 +229,16 @@ async function authorizePublicDeviceScope(
     );
   }
 
+  return { packageRecord, keyRecord };
+}
+
+async function authorizePublicDeviceScope(
+  apiSecret: string,
+  deviceId: string,
+  requiredScope: string
+): Promise<PublicApiAuthorizedContext & { deviceState: PublicDeviceState }> {
+  const { packageRecord, keyRecord } = await authorizeApiKeyForScope(apiSecret, requiredScope);
+
   try {
     const device = await getDevice(deviceId, {});
 
@@ -232,17 +256,7 @@ async function authorizePublicDeviceScope(
     return {
       packageRecord,
       keyRecord,
-      deviceState: {
-        deviceId: device.deviceId,
-        displayName: device.displayName,
-        pid: device.pid,
-        ...(device.firmwareVersion ? { firmwareVersion: device.firmwareVersion } : {}),
-        ...(device.hardwareRevision ? { hardwareRevision: device.hardwareRevision } : {}),
-        mqttStatus: device.mqttStatus,
-        cloudStatus: device.cloudStatus,
-        ...(device.localStatus ? { localStatus: device.localStatus } : {}),
-        ...(device.lastSeenAt ? { lastSeenAt: device.lastSeenAt } : {})
-      }
+      deviceState: toPublicDeviceState(device)
     };
   } catch (error) {
     translateDeviceError(error);
@@ -317,17 +331,13 @@ export async function createApiKey(
     throw new ApiAccessModuleError(409, "API package must be active before keys can be issued");
   }
 
-  const devices = (await listDevices({ homeId })).filter(
-    (device) => device.pid === packageRecord.pid
-  );
-
-  if (!devices.length) {
-    throw new ApiAccessModuleError(
-      409,
-      `HOME ${homeId} does not contain a device for PID ${packageRecord.pid}`
-    );
-  }
-
+  // Deliberately no "HOME must already contain a device for this PID"
+  // precondition — a vendor-pool key (see RELAY_INTEGRATION_PLAN.md) must
+  // be issuable *before* the first device is claimed into that pool via
+  // POST /api/v1/public/devices/register, which itself requires this key
+  // to exist first. A key for a HOME with zero matching devices yet is
+  // simply inert until one is registered, not unsafe — this precondition
+  // didn't gate anything security-relevant, only ordering.
   const scopes = uniqueScopes(input.scopes ?? packageRecord.scopes);
   const packageScopes = new Set(packageRecord.scopes.map(normalizeScope));
   const invalidScope = scopes.find((scope) => !packageScopes.has(scope));
@@ -427,6 +437,32 @@ export async function executePublicDeviceCommand(
     requiredScope
   );
 
+  // A registered plugin capability (e.g. @jenix/qrunlock-backend's
+  // unlockDevice) always wins over the generic scene-command dispatch
+  // below — see public-device-capabilities.ts's doc comment for why this
+  // must never be bypassed. `caller` is fixed here, never taken from the
+  // request body, so a client can't claim to be someone else.
+  const capabilities = getPublicDeviceCapabilities(authorized.packageRecord.pid);
+  if (capabilities?.executeCommand) {
+    const caller = `api:${authorized.packageRecord.packageId}`;
+    const commandResult = await capabilities.executeCommand(
+      deviceId,
+      authorized.keyRecord.homeId,
+      payload.command,
+      payload.payload ?? {},
+      caller
+    );
+
+    return {
+      deviceId,
+      accepted: true,
+      command: payload.command,
+      occurredAt: new Date().toISOString(),
+      packageId: authorized.packageRecord.packageId,
+      ...commandResult
+    };
+  }
+
   const result: PublicDeviceCommandResult = {
     deviceId,
     accepted: true,
@@ -438,6 +474,135 @@ export async function executePublicDeviceCommand(
     ...result,
     packageId: authorized.packageRecord.packageId
   };
+}
+
+function toPublicDeviceState(device: DeviceRecord): PublicDeviceState {
+  return {
+    deviceId: device.deviceId,
+    displayName: device.displayName,
+    pid: device.pid,
+    ...(device.firmwareVersion ? { firmwareVersion: device.firmwareVersion } : {}),
+    ...(device.hardwareRevision ? { hardwareRevision: device.hardwareRevision } : {}),
+    mqttStatus: device.mqttStatus,
+    cloudStatus: device.cloudStatus,
+    ...(device.localStatus ? { localStatus: device.localStatus } : {}),
+    ...(device.lastSeenAt ? { lastSeenAt: device.lastSeenAt } : {})
+  };
+}
+
+/**
+ * Vendor device claim — authenticated by API key alone, no Jenix user
+ * session (a QRunlock host never logs into Jenix One). Registers the
+ * device into the key's own homeId, i.e. the "vendor pool HOME" —
+ * see RELAY_INTEGRATION_PLAN.md. Idempotent: re-claiming a device that's
+ * already in this same vendor's pool just returns it; claiming a
+ * deviceId that belongs to a different HOME (a real Jenix end-user's own
+ * device, or a different vendor's pool) is a real conflict, not silently
+ * absorbed.
+ */
+export async function registerVendorDevice(
+  apiSecret: string,
+  input: RegisterVendorDeviceInput
+): Promise<PublicApiStateResponse> {
+  const { packageRecord, keyRecord } = await authorizeApiKeyForScope(apiSecret, "devices:write");
+
+  const existing = await getDevice(input.deviceId, {}).catch((error) => {
+    if (error instanceof DeviceModuleError && error.statusCode === 404) {
+      return undefined;
+    }
+    throw error;
+  });
+
+  if (existing) {
+    if (existing.homeId !== keyRecord.homeId || existing.pid !== packageRecord.pid) {
+      throw new ApiAccessModuleError(
+        409,
+        `Device already registered outside this vendor's pool: ${input.deviceId}`
+      );
+    }
+
+    return { ...toPublicDeviceState(existing), packageId: packageRecord.packageId };
+  }
+
+  const device = await registerDevice({
+    deviceId: input.deviceId,
+    pid: packageRecord.pid,
+    homeId: keyRecord.homeId,
+    ownerUserId: keyRecord.createdByUserId,
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.hardwareRevision ? { hardwareRevision: input.hardwareRevision } : {}),
+    ...(input.firmwareVersion ? { firmwareVersion: input.firmwareVersion } : {})
+  }).catch((error) => {
+    if (error instanceof DeviceModuleError) {
+      throw new ApiAccessModuleError(error.statusCode, error.message);
+    }
+    throw error;
+  });
+
+  return { ...toPublicDeviceState(device), packageId: packageRecord.packageId };
+}
+
+export async function listVendorDevices(apiSecret: string): Promise<VendorDeviceListResponse> {
+  const { packageRecord, keyRecord } = await authorizeApiKeyForScope(apiSecret, "devices:read");
+
+  const devices = (await listDevices({ homeId: keyRecord.homeId })).filter(
+    (device) => device.pid === packageRecord.pid
+  );
+
+  return {
+    packageId: packageRecord.packageId,
+    devices: devices.map(toPublicDeviceState)
+  };
+}
+
+export async function getVendorDeviceConfig(deviceId: string, apiSecret: string): Promise<unknown> {
+  const authorized = await authorizePublicDeviceScope(apiSecret, deviceId, "devices:read");
+  const getConfig = getPublicDeviceCapabilities(authorized.packageRecord.pid)?.getConfig;
+
+  if (!getConfig) {
+    throw new ApiAccessModuleError(
+      501,
+      `PID ${authorized.packageRecord.pid} does not support getConfig through the vendor API`
+    );
+  }
+
+  return getConfig(deviceId, authorized.keyRecord.homeId);
+}
+
+export async function patchVendorDeviceConfig(
+  deviceId: string,
+  apiSecret: string,
+  payload: VendorConfigPatchPayload
+): Promise<unknown> {
+  const authorized = await authorizePublicDeviceScope(apiSecret, deviceId, "devices:write");
+  const patchConfig = getPublicDeviceCapabilities(authorized.packageRecord.pid)?.patchConfig;
+
+  if (!patchConfig) {
+    throw new ApiAccessModuleError(
+      501,
+      `PID ${authorized.packageRecord.pid} does not support patchConfig through the vendor API`
+    );
+  }
+
+  return patchConfig(deviceId, authorized.keyRecord.homeId, payload.patch);
+}
+
+export async function getVendorDeviceLogs(
+  deviceId: string,
+  apiSecret: string,
+  limit: number
+): Promise<unknown[]> {
+  const authorized = await authorizePublicDeviceScope(apiSecret, deviceId, "devices:read");
+  const getLogs = getPublicDeviceCapabilities(authorized.packageRecord.pid)?.getLogs;
+
+  if (!getLogs) {
+    throw new ApiAccessModuleError(
+      501,
+      `PID ${authorized.packageRecord.pid} does not support getLogs through the vendor API`
+    );
+  }
+
+  return getLogs(deviceId, authorized.keyRecord.homeId, limit);
 }
 
 export const apiAccessTesting = {

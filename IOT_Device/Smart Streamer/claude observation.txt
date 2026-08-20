@@ -1,0 +1,42 @@
+Must read — defines exactly what to build
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+¦                    File                     ¦                                                        What it covers                                                        ¦
++---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------¦
+¦ IOT_Device\Smart                            ¦ The full device?VPS contract: every HTTPS endpoint (bootstrap, claim, config/schedule fetch, session authorize/stop,         ¦
+¦ Streamer\firmware\API_CONTRACT.md           ¦ heartbeat, OTA metadata), request signing scheme, error codes, and the new §10 MQTT section (topic scheme, command payload   ¦
+¦                                             ¦ shape, ack/LWT)                                                                                                              ¦
++---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------¦
+¦ PROVISIONING.md (repo root)                 ¦ The provisioning standard every device must implement: ESP-IDF wifi_provisioning/protocomm, Security Scheme 2 (SRP6a +       ¦
+¦                                             ¦ AES-256-GCM), BLE+SoftAP, device naming (JNXSS{6-hex-MAC}), per-device Proof-of-Possession                                   ¦
++---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------¦
+¦ SCHEDULE.md (repo root)                     ¦ Why/how scheduled commands arrive over MQTT instead of polling — firmware §2 is written directly at him: pick command names, ¦
+¦                                             ¦  don't build scheduling logic, handle {deviceId, pid, command, payload?} generically                                         ¦
++---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------¦
+¦ packages\shared\src\utils\mqtt-topics.ts    ¦ The actual source of the frozen MQTT topic scheme (jnx/{tenantId}/{pid}/{deviceId}/{suffix}) — worth seeing the real code,   ¦
+¦                                             ¦ not just my paraphrase of it                                                                                                 ¦
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+Reference — grounds the "why"
+
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+¦                                    File                                    ¦                                         What it covers                                         ¦
++----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------¦
+¦                                                                            ¦ smartStreamerPidBlueprint — the registered product identity (PID JNX-SS-P4-001, hardware       ¦
+¦ packages\device-schemas\src\pid\pid.types.ts                               ¦ profile he should match: mcu: "ESP32-P4", and the two declared commands                        ¦
+¦                                                                            ¦ start_stream/stop_stream)                                                                      ¦
++----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------¦
+¦ VPS\apps\api-server\src\infrastructure\http\require-device-auth.ts         ¦ Shows what device auth is actually enforced today (a stopgap shared key) vs. the per-device    ¦
+¦                                                                            ¦ HMAC scheme the contract requires — so he knows not to build against the stopgap               ¦
++----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------¦
+¦ IOT_Device\Smart Streamer\VPS\API_CONTRACT.md                              ¦ The PWA?VPS side — not his to implement, but explains where the data he reports (camera        ¦
+¦                                                                            ¦ status, session state, health) ends up on screen                                               ¦
++----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------¦
+¦ IOT_Device\Smart Streamer\PWA tool\UI_UX_PLAN.md                           ¦ What the app screens actually look like/expect — useful if a field name or state value seems   ¦
+¦                                                                            ¦ arbitrary                                                                                      ¦
++----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------¦
+¦ Live preview:                                                              ¦ Interactive mockup of the whole plugin — seeing what "Diagnostics shows CAMERA_AUTH_FAILED"    ¦
+¦ https://claude.ai/code/artifact/19860f60-929c-470e-9bbe-8bf8445eb5a1       ¦ actually renders as makes the error-code contract concrete                                     ¦
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+One thing worth telling him directly: §10.5 in the firmware contract flags that MQTT connection auth (how the device authenticates to the broker) is unverified — I couldn't confirm it from the server-side code alone. He should get that confirmed by whoever owns VPS/apps/api-server/src/infrastructure/mqtt/ before building the MQTT client, not assume it reuses the HTTP signing key.
