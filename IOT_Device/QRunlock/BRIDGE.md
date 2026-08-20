@@ -245,6 +245,67 @@ the "cloud connected" indicator is decorative.
 
 ---
 
+## 9. QRunlock Field Test Procedure (this bench unit, 2026-08-20)
+
+Concrete, run-it-now steps for whoever has the flashed hardware. Steps 1–6
+need no platform secrets at all — they only need the device and a machine
+on the same Wi-Fi. Report the results (screenshots or copy-pasted output
+are both fine) and stop there; step 7 (the real platform-triggered unlock)
+is done from the platform side once steps 1–6 pass, not by the firmware
+tester.
+
+1. **Build + flash**: from `IOT_Device/QRunlock/`, `pio run -e
+   esp32-c3-supermini -t upload`. Confirm it flashes and boots (serial
+   monitor: `pio device monitor -b 115200`).
+2. **Join Wi-Fi** the same way already validated on this unit (AP mode +
+   `POST /api/wifi`, or whatever local method was used before). Confirm
+   `GET http://<device-ip>/api/status` shows `wifi.connected: true` and
+   note the IP.
+3. **Bind to the real vendor pool HOME**:
+   ```
+   POST http://<device-ip>/api/cloud
+   Content-Type: application/json
+
+   {"homeId": "home-user-qrunlock-vendor-jenix-internal"}
+   ```
+   Expect `{"ok":true}`.
+4. **Confirm the bridge connected**: within ~5 seconds,
+   `GET http://<device-ip>/api/status` → `cloud.connected` should be
+   `true`, and `cloud.cmdTopic` should read
+   `jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/JNX-QRU-C3-<yourMAC>/cmd`.
+   Also note `device.deviceId` from the same response — needed for step 7.
+   If `cloud.connected` stays `false`: check the device's serial log for
+   `MQTT connect failed rc=...` (outbound port 1883 to `mqtt.iotsoft.in`
+   blocked by the local network is the most likely cause on a
+   corporate/guest Wi-Fi).
+5. **Self-test the full command loop locally** — this proves the bridge
+   itself works without touching any Jenix platform secret. Needs
+   `mosquitto_pub`/`mosquitto_sub` (part of the `mosquitto-clients` package
+   on most platforms). In one terminal:
+   ```
+   mosquitto_sub -h mqtt.iotsoft.in -p 1883 -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd/ack" -v
+   ```
+   In another:
+   ```
+   mosquitto_pub -h mqtt.iotsoft.in -p 1883 -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd" -m "{\"deliveryId\":\"bench-1\",\"command\":\"unlock\",\"payload\":{\"reason\":\"bench-test\"}}"
+   ```
+   Expected: the physical relay pulses immediately, and within ~1s the
+   `mosquitto_sub` terminal prints an ack with `"deliveryId":"bench-1"` and
+   `"status":"completed"`. Repeat immediately — a second pulse inside the
+   relay's cooldown window is fine to attempt (firmware just won't re-pulse;
+   `Unlock()` returns false, so expect `"status":"failed"`,
+   `"errorMessage":"unlock_rejected"` on that one — that's correct
+   behavior, not a bug).
+6. **Report back**: deviceId from step 4, whether step 5's relay pulse and
+   ack both happened, and the exact ack JSON. If anything didn't match the
+   expected result, include the serial log around that moment.
+7. **(Platform side, done separately once 1–6 pass)**: trigger the same
+   unlock through the real QRunlock vendor API
+   (`POST /api/v1/public/devices/<deviceId>/commands`) to confirm the whole
+   chain — app/vendor call → Jenix → MQTT → physical relay — not just the
+   device's own MQTT client. This step needs the vendor API key, which
+   stays platform-side.
+
 ## References
 
 - `PROVISIONING.md` — the companion standard for how a device gets Wi-Fi in
