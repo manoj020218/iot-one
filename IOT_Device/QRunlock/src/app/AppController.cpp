@@ -42,7 +42,8 @@ void AppController::Begin() {
             config::kRfLearnSettleMs);
   ble_.AttachApi(*this);
   wifi_.Begin();
-  if (app::kBleProvisioningEnabled && wifi_.AccessPointActive()) {
+  if (app::kBleProvisioningEnabled && wifi_.AccessPointActive() &&
+      !store_.Network().configured) {
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
     ble_.Begin(identity_);
     lastApActive_ = true;
@@ -58,7 +59,7 @@ void AppController::Tick() {
   wifi_.Tick(nowMs);
   const bool apActive = wifi_.AccessPointActive();
   if (app::kBleProvisioningEnabled) {
-    if (apActive && !lastApActive_) {
+    if (apActive && !lastApActive_ && !store_.Network().configured) {
       ArmBleProvisionWindow(nowMs, &bleWindowExpiresAtMs_);
       ble_.Begin(identity_);
     } else if (!apActive && lastApActive_) {

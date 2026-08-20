@@ -26,6 +26,15 @@ inline constexpr uint32_t kRfLearnSettleMs = 250;
 inline constexpr char kDefaultMqttHost[] = "mqtt.iotsoft.in";
 inline constexpr uint16_t kDefaultMqttPort = 1883;
 inline constexpr uint32_t kMqttReconnectMs = 5000;
+// The broker's acl_file only reliably grants PUBLISH to a named "user"
+// block — a plain anonymous connection can subscribe fine but every
+// publish (this device's own status/ack, or a command sent to it) gets
+// silently denied. Found and fixed live 2026-08-20 (see BRIDGE.md §4) —
+// default to the shared platform credential so a future device copying
+// this file doesn't rediscover the same silent failure. password_file is
+// disabled on this listener, so the password value has no real secrecy
+// function yet; the username is what the ACL actually matches on.
+inline constexpr char kDefaultMqttUsername[] = "jenix_platform";
 
 inline uint16_t ClampRelayPulseMs(uint16_t value) {
   if (value < kMinRelayPulseMs) return kMinRelayPulseMs;
@@ -80,7 +89,7 @@ inline CloudConfig DefaultCloudConfig() {
   config.homeId[0] = '\0';
   std::strncpy(config.mqttHost, kDefaultMqttHost, sizeof(config.mqttHost) - 1);
   config.mqttPort = kDefaultMqttPort;
-  config.mqttUsername[0] = '\0';
+  std::strncpy(config.mqttUsername, kDefaultMqttUsername, sizeof(config.mqttUsername) - 1);
   config.mqttPassword[0] = '\0';
   return config;
 }

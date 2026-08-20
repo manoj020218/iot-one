@@ -160,19 +160,28 @@ Content-Type: application/json
   "homeId": "home-user-qrunlock-vendor-jenix-internal",
   "mqttHost": "mqtt.iotsoft.in",
   "mqttPort": 1883,
-  "mqttUsername": "",
-  "mqttPassword": ""
+  "mqttUsername": "jenix_platform",
+  "mqttPassword": "anything"
 }
 ```
 
-`mqttHost`/`mqttPort` default to the production broker if omitted —
-only pass them to point at a different broker (e.g. a local bench broker).
-`mqttUsername`/`mqttPassword` are optional; today's broker runs with no auth
-at all (confirmed live 2026-08-20 — `MQTT_USERNAME`/`MQTT_PASSWORD` are unset
-in the VPS's `api-server.env`), so leave them blank. The fields exist so a
-future per-device-credential rollout
-(`MQTT_LICENSED_DEVICE_ACCESS_PLAN.md`) is a config change here, not a
-firmware rebuild.
+`mqttHost`/`mqttPort` default to the production broker if omitted — only
+pass them to point at a different broker (e.g. a local bench broker).
+
+**`mqttUsername` is required, not optional — corrected 2026-08-20.** The
+broker's `password_file` is disabled on this listener (any password value
+is accepted, so `mqttPassword` genuinely has no security function right
+now), but its `acl_file` only reliably grants **publish** to a named `user`
+ACL block — the plain "no username" anonymous connection can subscribe to
+`jnx/#` fine but every publish from it (the device's own `status`/`cmd/ack`,
+and the platform's own command dispatch) gets silently denied. This was
+found and fixed live 2026-08-20 (see `/etc/mosquitto/acl` on the VPS — a
+`user jenix_platform` / `topic readwrite jnx/#` block) after a real bench
+test showed `cloud.connected: true` but no command ever arriving. Every
+device using this bridge, and the platform's own MQTT bridge
+(`MQTT_USERNAME=jenix_platform` in the VPS's `api-server.env`), must
+connect as `jenix_platform` until real per-device credentials
+(`MQTT_LICENSED_DEVICE_ACCESS_PLAN.md`) replace this shared one.
 
 Saving triggers an immediate reconnect with the new topics
 (`ControlApi::SaveCloudConfig` → `CloudBridgeService::ApplyConfig`) — no
@@ -266,9 +275,12 @@ tester.
    POST http://<device-ip>/api/cloud
    Content-Type: application/json
 
-   {"homeId": "home-user-qrunlock-vendor-jenix-internal"}
+   {"homeId": "home-user-qrunlock-vendor-jenix-internal", "mqttUsername": "jenix_platform", "mqttPassword": "anything"}
    ```
-   Expect `{"ok":true}`.
+   Expect `{"ok":true}`. `mqttUsername` is required — see §4's 2026-08-20
+   correction; without it the device connects and subscribes fine but every
+   publish (its own status, and any command sent to it) is silently denied
+   by the broker's ACL.
 4. **Confirm the bridge connected**: within ~5 seconds,
    `GET http://<device-ip>/api/status` → `cloud.connected` should be
    `true`, and `cloud.cmdTopic` should read
@@ -279,15 +291,16 @@ tester.
    blocked by the local network is the most likely cause on a
    corporate/guest Wi-Fi).
 5. **Self-test the full command loop locally** — this proves the bridge
-   itself works without touching any Jenix platform secret. Needs
+   itself works without touching any Jenix platform secret (the
+   `jenix_platform` username has no real secrecy value — see §4). Needs
    `mosquitto_pub`/`mosquitto_sub` (part of the `mosquitto-clients` package
    on most platforms). In one terminal:
    ```
-   mosquitto_sub -h mqtt.iotsoft.in -p 1883 -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd/ack" -v
+   mosquitto_sub -h mqtt.iotsoft.in -p 1883 -u jenix_platform -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd/ack" -v
    ```
    In another:
    ```
-   mosquitto_pub -h mqtt.iotsoft.in -p 1883 -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd" -m "{\"deliveryId\":\"bench-1\",\"command\":\"unlock\",\"payload\":{\"reason\":\"bench-test\"}}"
+   mosquitto_pub -h mqtt.iotsoft.in -p 1883 -u jenix_platform -t "jnx/home-user-qrunlock-vendor-jenix-internal/JNX-QRU-C3-001/<deviceId>/cmd" -m "{\"deliveryId\":\"bench-1\",\"command\":\"unlock\",\"payload\":{\"reason\":\"bench-test\"}}"
    ```
    Expected: the physical relay pulses immediately, and within ~1s the
    `mosquitto_sub` terminal prints an ack with `"deliveryId":"bench-1"` and
@@ -305,6 +318,18 @@ tester.
    chain — app/vendor call → Jenix → MQTT → physical relay — not just the
    device's own MQTT client. This step needs the vendor API key, which
    stays platform-side.
+
+**Result — confirmed live 2026-08-20**: steps 1–7 all passed on this bench
+unit (`JNX-QRU-C3-3B0010`). Step 5 initially failed with `cloud.connected:
+true` but no command ever arriving or acking — root-caused live to the
+missing `mqttUsername` (§4's correction), fixed on both the broker and this
+device, then re-run clean: relay pulsed
+(`relay.lastReason = "bench-test"`, serial log `Relay pulse started:
+bench-test -> state ON`), ack `{"deliveryId":"bench-1",...,"status":
+"completed"}` received, and the cooldown-rejected second pulse ack'd
+correctly as `"status":"failed","errorMessage":"unlock_rejected"`. Step 7
+(the real vendor HTTP API round trip) verified separately from the platform
+side the same day — see `VPS/HANDOFF.md` Round 5.
 
 ## References
 

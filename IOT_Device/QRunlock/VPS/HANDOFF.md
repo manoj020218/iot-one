@@ -342,36 +342,57 @@ could not be executed on this machine (no gcc/g++ installed) — run
 `pio test -e native` before trusting them blindly, though the real-target
 build succeeding is strong secondary evidence the wiring compiles correctly.
 
-**Still not live end-to-end**: the device needs `homeId` before it will
-connect at all — see `BRIDGE.md` §4 for the local `POST /api/cloud` bench
-mechanism (use `home-user-qrunlock-vendor-jenix-internal`, the real vendor
-pool HOME from Round 3/4, for a first real test). Not yet flashed or tested
-against a live broker as of this note — that's the next action.
+**Update — live end-to-end, verified 2026-08-20.** Firmware developer
+flashed the device (`JNX-QRU-C3-3B0010`), joined it to Wi-Fi, and bound it
+via `/api/cloud`. First attempt showed `cloud.connected: true` but no
+command ever arrived or acked — root-caused live (both from the platform
+side and independently confirmed by the firmware developer): the broker's
+`acl_file` only reliably grants **publish** to a named `user` ACL block —
+anonymous connections could subscribe to `jnx/#` fine but every publish
+(the device's own `status`/`cmd/ack`, and the platform's own command
+dispatch) was silently denied. Fixed on the VPS: `/etc/mosquitto/acl` now
+has a `user jenix_platform` / `topic readwrite jnx/#` block (backed up
+before every edit, FireGuard/FloodGuard's existing entries untouched and
+confirmed still healthy — `fireguard-backend` reconnected clean through
+every restart); `api-server.env` now has `MQTT_USERNAME=jenix_platform`
+(password irrelevant — `password_file` is disabled on this listener,
+matching the pre-existing risk posture, not a new one introduced here);
+`jenix-one-api` restarted with it. Firmware's `Defaults.h` now defaults
+`mqttUsername` to `jenix_platform` too, so a future device copying this
+pattern doesn't rediscover the same silent failure. Full writeup:
+`BRIDGE.md` §4 and §9.
+
+Re-run clean after the fix: relay physically pulsed
+(`relay.lastReason = "bench-test"`, serial log confirms), ack
+`{"status":"completed"}` received on `cmd/ack`, and a rapid second pulse
+correctly ack'd `"status":"failed","errorMessage":"unlock_rejected"`
+(cooldown, not a bug). Then verified the *real* HTTP vendor path too:
+`POST /api/v1/public/devices/register` for `JNX-QRU-C3-3B0010`, then
+`POST .../commands {"command":"unlock"}` — confirmed the platform's own
+publish reaching the device over MQTT via the broker's own log (not just
+an `accepted:true` HTTP response, which — this round revealed — is not on
+its own proof of MQTT delivery). Separately, one firmware bug was found and
+fixed by the developer while testing: BLE provisioning could crash on boot
+on this ESP32-C3 revision when Wi-Fi was already configured —
+`AppController::Begin()`/`Tick()` now only arm the BLE provisioning window
+when `!store_.Network().configured`.
 
 ## Next recommended steps
 
-1. **Flash + test the bridge**: build/upload the updated firmware, join it
-   to Wi-Fi, `POST /api/cloud` with the vendor pool `homeId` (see above),
-   confirm `GET /api/status`'s `cloud.connected` flips true, then fire a
-   real unlock through the vendor API smoke-tested in Round 4
-   (`POST /api/v1/public/devices/<deviceId>/commands {"command":"unlock"}`)
-   and confirm the physical relay actually pulses. This is the first
-   genuinely real end-to-end test since this device was flashed.
-2. **QRunlock video-call project**: actually run the app and click
-   through the Relay device list/detail/unlock/settings pages against a
-   real device — the vendor API itself is proven live, and now the
-   device-side bridge is too, but the app's own UI against a real device
-   is still unclicked. See that project's own `HANDOFF.md` §0
-   "Not verified" list.
-3. **Firmware**: decide whether `relayStateAfterPowerRestore`/`switchType`
+1. **QRunlock video-call project**: actually run the app and click
+   through the Relay device list/detail/unlock/settings pages against this
+   real, now-live device — the vendor API and the device-side bridge are
+   both proven live end-to-end, but the app's own UI against it is still
+   unclicked. See that project's own `HANDOFF.md` §0 "Not verified" list.
+2. **Firmware**: decide whether `relayStateAfterPowerRestore`/`switchType`
    are worth adding to `ConfigTypes.h`, or should be dropped from the API
    instead of staying permanently inert.
-4. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
+3. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
    end to end against a real unit, through **both** the PWA and the
    QRunlock vendor path — neither has happened yet.
-5. Show the user the top-segmented-tabs deviation from the approved
+4. Show the user the top-segmented-tabs deviation from the approved
    mockup (see above) before considering the PWA screen fully signed off.
-6. Replace the bench-only `/api/cloud` binding mechanism with the real
+5. Replace the bench-only `/api/cloud` binding mechanism with the real
    provisioning-intent bind flow (`PROVISIONING.md` §9 item 8) once that
    exists — not urgent while there's a single bench unit, load-bearing
    before any second device or a real customer.
