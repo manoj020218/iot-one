@@ -289,29 +289,55 @@ That standalone service is left running, untouched, no migration
 attempted (zero real users on it — nothing to migrate). No longer an open
 question as of this round.
 
+## Round 4 — vendor pool provisioned, live-verified, 2026-08-20
+
+Steps 1–2 below (previously "Next recommended steps") are done:
+
+- Real Jenix records exist: PID `JNX-QRU-C3-001` (`POST /api/v1/admin/pids`,
+  required a `ui: { uiMode: "builtin" }` object the earlier example payload
+  in this doc was missing — fixed), a dedicated vendor-pool HOME (account
+  `qrunlock-vendor@jenix.internal`), `ApiPackage` `QRUNLOCK-VENDOR`, and a
+  365-day `ApiKey` scoped to it. Created via `/root/bin/
+  provision-qrunlock-vendor.sh` on the VPS (never prints the key/password —
+  writes straight into QRunlock's `.env` and a root-only secrets file).
+- The QRunlock video-call project's `.env` on the VPS
+  (`/root/projects/qrunlock/qrunlock/.env`) has the real
+  `JENIX_ONE_API_URL`/`JENIX_ONE_API_KEY` (renamed from `JENIX_API_*` —
+  "JENIX" alone collided with another project's name); `qrunlock-api`
+  restarted with them.
+- **Live round-trip verified** with the real key (not just the automated
+  test suite): `POST /api/v1/public/devices/register` → 201,
+  `POST .../commands {command:"unlock"}` → 200 with `accepted: true` and a
+  `cooldownMs`, `GET .../logs` → `source: "api:QRUNLOCK-VENDOR"`. Confirms
+  the vendor path genuinely routes through Jenix's guarded `unlockDevice`
+  service, not a stub. Test device `qrunlock-vendor-smoketest-01` was left
+  in the vendor pool HOME (harmless, no dependents — delete whenever).
+- Deploy scripts fixed at the script level (both flagged as fragile last
+  round): QRunlock's `deploy.sh` step 4 now `cd backend` +
+  `CI=true pnpm install --frozen-lockfile --prod --ignore-workspace`
+  (was silently walking up into the shared `/root/projects/
+  pnpm-workspace.yaml`); `/root/bin/deploy-iot-one.sh` now runs
+  `pnpm -r --if-present build` + `pm2 restart --update-env` + a 10-attempt
+  health-check loop after install (previously had none). Both exercised
+  for real this round — QRunlock's full `deploy.sh` ran end to end
+  (install succeeded against its own lockfile, PM2 restart clean, nginx
+  reload clean, `https://qrunlock.com` and the API health endpoint both
+  200 afterward).
+
 ## Next recommended steps
 
-1. **Platform lead**: create the "QRunlock vendor pool" HOME (a real
-   Jenix HOME, owned by whichever account is designated the vendor
-   operator), issue the PID via `POST /api/v1/admin/pids` using
-   `JNX-QRU-C3-001` with `api.enabled: true` and `allowedScopes`
-   including whatever scope `devices:write`/`devices:read` map to for
-   this product, create an `ApiPackage` for that PID, then
-   `POST /api/v1/api-keys` scoped to it from inside that HOME. Nothing
-   above works until all of this exists — right now it's all still
-   hand-wavy example values in code/docs, no real records.
-2. **QRunlock video-call project**: add the real `JENIX_API_URL`/
-   `JENIX_API_KEY` (from step 1) to its untracked `.env`, then actually
-   run it and click through the Relay device list/detail/unlock/settings
-   pages against a real or MQTT-simulated device — see that project's own
-   `HANDOFF.md` §0 "Not verified" list for exactly what's unproven.
-3. **Firmware**: close the MQTT command/ack gap (PROVISIONING.md §9 item
+1. **QRunlock video-call project**: actually run the app and click
+   through the Relay device list/detail/unlock/settings pages against a
+   real or MQTT-simulated device — the vendor API itself is proven live
+   (see above), but the app's own UI against it is still unclicked. See
+   that project's own `HANDOFF.md` §0 "Not verified" list.
+2. **Firmware**: close the MQTT command/ack gap (PROVISIONING.md §9 item
    9) — nothing above has a real device to talk to until this exists —
    and decide whether `relayStateAfterPowerRestore`/`switchType` are
    worth adding to `ConfigTypes.h`, or should be dropped from the API
    instead of staying permanently inert.
-4. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
+3. Run the `DEVICE_INTEGRATION_GUIDE.md` §"Minimal Validation Script"
    end to end against a real unit, through **both** the PWA and the
-   QRunlock vendor path — neither has happened yet.
-5. Show the user the top-segmented-tabs deviation from the approved
+   QRunlock vendor path — neither has happened yet (blocked on item 2).
+4. Show the user the top-segmented-tabs deviation from the approved
    mockup (see above) before considering the PWA screen fully signed off.

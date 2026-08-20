@@ -166,9 +166,19 @@ The PID payload must include:
     "dynamicPages": ["tank-level", "thresholds"],
     "icon": "tank",
     "cardLayout": "default"
+  },
+  "ui": {
+    "uiMode": "builtin"
   }
 }
 ```
+
+`ui` is required (validated in `pid.validation.ts`'s `parseUiProfile`) even
+though it has no effect for a device whose screen ships as a bundled PWA
+feature — `{ "uiMode": "builtin" }` is the correct minimal value for that
+case. Only set `uiMode: "remote-package"` (plus `uiPackageId`/
+`uiPackageVersion`) if the device's UI is actually delivered as a separate
+remote UI package.
 
 ## Device Identity Rules
 
