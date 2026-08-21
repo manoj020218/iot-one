@@ -155,6 +155,7 @@ POST to the device while it's on the same network.
 ```
 POST http://<device-ip>/api/cloud
 Content-Type: application/json
+X-Jenix-Local-Token: <token from GET /api/status, or Serial log on first boot>
 
 {
   "homeId": "home-user-qrunlock-vendor-jenix-internal",
@@ -164,6 +165,16 @@ Content-Type: application/json
   "mqttPassword": "anything"
 }
 ```
+
+**Every mutating local route now requires `X-Jenix-Local-Token`** (added
+after this section was first written — see the local API auth hardening
+noted in `QRUNLOCK_PROVISIONING_HANDOFF.md`). The token is generated on
+first boot (`esp_random()`, persisted to NVS) and printed once to Serial;
+`GET /api/status` (unauthenticated, read-only) exposes whether a token is
+configured and its source (`generated`/`provisioned`) but never the raw
+value — read it off Serial or set one at flash time via
+`JNX_LOCAL_API_TOKEN`. `/api/cloud` also now preserves any field you omit
+instead of blanking it — safe to send only the fields you're changing.
 
 `mqttHost`/`mqttPort` default to the production broker if omitted — only
 pass them to point at a different broker (e.g. a local bench broker).
@@ -267,13 +278,15 @@ tester.
    esp32-c3-supermini -t upload`. Confirm it flashes and boots (serial
    monitor: `pio device monitor -b 115200`).
 2. **Join Wi-Fi** the same way already validated on this unit (AP mode +
-   `POST /api/wifi`, or whatever local method was used before). Confirm
+   `POST /api/wifi`, or whatever local method was used before — needs the
+   `X-Jenix-Local-Token` header now, see §4). Confirm
    `GET http://<device-ip>/api/status` shows `wifi.connected: true` and
    note the IP.
 3. **Bind to the real vendor pool HOME**:
    ```
    POST http://<device-ip>/api/cloud
    Content-Type: application/json
+   X-Jenix-Local-Token: <token>
 
    {"homeId": "home-user-qrunlock-vendor-jenix-internal", "mqttUsername": "jenix_platform", "mqttPassword": "anything"}
    ```
