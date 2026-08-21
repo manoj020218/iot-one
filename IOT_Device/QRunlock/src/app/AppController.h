@@ -31,10 +31,15 @@ class AppController : public platform::ControlApi {
   bool ApplyWifi(const String& ssid, const String& password) override;
   void HandleProvisioningRequest(const JsonDocument& request,
                                  JsonDocument& response) override;
+  bool AuthorizeLocalMutation(const String& token) const override;
   bool SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs,
                     const String& otaUrl) override;
-  bool SaveCloudConfig(const String& homeId, const String& mqttHost, uint16_t mqttPort,
-                       const String& mqttUsername, const String& mqttPassword) override;
+  bool SaveCloudConfig(const String& homeId, bool homeIdProvided,
+                       const String& mqttHost, bool mqttHostProvided,
+                       uint16_t mqttPort, bool mqttPortProvided,
+                       const String& mqttUsername, bool mqttUsernameProvided,
+                       const String& mqttPassword,
+                       bool mqttPasswordProvided) override;
   bool RequestOta(const String& url, const String& targetVersion,
                   bool allowDowngrade) override;
   void Restart() override;
@@ -47,6 +52,7 @@ class AppController : public platform::ControlApi {
   void HandleButton(button::ButtonEvent event);
   void HandleRfEvent(const rf::RfEvent& event);
   void HandleDeferredRestart(uint32_t nowMs);
+  static bool FixedTimeTokenEquals(const char* expected, const String& actual);
 
   systemlog::Logger logger_{};
   identity::DeviceIdentity identity_{};
@@ -62,6 +68,7 @@ class AppController : public platform::ControlApi {
   web::WebServerService web_{};
   uint32_t bleWindowExpiresAtMs_ = 0;
   uint32_t restartAtMs_ = 0;
+  bool taskWatchdogActive_ = false;
   bool factoryResetPending_ = false;
   bool lastApActive_ = false;
   AppState state_ = AppState::Boot;

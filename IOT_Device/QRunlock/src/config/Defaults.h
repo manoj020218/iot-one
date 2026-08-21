@@ -15,6 +15,7 @@ inline constexpr uint16_t kMaxRelayCooldownMs = 10000;
 inline constexpr uint32_t kWifiConnectTimeoutMs = 30000;
 inline constexpr uint32_t kWifiReconnectMs = 30000;
 inline constexpr uint32_t kBleProvisionWindowMs = 180000;
+inline constexpr uint32_t kTaskWatchdogTimeoutSec = 20;
 inline constexpr uint32_t kRfValidHighMs = 40;
 inline constexpr uint32_t kRfDebounceMs = 20;
 inline constexpr uint32_t kRfDuplicateSuppressMs = 250;
@@ -29,12 +30,32 @@ inline constexpr uint32_t kMqttReconnectMs = 5000;
 // The broker's acl_file only reliably grants PUBLISH to a named "user"
 // block — a plain anonymous connection can subscribe fine but every
 // publish (this device's own status/ack, or a command sent to it) gets
-// silently denied. Found and fixed live 2026-08-20 (see BRIDGE.md §4) —
-// default to the shared platform credential so a future device copying
-// this file doesn't rediscover the same silent failure. password_file is
-// disabled on this listener, so the password value has no real secrecy
-// function yet; the username is what the ACL actually matches on.
+// silently denied. Found and fixed live 2026-08-20 (see BRIDGE.md §4).
+// This is a SHARED credential (password_file is disabled on this listener,
+// so the password value has no real secrecy function — only the username
+// is checked), not a real per-device credential. It's a stand-in default so
+// a fresh/factory-reset device doesn't silently regress into the anonymous-
+// publish-denied failure mode with zero warning — replace with a real
+// per-device MQTT credential once the platform can issue one (see the
+// per-device Proof-of-Possession pattern below for the shape this should
+// eventually take).
 inline constexpr char kDefaultMqttUsername[] = "jenix_platform";
+inline constexpr char kLocalApiAuthHeaderName[] = "X-Jenix-Local-Token";
+inline constexpr size_t kLocalApiTokenBytes = 16;
+inline constexpr char kProvisioningSec2Username[] = "wifiprov";
+inline constexpr size_t kProvisioningPopBytes = 12;
+
+#ifdef JNX_LOCAL_API_TOKEN
+inline constexpr char kProvisionedLocalApiToken[] = JNX_LOCAL_API_TOKEN;
+#else
+inline constexpr char kProvisionedLocalApiToken[] = "";
+#endif
+
+#ifdef JNX_PROVISIONING_POP
+inline constexpr char kProvisionedProofOfPossession[] = JNX_PROVISIONING_POP;
+#else
+inline constexpr char kProvisionedProofOfPossession[] = "";
+#endif
 
 inline uint16_t ClampRelayPulseMs(uint16_t value) {
   if (value < kMinRelayPulseMs) return kMinRelayPulseMs;
@@ -110,6 +131,50 @@ inline CloudConfig SanitizeCloudConfig(CloudConfig config) {
 
 inline bool CloudConfigEquals(const CloudConfig& left, const CloudConfig& right) {
   return std::memcmp(&left, &right, sizeof(CloudConfig)) == 0;
+}
+
+inline LocalAuthConfig DefaultLocalAuthConfig() {
+  LocalAuthConfig config{};
+  config.schemaVersion = kSchemaVersion;
+  config.tokenSource = static_cast<uint8_t>(LocalAuthTokenSource::None);
+  config.apiToken[0] = '\0';
+  return config;
+}
+
+inline LocalAuthConfig SanitizeLocalAuthConfig(LocalAuthConfig config) {
+  config.schemaVersion = kSchemaVersion;
+  config.apiToken[sizeof(config.apiToken) - 1] = '\0';
+  if (config.apiToken[0] == '\0') {
+    config.tokenSource = static_cast<uint8_t>(LocalAuthTokenSource::None);
+  }
+  return config;
+}
+
+inline bool LocalAuthConfigEquals(const LocalAuthConfig& left,
+                                  const LocalAuthConfig& right) {
+  return std::memcmp(&left, &right, sizeof(LocalAuthConfig)) == 0;
+}
+
+inline ProvisioningConfig DefaultProvisioningConfig() {
+  ProvisioningConfig config{};
+  config.schemaVersion = kSchemaVersion;
+  config.popSource = static_cast<uint8_t>(ProvisioningPopSource::None);
+  config.proofOfPossession[0] = '\0';
+  return config;
+}
+
+inline ProvisioningConfig SanitizeProvisioningConfig(ProvisioningConfig config) {
+  config.schemaVersion = kSchemaVersion;
+  config.proofOfPossession[sizeof(config.proofOfPossession) - 1] = '\0';
+  if (config.proofOfPossession[0] == '\0') {
+    config.popSource = static_cast<uint8_t>(ProvisioningPopSource::None);
+  }
+  return config;
+}
+
+inline bool ProvisioningConfigEquals(const ProvisioningConfig& left,
+                                     const ProvisioningConfig& right) {
+  return std::memcmp(&left, &right, sizeof(ProvisioningConfig)) == 0;
 }
 
 }  // namespace config

@@ -13,6 +13,7 @@ class WebServerService {
 
  private:
   void ApplyCorsHeaders();
+  bool EnsureAuthorized(bool cors = false);
   bool ParseJsonBody(StaticJsonDocument<512>& doc, bool cors = false);
   void SendPayload(int statusCode, const char* contentType, const String& payload,
                    bool cors = false);

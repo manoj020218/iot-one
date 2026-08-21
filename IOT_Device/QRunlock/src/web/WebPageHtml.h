@@ -10,6 +10,8 @@ section{background:#fff;padding:14px;border-radius:12px;margin:12px 0;box-shadow
 pre{white-space:pre-wrap;background:#111;color:#e7f7ee;padding:12px;border-radius:10px;overflow:auto}
 </style></head><body>
 <h1>QRUnlock RF PSU</h1>
+<section><h3>Local API Auth</h3><input id=apiToken type=password placeholder="Local API token"><br>
+<button onclick="saveToken()">Save Token In Browser</button> <small>Header: X-Jenix-Local-Token</small></section>
 <section><button onclick="post('/api/relay/pulse',{})">Pulse Relay</button>
 <button onclick="post('/api/rf/learn/start',{})">Start RF Learn</button>
 <button onclick="post('/api/rf/learn/cancel',{})">Cancel RF Learn</button>
@@ -27,10 +29,14 @@ pre{white-space:pre-wrap;background:#111;color:#e7f7ee;padding:12px;border-radiu
 <section><h3>Status</h3><pre id=status>loading...</pre></section>
 <script>
 const gid=id=>document.getElementById(id),num=id=>parseInt(gid(id).value||'0',10);
-async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});load();return r.text();}
+const authHeader='X-Jenix-Local-Token';
+function authHeaders(){const token=gid('apiToken').value.trim();const headers={'Content-Type':'application/json'};if(token)headers[authHeader]=token;return headers;}
+function saveToken(){localStorage.setItem('qruLocalApiToken',gid('apiToken').value);}
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:authHeaders(),body:JSON.stringify(body)});load();return r.text();}
 async function load(){const r=await fetch('/api/status');const d=await r.json();gid('status').textContent=JSON.stringify(d,null,2);
 if(d.relay){gid('pulse').value=d.relay.pulseMs;gid('cooldown').value=d.relay.cooldownMs}
 if(d.ota&&d.ota.url){gid('otaUrl').value=d.ota.url}}
+gid('apiToken').value=localStorage.getItem('qruLocalApiToken')||'';
 load();setInterval(load,2000);
 </script></body></html>
 )HTML";

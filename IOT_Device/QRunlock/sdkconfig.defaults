@@ -1,0 +1,15 @@
+# ESP-IDF defaults used only by the mixed arduino+espidf provisioning pilot.
+# The shipping pure-Arduino env ignores this file.
+
+# Required when arduino-esp32 is used as an ESP-IDF component.
+CONFIG_FREERTOS_HZ=1000
+
+# BLE-only host selection for provisioning work.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+
+# Security Scheme 2 is the Jenix One standard for provisioning.
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
+CONFIG_WIFI_PROV_BLE_SEC_CONN=y

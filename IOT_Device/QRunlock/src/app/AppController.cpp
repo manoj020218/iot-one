@@ -1,6 +1,9 @@
 #include "app/AppController.h"
 
+#include <cstring>
+
 #include <esp_system.h>
+#include <esp_task_wdt.h>
 
 #include "app/ProductIdentity.h"
 #include "board/PinConfig.h"
@@ -25,6 +28,22 @@ void ArmBleProvisionWindow(uint32_t nowMs, uint32_t* expiresAtMs) {
   *expiresAtMs = nowMs + config::kBleProvisionWindowMs;
 }
 
+const char* TokenSourceString(uint8_t tokenSource) {
+  switch (static_cast<config::LocalAuthTokenSource>(tokenSource)) {
+    case config::LocalAuthTokenSource::Generated: return "generated";
+    case config::LocalAuthTokenSource::Provisioned: return "provisioned";
+    default: return "missing";
+  }
+}
+
+const char* PopSourceString(uint8_t popSource) {
+  switch (static_cast<config::ProvisioningPopSource>(popSource)) {
+    case config::ProvisioningPopSource::Generated: return "generated";
+    case config::ProvisioningPopSource::Provisioned: return "provisioned";
+    default: return "missing";
+  }
+}
+
 }  // namespace
 
 void AppController::Begin() {
@@ -33,6 +52,43 @@ void AppController::Begin() {
   delay(50);
   identity_.Begin();
   store_.Begin();
+  const esp_err_t initWatchdogResult =
+      esp_task_wdt_init(config::kTaskWatchdogTimeoutSec, true);
+  if (initWatchdogResult == ESP_OK || initWatchdogResult == ESP_ERR_INVALID_STATE) {
+    const esp_err_t watchdogStatus = esp_task_wdt_status(nullptr);
+    if (watchdogStatus == ESP_OK) {
+      taskWatchdogActive_ = true;
+    } else if (watchdogStatus == ESP_ERR_NOT_FOUND) {
+      const esp_err_t addWatchdogResult = esp_task_wdt_add(nullptr);
+      taskWatchdogActive_ = addWatchdogResult == ESP_OK;
+      if (!taskWatchdogActive_) {
+        logger_.Error(String("Task watchdog subscribe failed err=") + addWatchdogResult);
+      }
+    } else {
+      logger_.Error(String("Task watchdog status failed err=") + watchdogStatus);
+    }
+  } else {
+    logger_.Error(String("Task watchdog init failed err=") + initWatchdogResult);
+  }
+  bool generatedLocalApiToken = false;
+  store_.EnsureLocalApiToken(&generatedLocalApiToken);
+  if (generatedLocalApiToken) {
+    Serial.printf("[SECURITY] Generated local API token header %s value %s\r\n",
+                  config::kLocalApiAuthHeaderName, store_.LocalAuth().apiToken);
+  } else {
+    Serial.printf("[SECURITY] Local API token source=%s header=%s\r\n",
+                  TokenSourceString(store_.LocalAuth().tokenSource),
+                  config::kLocalApiAuthHeaderName);
+  }
+  bool generatedProvisioningPop = false;
+  store_.EnsureProvisioningPop(&generatedProvisioningPop);
+  Serial.printf("[PROVISIONING] Security2 username %s PoP source=%s value=%s\r\n",
+                config::kProvisioningSec2Username,
+                PopSourceString(store_.Provisioning().popSource),
+                store_.Provisioning().proofOfPossession);
+  if (generatedProvisioningPop) {
+    Serial.println("[PROVISIONING] Generated new per-device Proof-of-Possession");
+  }
   relay_.Begin(board::kRelayPin, board::kRelayActiveHigh, store_.Device().relayPulseMs,
                store_.Device().relayCooldownMs);
   led_.Begin(board::kStatusLedPin, board::kLedActiveHigh);
@@ -82,6 +138,7 @@ void AppController::Tick() {
   led_.SetState(state_);
   led_.Tick(nowMs);
   web_.Tick();
+  if (taskWatchdogActive_) esp_task_wdt_reset();
 }
 
 bool AppController::Unlock(const String& reason) {
@@ -107,6 +164,10 @@ void AppController::EnterProvisioning() {
 }
 bool AppController::ApplyWifi(const String& ssid, const String& password) {
   return wifi_.SaveAndReconnect(ssid, password);
+}
+
+bool AppController::AuthorizeLocalMutation(const String& token) const {
+  return FixedTimeTokenEquals(store_.LocalAuth().apiToken, token);
 }
 
 void AppController::HandleProvisioningRequest(const JsonDocument& request,
@@ -176,20 +237,30 @@ bool AppController::SaveSettings(uint16_t relayPulseMs, uint16_t relayCooldownMs
   return true;
 }
 
-bool AppController::SaveCloudConfig(const String& homeId, const String& mqttHost,
-                                    uint16_t mqttPort, const String& mqttUsername,
-                                    const String& mqttPassword) {
+bool AppController::SaveCloudConfig(const String& homeId, bool homeIdProvided,
+                                    const String& mqttHost, bool mqttHostProvided,
+                                    uint16_t mqttPort, bool mqttPortProvided,
+                                    const String& mqttUsername, bool mqttUsernameProvided,
+                                    const String& mqttPassword,
+                                    bool mqttPasswordProvided) {
   config::CloudConfig config = store_.Cloud();
-  homeId.substring(0, sizeof(config.homeId) - 1).toCharArray(config.homeId, sizeof(config.homeId));
-  if (!mqttHost.isEmpty()) {
+  if (homeIdProvided) {
+    homeId.substring(0, sizeof(config.homeId) - 1)
+        .toCharArray(config.homeId, sizeof(config.homeId));
+  }
+  if (mqttHostProvided) {
     mqttHost.substring(0, sizeof(config.mqttHost) - 1)
         .toCharArray(config.mqttHost, sizeof(config.mqttHost));
   }
-  if (mqttPort != 0) config.mqttPort = mqttPort;
-  mqttUsername.substring(0, sizeof(config.mqttUsername) - 1)
-      .toCharArray(config.mqttUsername, sizeof(config.mqttUsername));
-  mqttPassword.substring(0, sizeof(config.mqttPassword) - 1)
-      .toCharArray(config.mqttPassword, sizeof(config.mqttPassword));
+  if (mqttPortProvided) config.mqttPort = mqttPort;
+  if (mqttUsernameProvided) {
+    mqttUsername.substring(0, sizeof(config.mqttUsername) - 1)
+        .toCharArray(config.mqttUsername, sizeof(config.mqttUsername));
+  }
+  if (mqttPasswordProvided) {
+    mqttPassword.substring(0, sizeof(config.mqttPassword) - 1)
+        .toCharArray(config.mqttPassword, sizeof(config.mqttPassword));
+  }
   if (!store_.SaveCloud(config)) return false;
   cloud_.ApplyConfig();
   return true;
@@ -268,6 +339,23 @@ void AppController::FillStatus(JsonDocument& doc) const {
        bleWindowExpiresAtMs_ > millis())
           ? (bleWindowExpiresAtMs_ - millis())
           : 0;
+  JsonObject localApiAuth = doc.createNestedObject("localApiAuth");
+  localApiAuth["configured"] = store_.LocalAuth().apiToken[0] != '\0';
+  localApiAuth["headerName"] = config::kLocalApiAuthHeaderName;
+  localApiAuth["source"] = TokenSourceString(store_.LocalAuth().tokenSource);
+  JsonObject provisioning = doc.createNestedObject("provisioning");
+  provisioning["serviceName"] = identity_.BleName();
+  provisioning["security"] = "scheme2_ready";
+  provisioning["username"] = config::kProvisioningSec2Username;
+  provisioning["proofOfPossessionConfigured"] =
+      store_.Provisioning().proofOfPossession[0] != '\0';
+  provisioning["proofOfPossessionSource"] =
+      PopSourceString(store_.Provisioning().popSource);
+#ifdef JENIX_PROV_V2
+  provisioning["pilotBuild"] = true;
+#else
+  provisioning["pilotBuild"] = false;
+#endif
   wifi_.FillJson(doc.createNestedObject("wifi"));
   cloud_.FillJson(doc.createNestedObject("cloud"));
   relay_.FillJson(doc.createNestedObject("relay"));
@@ -305,6 +393,17 @@ void AppController::HandleDeferredRestart(uint32_t nowMs) {
   if (restartAtMs_ == 0 || nowMs < restartAtMs_) return;
   if (factoryResetPending_) store_.FactoryReset();
   ESP.restart();
+}
+
+bool AppController::FixedTimeTokenEquals(const char* expected, const String& actual) {
+  const size_t expectedLength = std::strlen(expected);
+  const size_t actualLength = actual.length();
+  if (expectedLength == 0 || expectedLength != actualLength) return false;
+  uint8_t diff = 0;
+  for (size_t index = 0; index < expectedLength; ++index) {
+    diff |= static_cast<uint8_t>(expected[index] ^ actual[index]);
+  }
+  return diff == 0;
 }
 
 }  // namespace app

@@ -1,0 +1,8 @@
+# QRunlock provisioning-v2 pilot env only.
+# Single app slot for flash headroom while bringing up esp-idf
+# wifi_provisioning/protocomm, plus a coredump partition for crash capture.
+# Name,     Type, SubType,  Offset,   Size,    Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+app0,       app,  factory,  0x10000,  0x300000,
+spiffs,     data, spiffs,   0x310000, 0xE0000,
+coredump,   data, coredump, 0x3F0000, 0x10000,

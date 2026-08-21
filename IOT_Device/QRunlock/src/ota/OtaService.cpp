@@ -4,6 +4,7 @@
 #include <Update.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_task_wdt.h>
 
 #include "app/ProductIdentity.h"
 #include "ota/Semver.h"
@@ -54,7 +55,9 @@ void OtaService::RunInstall() {
 
   const char* headers[] = {"x-fw-version", "x-firmware-version"};
   http.collectHeaders(headers, 2);
+  esp_task_wdt_reset();
   const int code = http.GET();
+  esp_task_wdt_reset();
   if (code != HTTP_CODE_OK) {
     http.end();
     Fail(String("http_") + code);
@@ -82,6 +85,7 @@ void OtaService::RunInstall() {
   size_t written = 0;
   uint8_t buffer[1024];
   while (http.connected() && written < static_cast<size_t>(contentLength)) {
+    esp_task_wdt_reset();
     const size_t available = static_cast<size_t>(stream->available());
     if (available == 0) {
       delay(1);

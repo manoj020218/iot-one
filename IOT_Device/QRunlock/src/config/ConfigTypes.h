@@ -35,4 +35,28 @@ struct CloudConfig {
   char mqttPassword[64];
 };
 
+enum class LocalAuthTokenSource : uint8_t {
+  None = 0,
+  Generated = 1,
+  Provisioned = 2,
+};
+
+struct LocalAuthConfig {
+  uint32_t schemaVersion;
+  uint8_t tokenSource;
+  char apiToken[65];
+};
+
+enum class ProvisioningPopSource : uint8_t {
+  None = 0,
+  Generated = 1,
+  Provisioned = 2,
+};
+
+struct ProvisioningConfig {
+  uint32_t schemaVersion;
+  uint8_t popSource;
+  char proofOfPossession[33];
+};
+
 }  // namespace config

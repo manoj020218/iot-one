@@ -1,0 +1,258 @@
+# QRunlock Provisioning Migration Handoff
+
+Saved: 2026-08-20
+
+Read this first if the session closes and the work needs to be resumed.
+
+## Goal
+
+Migrate QRunlock from the current custom AP/BLE onboarding flow to Espressif's
+official `wifi_provisioning` / `protocomm` stack using Security Scheme 2
+(SRP6a + AES-256-GCM), per `PROVISIONING.md` section 9.
+
+The rollout approach is intentionally staged:
+
+1. Keep the shipping `esp32-c3-supermini` env stable.
+2. Bring up a separate mixed `arduino, espidf` pilot env first.
+3. Land per-device provisioning credential groundwork.
+4. Only then swap the actual provisioning transport in the pilot env.
+
+## Current Status
+
+### Already done before this handoff
+
+1. Tier 1 local API auth hardening:
+   - mutating local HTTP routes require `X-Jenix-Local-Token`
+   - token is stored/generated in NVS
+2. MQTT credential groundwork:
+   - firmware no longer defaults to compiled-in shared MQTT username
+   - `/api/cloud` preserves existing fields on partial updates
+3. Task watchdog:
+   - `esp_task_wdt` initialized and fed in the main loop
+   - OTA path explicitly feeds watchdog during long download/write work
+
+### Provisioning migration groundwork landed in this session
+
+1. Separate provisioning pilot env added in `platformio.ini`:
+   - `[env:esp32-c3-supermini-prov2]`
+   - `framework = arduino, espidf`
+   - `-D JENIX_PROV_V2=1`
+   - global `build_dir = C:/pio-builds/qrunlock` added because ESP-IDF/CMake
+     is brittle around whitespace in the source path
+2. Pilot-only partition layout added:
+   - `partitions_prov2.csv`
+   - single app slot
+   - `coredump` partition included
+3. ESP-IDF provisioning defaults added:
+   - `sdkconfig.defaults`
+   - NimBLE enabled
+   - Bluedroid disabled
+   - Security 2 enabled
+   - `CONFIG_FREERTOS_HZ=1000`
+4. Per-device provisioning PoP groundwork added:
+   - new `ProvisioningConfig` in `src/config/ConfigTypes.h`
+   - new defaults/helpers in `src/config/Defaults.h`
+   - new NVS namespace `qru_prov` in `src/storage/ConfigStore.cpp`
+   - PoP generates once on first boot if absent
+   - PoP persists in NVS
+   - optional flash-time override via `JNX_PROVISIONING_POP`
+5. Bench visibility added:
+   - boot prints Security 2 username and PoP source to Serial
+   - boot prints the PoP value to Serial for bench use
+   - `/api/status` now exposes provisioning readiness metadata
+     without exposing the raw PoP
+6. `PROVISIONING.md` updated:
+   - section 9 now states that naming is already compliant
+   - groundwork and current blocker are recorded there
+
+## Important Reality Checks
+
+1. QRunlock's current provisioning identity is already compliant:
+   - BLE/AP name is `JNXQRU` + last 6 uppercase hex digits of STA MAC
+   - this comes from `src/device_identity/DeviceIdentity.cpp`
+   - the old section-9 note claiming names still looked like `JNX-QRU-0010`
+     was stale and has been corrected in `PROVISIONING.md`
+2. The actual provisioning transport has NOT been migrated yet:
+   - current runtime still uses `src/connectivity/BleProvisioningService.*`
+   - current Wi-Fi onboarding still uses the custom `WifiManager` and local
+     routes like `/api/wifi`
+3. The mixed-framework pilot env is not buildable yet:
+   - the failure is in PlatformIO's Espressif builder logic, not in the
+     QRunlock code added so far
+
+## Verified Build Results
+
+### Shipping env
+
+Command:
+
+```powershell
+pio run -e esp32-c3-supermini
+```
+
+Result:
+
+- success
+- this is the env that must remain stable right now
+
+### Native tests
+
+Command:
+
+```powershell
+pio test -e native
+```
+
+Result:
+
+- still blocked on host toolchain availability
+- not part of the provisioning migration itself
+
+### Provisioning pilot env
+
+Command:
+
+```powershell
+pio run -e esp32-c3-supermini-prov2
+```
+
+Result:
+
+- CMake configure completes far enough to generate file-API metadata
+- PlatformIO then aborts with:
+
+```text
+Error: Couldn't find the main target of the project!
+```
+
+## Exact Current Blocker
+
+PlatformIO's `espressif32` ESP-IDF builder expects the main project component
+target to be named:
+
+```text
+__idf_src
+```
+
+This is hardcoded in:
+
+```text
+%USERPROFILE%\.platformio\platforms\espressif32\builder\frameworks\espidf.py
+```
+
+Relevant logic:
+
+- `project_target_name = "__idf_%s" % os.path.basename(PROJECT_SRC_DIR)`
+- since `PROJECT_SRC_DIR` is `src`, it insists on `__idf_src`
+
+But the generated CMake codemodel for this project currently contains:
+
+```text
+_project_elf_src
+```
+
+not `__idf_src`.
+
+This was confirmed by checking:
+
+```text
+C:\pio-builds\qrunlock\esp32-c3-supermini-prov2\.cmake\api\v1\reply\
+```
+
+and seeing a target file for `_project_elf_src` but no `__idf_src`.
+
+So the immediate mixed-framework failure is:
+
+- not a missing header
+- not a PoP/NVS bug
+- not a bad `sdkconfig.defaults`
+- not a broken top-level `CMakeLists.txt`
+
+It is a PlatformIO builder target-name expectation mismatch.
+
+## Files Generated By The Mixed Build Attempt
+
+The first `arduino, espidf` configure generated these untracked files:
+
+- `CMakeLists.txt`
+- `src/CMakeLists.txt`
+- `sdkconfig.esp32-c3-supermini-prov2`
+
+These are normal outputs of PlatformIO's ESP-IDF flow for a project that
+didn't already have them. They are currently present in the worktree as
+untracked files.
+
+Current generated contents:
+
+- root `CMakeLists.txt`:
+  - standard `project(QRunlock)` wrapper including `project.cmake`
+- `src/CMakeLists.txt`:
+  - auto-generated `idf_component_register(SRCS ${app_sources})`
+
+These do not by themselves fix the `__idf_src` vs `_project_elf_src` mismatch.
+
+## Recommended Next Step
+
+Resume with the mixed-framework build unblock first. Do NOT start rewriting
+the BLE transport to `wifi_prov_mgr` until `esp32-c3-supermini-prov2` can
+actually link.
+
+### First experiment to try next
+
+See whether the local `src/CMakeLists.txt` can be adjusted to satisfy
+PlatformIO's hardcoded `__idf_src` expectation.
+
+The next experiment should be:
+
+1. inspect how `__idf_main` or component aliases are named in working mixed
+   PlatformIO projects
+2. try adding a local alias or component naming tweak in `src/CMakeLists.txt`
+   so the codemodel exposes `__idf_src`
+3. rerun:
+
+```powershell
+pio run -e esp32-c3-supermini-prov2
+```
+
+If that works, then the next provisioning slice is:
+
+1. guard the old NimBLE-based provisioning code out of the prov2 env
+2. remove `NimBLE-Arduino` from prov2 `lib_deps`
+3. add a new `Provisioning2` wrapper around `wifi_prov_mgr`
+4. start with BLE transport only in prov2
+5. feed Security 2 using the per-device PoP already stored in NVS
+6. leave the shipping env untouched until prov2 is proven
+
+## Important Notes For Resume
+
+1. The current repo is dirty for legitimate reasons. Do not revert unrelated
+   user changes.
+2. The provisioning work is intentionally incomplete. The repo currently has
+   groundwork, not a finished migration.
+3. The raw PoP is intentionally printed to Serial for bench use only.
+   That is acceptable for the temporary pilot path described in `PROVISIONING.md`,
+   but not the final manufacturing flow.
+4. `PROVISIONING.md` section 9 and this file should be kept in sync as the
+   migration progresses.
+
+## Commands Used In This Session
+
+```powershell
+pio run -e esp32-c3-supermini
+pio run -e esp32-c3-supermini-prov2
+Select-String -Path $env:USERPROFILE\.platformio\platforms\espressif32\builder\frameworks\espidf.py -Pattern "project_target_name"
+Get-ChildItem C:\pio-builds\qrunlock\esp32-c3-supermini-prov2\.cmake\api\v1\reply
+```
+
+## Resume Summary
+
+If resuming cold, the correct short summary is:
+
+```text
+QRunlock provisioning migration groundwork is landed.
+Shipping env still builds.
+Per-device PoP is now persisted in NVS and visible for bench use.
+Mixed arduino+espidf pilot env exists but is blocked by PlatformIO expecting
+__idf_src while CMake generates _project_elf_src.
+Unblock the prov2 env first, then wire wifi_prov_mgr Security Scheme 2 in that env.
+```

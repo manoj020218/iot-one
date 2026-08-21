@@ -75,6 +75,15 @@ bool CloudBridgeService::Reconnect(uint32_t nowMs) {
   mqtt_.setServer(cfg.mqttHost, cfg.mqttPort);
   const char* clientId = identity_.DeviceId().c_str();
   const bool hasAuth = cfg.mqttUsername[0] != '\0';
+  if (!hasAuth) {
+    // The broker's acl_file only reliably grants PUBLISH to a named "user"
+    // block (see BRIDGE.md §4) — an anonymous connect will still succeed
+    // and still subscribe fine, making this failure mode invisible unless
+    // it's logged explicitly. Every status/ack publish from here on will be
+    // silently dropped by the broker.
+    logger_.Warn("MQTT connecting anonymously — no mqttUsername configured; "
+                 "publishes (status/cmd ack) will likely be silently denied");
+  }
   const char* willMessage = "{\"status\":\"offline\"}";
 
   const bool ok = hasAuth
@@ -150,6 +159,7 @@ void CloudBridgeService::FillJson(JsonObject object) const {
   object["homeId"] = cfg.homeId;
   object["mqttHost"] = cfg.mqttHost;
   object["mqttPort"] = cfg.mqttPort;
+  object["mqttUsernameConfigured"] = cfg.mqttUsername[0] != '\0';
   object["cmdTopic"] = cmdTopic_;
 }
 

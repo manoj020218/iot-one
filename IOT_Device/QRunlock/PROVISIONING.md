@@ -299,11 +299,21 @@ This section is the direct gap list for the current `QRunlock` firmware.
   - failed Wi-Fi falls back to AP mode
   - 10 quick button presses clear Wi-Fi and force AP mode
   - 30-second button hold also clears Wi-Fi and forces AP mode
-- Device identity is not yet compliant with the naming convention in this
-  document:
-  - current AP/BLE name format is like `JNX-QRU-0010`
-  - the standard requires `JNXQRU` plus the last 6 uppercase hex digits of
-    the STA MAC, with no separators
+- Device identity is now compliant with the provisioning naming convention:
+  - current AP/BLE name format is `JNXQRU` plus the last 6 uppercase hex
+    digits of the STA MAC, with no separators
+- Provisioning migration groundwork landed 2026-08-20:
+  - separate `esp32-c3-supermini-prov2` PlatformIO env added with
+    `framework = arduino, espidf`
+  - dedicated `partitions_prov2.csv` added (single app slot + `coredump`)
+  - `sdkconfig.defaults` added for Security Scheme 2 / NimBLE / mixed
+    Arduino+ESP-IDF operation
+  - per-device Proof-of-Possession now generates once on first boot if
+    absent, persists to NVS, and prints to Serial for bench use
+  - current blocker: `pio run -e esp32-c3-supermini-prov2` still fails inside
+    PlatformIO's Espressif mixed-framework builder with `Error: Couldn't find
+    the main target of the project!`, same class of failure previously seen
+    on the Token Dispenser pilot
 - MQTT / VPS cloud connection is not yet part of *provisioning* (still
   correct — see item 8), but the device now **can** connect to the platform
   broker once Wi-Fi is up: `src/cloud/CloudBridgeService.*` implements the
