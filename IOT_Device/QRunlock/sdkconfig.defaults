@@ -13,3 +13,14 @@ CONFIG_BT_BLUEDROID_ENABLED=n
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
 CONFIG_WIFI_PROV_BLE_SEC_CONN=y
+
+# PlatformIO's ESP-IDF builder reparses CMake compiler fragments and currently
+# breaks on the space-containing project path when this option emits
+# -fmacro-prefix-map=<project>=. Disable it for the pilot env so mixed
+# arduino+espidf builds remain stable in the existing workspace.
+# CONFIG_COMPILER_HIDE_PATHS_MACROS is not set
+
+# Match the esp32-c3-devkitm-1 board definition used by the pilot env.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+# CONFIG_ESPTOOLPY_FLASHSIZE_DETECT is not set

@@ -76,9 +76,12 @@ The rollout approach is intentionally staged:
    - current runtime still uses `src/connectivity/BleProvisioningService.*`
    - current Wi-Fi onboarding still uses the custom `WifiManager` and local
      routes like `/api/wifi`
-3. The mixed-framework pilot env is not buildable yet:
-   - the failure is in PlatformIO's Espressif builder logic, not in the
-     QRunlock code added so far
+3. The mixed-framework pilot env is still not buildable end-to-end, though
+   real progress landed 2026-08-21 (see "Exact Current Blocker" below): it
+   now gets past CMake configure and into real compilation of QRunlock's
+   own source, failing on a compiler-flag/whitespace-in-path issue rather
+   than the earlier project-target-name mismatch. Still a build-tooling
+   problem, not a bug in the QRunlock code itself.
 
 ## Verified Build Results
 
@@ -125,50 +128,104 @@ Result:
 Error: Couldn't find the main target of the project!
 ```
 
-## Exact Current Blocker
+## Exact Current Blocker (updated 2026-08-21 — the __idf_src issue below is RESOLVED)
 
-PlatformIO's `espressif32` ESP-IDF builder expects the main project component
-target to be named:
+**Update 2026-08-21**: the `__idf_src` vs `_project_elf_src` mismatch
+described in this section is fixed. The fix: point `src_dir = main` at the
+`[platformio]` (global) level — **not** per-env, PlatformIO silently ignores
+`src_dir` set under `[env:...]` and warns `Ignore unknown configuration
+option src_dir` if you try — plus a hand-written `main/CMakeLists.txt` that
+globs sources back out of the real `src/` tree:
 
-```text
-__idf_src
+```cmake
+set(qru_src_dir "${CMAKE_SOURCE_DIR}/src")
+file(GLOB_RECURSE qru_app_sources
+    "${qru_src_dir}/*.c" "${qru_src_dir}/*.cpp" "${qru_src_dir}/*.S")
+idf_component_register(SRCS ${qru_app_sources} INCLUDE_DIRS "${qru_src_dir}")
 ```
 
-This is hardcoded in:
+This gives PlatformIO the canonical `__idf_main` component name it expects
+natively, with zero PlatformIO patching, while the actual source of truth
+stays in `src/` (the loose `.cpp` files physically inside `main/` from an
+earlier copy-based attempt are stale leftovers — safe to delete, `main/`
+only needs `CMakeLists.txt`). Confirmed: the shipping `esp32-c3-supermini`
+env is unaffected — its classic Arduino build never reads `src_dir` and
+produces byte-identical output with or without this line (verified same
+size before/after: 75.8% flash, 16.1% RAM).
+
+**New, different blocker now** — the build gets past CMake configure and
+into real compilation of `src/app/AppController.cpp` etc., then fails with:
 
 ```text
-%USERPROFILE%\.platformio\platforms\espressif32\builder\frameworks\espidf.py
+riscv32-esp-elf-g++: error: Device/IOT_Platform/jenix: No such file or directory
+riscv32-esp-elf-g++: error: One/IOT_Device/QRunlock=.: No such file or directory
 ```
 
-Relevant logic:
+This is the same root problem the comments already anticipated (whitespace
+in `D:\IOT Device\IOT_Platform\jenix One\...`) but manifesting as an actual
+compile failure now that real source is being compiled: some ESP-IDF/CMake-
+emitted compiler flag containing the full project path gets space-split
+into two separate argv entries, and gcc treats the second half
+(`One/IOT_Device/QRunlock=.`) as an input filename. Two mitigations exist
+already but neither has been confirmed working yet:
 
-- `project_target_name = "__idf_%s" % os.path.basename(PROJECT_SRC_DIR)`
-- since `PROJECT_SRC_DIR` is `src`, it insists on `__idf_src`
+1. `tools/fix_pio_space_flags.py` (a `post:` extra_script) strips any flag
+   matching `-fmacro-prefix-map=<project-path-fragment>` from
+   ASFLAGS/CCFLAGS/CFLAGS/CXXFLAGS/CPPFLAGS/LINKFLAGS — but the error still
+   reproduces with it in place, so either it's not catching the actual flag
+   key responsible, or it runs at the wrong point in the SCons pipeline
+   relative to when this flag gets added.
+2. `sdkconfig.defaults` now has `# CONFIG_COMPILER_HIDE_PATHS_MACROS is not
+   set`, which should stop ESP-IDF from emitting `-fmacro-prefix-map=` at
+   all (a root-cause fix rather than post-hoc stripping) — but the error
+   still reproduced after this was added too. Worth checking whether a
+   fully clean rebuild (delete `C:\pio-builds\qrunlock\
+   esp32-c3-supermini-prov2` entirely, not just re-run `pio run`) is needed
+   for a changed `sdkconfig.defaults` to actually regenerate the CMake
+   config — that wasn't tried yet.
 
-But the generated CMake codemodel for this project currently contains:
+**Tried 2026-08-21: a truly clean rebuild (deleting
+`C:\pio-builds\qrunlock\esp32-c3-supermini-prov2` entirely) — this is
+WORSE, not better.** It fails earlier and differently:
 
 ```text
-_project_elf_src
+FileNotFoundError: [Errno 2] No such file or directory:
+'C:/pio-builds/qrunlock/esp32-c3-supermini-prov2/component_requires.temp.cmake'
 ```
 
-not `__idf_src`.
+(inside ESP-IDF's `idf_component_manager`, during CMake configure, before
+any real source ever compiles).
 
-This was confirmed by checking:
+**Re-running again after that (non-clean) did NOT cleanly restore the
+space-in-path state either — it produced a THIRD, different failure**,
+rebuilding the entire Arduino-as-ESP-IDF-component framework from scratch
+(227s, much longer than any prior attempt) and then failing during
+archiving:
 
 ```text
-C:\pio-builds\qrunlock\esp32-c3-supermini-prov2\.cmake\api\v1\reply\
+ar.exe: C:/pio-builds/qrunlock/esp32-c3-supermini-prov2/esp32-hal-psram.c.o: No such file or directory
 ```
 
-and seeing a target file for `_project_elf_src` but no `__idf_src`.
+— a missing intermediate object file, not a compiler error at all. **Be
+honest with whoever picks this up: build results on this machine have been
+inconsistent across consecutive attempts at the same cached state**
+(three different failure modes across three consecutive runs, only one
+partial clean). This smells like real fragility in how PlatformIO's
+Espressif builder handles incremental state for a mixed arduino+espidf
+project, not a single deterministic bug with one fix. Whoever resumes this
+should expect to need a few repeat attempts to even reproduce a given
+failure reliably, and should keep a copy of `C:\pio-builds\qrunlock\
+esp32-c3-supermini-prov2` from a "furthest reached" run before trying
+anything that might disturb it, since there's no confirmed way back to it.
 
-So the immediate mixed-framework failure is:
-
-- not a missing header
-- not a PoP/NVS bug
-- not a bad `sdkconfig.defaults`
-- not a broken top-level `CMakeLists.txt`
-
-It is a PlatformIO builder target-name expectation mismatch.
+Next step: figure out why neither space-flag mitigation is taking effect —
+likely either `fix_pio_space_flags.py` is checking the wrong flag key/env
+var, or runs at the wrong phase relative to when ESP-IDF's CMake step adds
+it, or `CONFIG_COMPILER_HIDE_PATHS_MACROS` isn't actually the config
+controlling this flag in this ESP-IDF version. Also worth understanding
+what `component_requires.temp.cmake` needs and why a from-scratch configure
+doesn't produce it, independently of the space-in-path issue — that's the
+real blocker for anyone who can't reuse this exact cached build state.
 
 ## Files Generated By The Mixed Build Attempt
 
@@ -250,9 +307,28 @@ If resuming cold, the correct short summary is:
 
 ```text
 QRunlock provisioning migration groundwork is landed.
-Shipping env still builds.
+Shipping env still builds (verified 2026-08-21, byte-identical output).
 Per-device PoP is now persisted in NVS and visible for bench use.
-Mixed arduino+espidf pilot env exists but is blocked by PlatformIO expecting
-__idf_src while CMake generates _project_elf_src.
-Unblock the prov2 env first, then wire wifi_prov_mgr Security Scheme 2 in that env.
+Local API auth, task watchdog, and /api/cloud partial-update fixes also
+landed this round — see the main firmware commits, not just this file.
+
+The __idf_src vs _project_elf_src mismatch is RESOLVED (global
+src_dir = main + main/CMakeLists.txt glob-redirecting back into src/).
+
+Current state is genuinely flaky: three consecutive build attempts on
+2026-08-21 produced three DIFFERENT failures (space-in-path compile error;
+then, after deleting the build cache, a CMake-configure-time
+component_requires.temp.cmake FileNotFoundError; then, on a further
+non-clean retry, a missing esp32-hal-psram.c.o during archiving). Two
+space-flag mitigations exist (tools/fix_pio_space_flags.py,
+sdkconfig.defaults's CONFIG_COMPILER_HIDE_PATHS_MACROS=n) but neither has
+been confirmed actually fixing anything yet, given the inconsistent
+results. Do not assume deleting C:\pio-builds\qrunlock\
+esp32-c3-supermini-prov2 gets you back to a clean baseline — it doesn't,
+and neither does re-running non-clean reliably reproduce the prior state.
+
+Next: get a REPEATABLE failure first (run the exact same command 2-3 times
+in a row and confirm you see the same error before trying to fix it) before
+chasing any specific error message — right now it's not clear which of the
+three failures is even the "real" one to fix first.
 ```
