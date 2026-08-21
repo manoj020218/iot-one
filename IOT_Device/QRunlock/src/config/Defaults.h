@@ -39,7 +39,7 @@ inline constexpr uint32_t kMqttReconnectMs = 5000;
 // per-device MQTT credential once the platform can issue one (see the
 // per-device Proof-of-Possession pattern below for the shape this should
 // eventually take).
-inline constexpr char kDefaultMqttUsername[] = "jenix_platform";
+inline constexpr char kLegacySharedMqttUsername[] = "jenix_platform";
 inline constexpr char kLocalApiAuthHeaderName[] = "X-Jenix-Local-Token";
 inline constexpr size_t kLocalApiTokenBytes = 16;
 inline constexpr char kProvisioningSec2Username[] = "wifiprov";
@@ -55,6 +55,18 @@ inline constexpr char kProvisionedLocalApiToken[] = "";
 inline constexpr char kProvisionedProofOfPossession[] = JNX_PROVISIONING_POP;
 #else
 inline constexpr char kProvisionedProofOfPossession[] = "";
+#endif
+
+#ifdef JNX_DEVICE_MQTT_USERNAME
+inline constexpr char kProvisionedDeviceMqttUsername[] = JNX_DEVICE_MQTT_USERNAME;
+#else
+inline constexpr char kProvisionedDeviceMqttUsername[] = "";
+#endif
+
+#ifdef JNX_DEVICE_MQTT_PASSWORD
+inline constexpr char kProvisionedDeviceMqttPassword[] = JNX_DEVICE_MQTT_PASSWORD;
+#else
+inline constexpr char kProvisionedDeviceMqttPassword[] = "";
 #endif
 
 inline uint16_t ClampRelayPulseMs(uint16_t value) {
@@ -110,7 +122,7 @@ inline CloudConfig DefaultCloudConfig() {
   config.homeId[0] = '\0';
   std::strncpy(config.mqttHost, kDefaultMqttHost, sizeof(config.mqttHost) - 1);
   config.mqttPort = kDefaultMqttPort;
-  std::strncpy(config.mqttUsername, kDefaultMqttUsername, sizeof(config.mqttUsername) - 1);
+  config.mqttUsername[0] = '\0';
   config.mqttPassword[0] = '\0';
   return config;
 }
@@ -131,6 +143,86 @@ inline CloudConfig SanitizeCloudConfig(CloudConfig config) {
 
 inline bool CloudConfigEquals(const CloudConfig& left, const CloudConfig& right) {
   return std::memcmp(&left, &right, sizeof(CloudConfig)) == 0;
+}
+
+enum class CloudMqttAuthSource : uint8_t {
+  None = 0,
+  DeviceCredential = 1,
+  LegacyCloudConfig = 2,
+};
+
+inline MqttDeviceCredentialConfig DefaultMqttDeviceCredentialConfig() {
+  MqttDeviceCredentialConfig config{};
+  config.schemaVersion = kSchemaVersion;
+  config.source = static_cast<uint8_t>(MqttDeviceCredentialSource::None);
+  config.useForCloudBroker = 0;
+  config.username[0] = '\0';
+  config.password[0] = '\0';
+  return config;
+}
+
+inline MqttDeviceCredentialConfig SanitizeMqttDeviceCredentialConfig(
+    MqttDeviceCredentialConfig config) {
+  config.schemaVersion = kSchemaVersion;
+  config.username[sizeof(config.username) - 1] = '\0';
+  config.password[sizeof(config.password) - 1] = '\0';
+  if (config.username[0] == '\0') {
+    config.source = static_cast<uint8_t>(MqttDeviceCredentialSource::None);
+    config.useForCloudBroker = 0;
+    config.password[0] = '\0';
+  } else {
+    config.useForCloudBroker = config.useForCloudBroker ? 1 : 0;
+  }
+  return config;
+}
+
+inline bool MqttDeviceCredentialConfigEquals(
+    const MqttDeviceCredentialConfig& left,
+    const MqttDeviceCredentialConfig& right) {
+  return std::memcmp(&left, &right, sizeof(MqttDeviceCredentialConfig)) == 0;
+}
+
+inline bool DeviceMqttCredentialActiveForCloud(
+    const MqttDeviceCredentialConfig& credential) {
+  return credential.username[0] != '\0' && credential.useForCloudBroker != 0;
+}
+
+inline CloudMqttAuthSource ResolveCloudMqttAuthSource(
+    const CloudConfig& cloudConfig,
+    const MqttDeviceCredentialConfig& deviceCredential) {
+  if (DeviceMqttCredentialActiveForCloud(deviceCredential)) {
+    return CloudMqttAuthSource::DeviceCredential;
+  }
+  if (cloudConfig.mqttUsername[0] != '\0') {
+    return CloudMqttAuthSource::LegacyCloudConfig;
+  }
+  return CloudMqttAuthSource::None;
+}
+
+inline const char* ResolveCloudMqttUsername(
+    const CloudConfig& cloudConfig,
+    const MqttDeviceCredentialConfig& deviceCredential) {
+  switch (ResolveCloudMqttAuthSource(cloudConfig, deviceCredential)) {
+    case CloudMqttAuthSource::DeviceCredential:
+      return deviceCredential.username;
+    case CloudMqttAuthSource::LegacyCloudConfig:
+      return cloudConfig.mqttUsername;
+    default:
+      return "";
+  }
+}
+
+inline const char* ResolveCloudMqttPassword(
+    const CloudConfig& cloudConfig,
+    const MqttDeviceCredentialConfig& deviceCredential) {
+  switch (ResolveCloudMqttAuthSource(cloudConfig, deviceCredential)) {
+    case CloudMqttAuthSource::DeviceCredential:
+      return deviceCredential.password;
+    case CloudMqttAuthSource::LegacyCloudConfig:
+      return cloudConfig.mqttPassword;
+    default:
+      return "";
+  }
 }
 
 inline LocalAuthConfig DefaultLocalAuthConfig() {

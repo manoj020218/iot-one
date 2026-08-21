@@ -10,6 +10,21 @@ namespace cloud {
 
 CloudBridgeService* CloudBridgeService::instance_ = nullptr;
 
+namespace {
+
+const char* CloudMqttAuthSourceString(config::CloudMqttAuthSource source) {
+  switch (source) {
+    case config::CloudMqttAuthSource::DeviceCredential:
+      return "device_credential";
+    case config::CloudMqttAuthSource::LegacyCloudConfig:
+      return "legacy_cloud_config";
+    default:
+      return "anonymous";
+  }
+}
+
+}  // namespace
+
 void CloudBridgeService::MqttCallbackTrampoline(char* topic, uint8_t* payload,
                                                 unsigned int length) {
   if (instance_ != nullptr) instance_->HandleMessage(topic, payload, length);
@@ -70,12 +85,21 @@ void CloudBridgeService::RebuildTopics() {
 bool CloudBridgeService::Reconnect(uint32_t nowMs) {
   (void)nowMs;
   const config::CloudConfig& cfg = store_.Cloud();
+  const config::MqttDeviceCredentialConfig& deviceCredential =
+      store_.DeviceMqttCredential();
   if (cfg.homeId[0] == '\0') return false;
 
   mqtt_.setServer(cfg.mqttHost, cfg.mqttPort);
   const char* clientId = identity_.DeviceId().c_str();
-  const bool hasAuth = cfg.mqttUsername[0] != '\0';
-  if (!hasAuth) {
+  const config::CloudMqttAuthSource authSource =
+      config::ResolveCloudMqttAuthSource(cfg, deviceCredential);
+  const char* mqttUsername = config::ResolveCloudMqttUsername(cfg, deviceCredential);
+  const char* mqttPassword = config::ResolveCloudMqttPassword(cfg, deviceCredential);
+  const bool hasAuth = mqttUsername[0] != '\0';
+  if (authSource == config::CloudMqttAuthSource::LegacyCloudConfig) {
+    logger_.Warn("MQTT using legacy cloud-config credential fallback; "
+                 "move auth into the per-device credential slot");
+  } else if (!hasAuth) {
     // The broker's acl_file only reliably grants PUBLISH to a named "user"
     // block (see BRIDGE.md §4) — an anonymous connect will still succeed
     // and still subscribe fine, making this failure mode invisible unless
@@ -87,7 +111,7 @@ bool CloudBridgeService::Reconnect(uint32_t nowMs) {
   const char* willMessage = "{\"status\":\"offline\"}";
 
   const bool ok = hasAuth
-      ? mqtt_.connect(clientId, cfg.mqttUsername, cfg.mqttPassword, lwtTopic_, 1, true,
+      ? mqtt_.connect(clientId, mqttUsername, mqttPassword, lwtTopic_, 1, true,
                       willMessage)
       : mqtt_.connect(clientId, nullptr, nullptr, lwtTopic_, 1, true, willMessage);
 
@@ -98,7 +122,8 @@ bool CloudBridgeService::Reconnect(uint32_t nowMs) {
 
   mqtt_.subscribe(cmdTopic_, 1);
   connected_ = true;
-  logger_.Info(String("MQTT connected, subscribed ") + cmdTopic_);
+  logger_.Info(String("MQTT connected via ") + CloudMqttAuthSourceString(authSource) +
+               ", subscribed " + cmdTopic_);
   PublishStatus("online", true);
   return true;
 }
@@ -154,12 +179,15 @@ void CloudBridgeService::PublishStatus(const char* status, bool retained) {
 
 void CloudBridgeService::FillJson(JsonObject object) const {
   const config::CloudConfig& cfg = store_.Cloud();
+  const config::CloudMqttAuthSource authSource =
+      config::ResolveCloudMqttAuthSource(cfg, store_.DeviceMqttCredential());
   object["configured"] = static_cast<bool>(cfg.configured);
   object["connected"] = connected_;
   object["homeId"] = cfg.homeId;
   object["mqttHost"] = cfg.mqttHost;
   object["mqttPort"] = cfg.mqttPort;
-  object["mqttUsernameConfigured"] = cfg.mqttUsername[0] != '\0';
+  object["mqttUsernameConfigured"] = authSource != config::CloudMqttAuthSource::None;
+  object["mqttAuthSource"] = CloudMqttAuthSourceString(authSource);
   object["cmdTopic"] = cmdTopic_;
 }
 

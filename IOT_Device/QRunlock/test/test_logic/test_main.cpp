@@ -109,7 +109,45 @@ void test_cloud_bridge_command_parsing() {
   TEST_ASSERT_EQUAL(cloud::CommandKind::Unknown, cloud::ParseCommandKind(nullptr));
 }
 
-void setup() {
+void test_cloud_mqtt_auth_resolution() {
+  config::CloudConfig cloudConfig = config::DefaultCloudConfig();
+  config::MqttDeviceCredentialConfig deviceCredential =
+      config::DefaultMqttDeviceCredentialConfig();
+
+  TEST_ASSERT_EQUAL(config::CloudMqttAuthSource::None,
+                    config::ResolveCloudMqttAuthSource(cloudConfig, deviceCredential));
+  TEST_ASSERT_EQUAL_STRING("",
+                           config::ResolveCloudMqttUsername(cloudConfig, deviceCredential));
+
+  std::strncpy(cloudConfig.mqttUsername, "jenix_platform",
+               sizeof(cloudConfig.mqttUsername) - 1);
+  std::strncpy(cloudConfig.mqttPassword, "legacy",
+               sizeof(cloudConfig.mqttPassword) - 1);
+  TEST_ASSERT_EQUAL(config::CloudMqttAuthSource::LegacyCloudConfig,
+                    config::ResolveCloudMqttAuthSource(cloudConfig, deviceCredential));
+  TEST_ASSERT_EQUAL_STRING("jenix_platform",
+                           config::ResolveCloudMqttUsername(cloudConfig, deviceCredential));
+  TEST_ASSERT_EQUAL_STRING("legacy",
+                           config::ResolveCloudMqttPassword(cloudConfig, deviceCredential));
+
+  std::strncpy(deviceCredential.username, "device-123",
+               sizeof(deviceCredential.username) - 1);
+  std::strncpy(deviceCredential.password, "secret",
+               sizeof(deviceCredential.password) - 1);
+  deviceCredential.useForCloudBroker = 0;
+  TEST_ASSERT_EQUAL(config::CloudMqttAuthSource::LegacyCloudConfig,
+                    config::ResolveCloudMqttAuthSource(cloudConfig, deviceCredential));
+
+  deviceCredential.useForCloudBroker = 1;
+  TEST_ASSERT_EQUAL(config::CloudMqttAuthSource::DeviceCredential,
+                    config::ResolveCloudMqttAuthSource(cloudConfig, deviceCredential));
+  TEST_ASSERT_EQUAL_STRING("device-123",
+                           config::ResolveCloudMqttUsername(cloudConfig, deviceCredential));
+  TEST_ASSERT_EQUAL_STRING("secret",
+                           config::ResolveCloudMqttPassword(cloudConfig, deviceCredential));
+}
+
+void run_all_tests() {
   UNITY_BEGIN();
   RUN_TEST(test_button_timing);
   RUN_TEST(test_relay_pulse_and_cooldown);
@@ -117,7 +155,23 @@ void setup() {
   RUN_TEST(test_state_transitions_and_bounds);
   RUN_TEST(test_cloud_bridge_topic_building);
   RUN_TEST(test_cloud_bridge_command_parsing);
+  RUN_TEST(test_cloud_mqtt_auth_resolution);
   UNITY_END();
 }
 
+#if defined(ARDUINO)
+void setup() {
+  run_all_tests();
+}
+
 void loop() {}
+#else
+void setUp() {}
+
+void tearDown() {}
+
+int main() {
+  run_all_tests();
+  return 0;
+}
+#endif

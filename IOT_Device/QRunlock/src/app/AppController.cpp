@@ -45,6 +45,27 @@ const char* PopSourceString(uint8_t popSource) {
   }
 }
 
+const char* DeviceMqttCredentialSourceString(uint8_t source) {
+  switch (static_cast<config::MqttDeviceCredentialSource>(source)) {
+    case config::MqttDeviceCredentialSource::Provisioned: return "provisioned";
+    case config::MqttDeviceCredentialSource::LocalApi: return "local_api";
+    case config::MqttDeviceCredentialSource::ProvisioningSession:
+      return "provisioning_session";
+    default: return "missing";
+  }
+}
+
+const char* CloudMqttAuthSourceString(config::CloudMqttAuthSource source) {
+  switch (source) {
+    case config::CloudMqttAuthSource::DeviceCredential:
+      return "device_credential";
+    case config::CloudMqttAuthSource::LegacyCloudConfig:
+      return "legacy_cloud_config";
+    default:
+      return "anonymous";
+  }
+}
+
 }  // namespace
 
 void AppController::Begin() {
@@ -99,6 +120,16 @@ void AppController::Begin() {
   if (generatedProvisioningPop) {
     Serial.println("[PROVISIONING] Generated new per-device Proof-of-Possession");
   }
+  bool provisionedDeviceMqttCredential = false;
+  store_.EnsureDeviceMqttCredential(&provisionedDeviceMqttCredential);
+  Serial.printf(
+      "[CLOUD] Device MQTT credential configured=%s source=%s active=%s\r\n",
+      store_.DeviceMqttCredential().username[0] != '\0' ? "true" : "false",
+      DeviceMqttCredentialSourceString(store_.DeviceMqttCredential().source),
+      store_.DeviceMqttCredential().useForCloudBroker != 0 ? "true" : "false");
+  if (provisionedDeviceMqttCredential) {
+    Serial.println("[CLOUD] Applied provisioned per-device MQTT credential");
+  }
   relay_.Begin(board::kRelayPin, board::kRelayActiveHigh, store_.Device().relayPulseMs,
                store_.Device().relayCooldownMs);
   led_.Begin(board::kStatusLedPin, board::kLedActiveHigh);
@@ -108,12 +139,18 @@ void AppController::Begin() {
             config::kRfLearnSettleMs);
   ble_.AttachApi(*this);
   wifi_.Begin();
+#ifdef JENIX_PROV_V2
+  if (app::kBleProvisioningEnabled && !store_.Network().configured) {
+    ble_.Begin(identity_);
+  }
+#else
   if (app::kBleProvisioningEnabled && wifi_.AccessPointActive() &&
       !store_.Network().configured) {
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
     ble_.Begin(identity_);
     lastApActive_ = true;
   }
+#endif
   web_.Begin(*this);
   cloud_.Begin(*this);
   logger_.Info(String("Boot PID=") + app::kPid + " AP/BLE=" + identity_.BleName() +
@@ -125,6 +162,11 @@ void AppController::Tick() {
   wifi_.Tick(nowMs);
   const bool apActive = wifi_.AccessPointActive();
   if (app::kBleProvisioningEnabled) {
+#ifdef JENIX_PROV_V2
+    if (!store_.Network().configured && !wifi_.Connected() && !ble_.Started()) {
+      ble_.Begin(identity_);
+    }
+#else
     if (apActive && !lastApActive_ && !store_.Network().configured) {
       ArmBleProvisionWindow(nowMs, &bleWindowExpiresAtMs_);
       ble_.Begin(identity_);
@@ -134,6 +176,7 @@ void AppController::Tick() {
     } else if (apActive && bleWindowExpiresAtMs_ != 0 && nowMs >= bleWindowExpiresAtMs_) {
       ble_.Stop();
     }
+#endif
   }
   lastApActive_ = apActive;
   ota_.Tick();
@@ -168,7 +211,9 @@ void AppController::CancelRfLearning() { rf_.CancelLearning(); }
 void AppController::EnterProvisioning() {
   wifi_.StartProvisioningAp(true);
   if (app::kBleProvisioningEnabled) {
+#ifndef JENIX_PROV_V2
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
+#endif
     ble_.Begin(identity_);
   }
 }
@@ -214,11 +259,70 @@ void AppController::HandleProvisioningRequest(const JsonDocument& request,
     return;
   }
 
+  if (cmd == "set_cloud") {
+    const bool homeIdProvided = request.containsKey("homeId");
+    const bool mqttHostProvided = request.containsKey("mqttHost");
+    const bool mqttPortProvided = request.containsKey("mqttPort");
+    const bool mqttUsernameProvided = request.containsKey("mqttUsername");
+    const bool mqttPasswordProvided = request.containsKey("mqttPassword");
+    if (!SaveCloudConfig(request["homeId"] | "", homeIdProvided,
+                         request["mqttHost"] | "", mqttHostProvided,
+                         request["mqttPort"] | 0, mqttPortProvided,
+                         request["mqttUsername"] | "", mqttUsernameProvided,
+                         request["mqttPassword"] | "", mqttPasswordProvided)) {
+      payload["ok"] = false;
+      payload["error"] = "cloud_save_failed";
+      return;
+    }
+    payload["ok"] = true;
+    payload["cmd"] = "set_cloud";
+    payload["cloud_configured"] = store_.Cloud().configured != 0;
+    payload["mqtt_username_configured"] =
+        config::ResolveCloudMqttAuthSource(store_.Cloud(), store_.DeviceMqttCredential()) !=
+        config::CloudMqttAuthSource::None;
+    payload["mqtt_auth_source"] = CloudMqttAuthSourceString(
+        config::ResolveCloudMqttAuthSource(store_.Cloud(), store_.DeviceMqttCredential()));
+    return;
+  }
+
+  if (cmd == "set_device_mqtt_credential") {
+    const bool mqttUsernameProvided = request.containsKey("mqttUsername");
+    const bool mqttPasswordProvided = request.containsKey("mqttPassword");
+    const bool activateProvided = request.containsKey("activateForCloudBroker");
+    if (!SaveDeviceMqttCredential(
+            request["mqttUsername"] | "", mqttUsernameProvided,
+            request["mqttPassword"] | "", mqttPasswordProvided,
+            request["activateForCloudBroker"] | false, activateProvided,
+            static_cast<uint8_t>(
+                config::MqttDeviceCredentialSource::ProvisioningSession))) {
+      payload["ok"] = false;
+      payload["error"] = "device_mqtt_credential_save_failed";
+      return;
+    }
+    payload["ok"] = true;
+    payload["cmd"] = "set_device_mqtt_credential";
+    payload["device_mqtt_credential_configured"] =
+        store_.DeviceMqttCredential().username[0] != '\0';
+    payload["device_mqtt_credential_active"] =
+        store_.DeviceMqttCredential().useForCloudBroker != 0;
+    return;
+  }
+
   if (cmd == "c" || cmd == "cloud_status") {
     payload["ok"] = true;
     payload["cmd"] = "c";
     payload["wifi_connected"] = wifi_.Connected();
     payload["mqtt_connected"] = cloud_.Connected();
+    payload["cloud_configured"] = store_.Cloud().configured != 0;
+    payload["mqtt_username_configured"] =
+        config::ResolveCloudMqttAuthSource(store_.Cloud(), store_.DeviceMqttCredential()) !=
+        config::CloudMqttAuthSource::None;
+    payload["mqtt_auth_source"] = CloudMqttAuthSourceString(
+        config::ResolveCloudMqttAuthSource(store_.Cloud(), store_.DeviceMqttCredential()));
+    payload["device_mqtt_credential_configured"] =
+        store_.DeviceMqttCredential().username[0] != '\0';
+    payload["device_mqtt_credential_active"] =
+        store_.DeviceMqttCredential().useForCloudBroker != 0;
     return;
   }
 
@@ -276,6 +380,33 @@ bool AppController::SaveCloudConfig(const String& homeId, bool homeIdProvided,
   return true;
 }
 
+bool AppController::SaveDeviceMqttCredential(const String& mqttUsername,
+                                             bool mqttUsernameProvided,
+                                             const String& mqttPassword,
+                                             bool mqttPasswordProvided,
+                                             bool activateForCloudBroker,
+                                             bool activateProvided,
+                                             uint8_t credentialSource) {
+  config::MqttDeviceCredentialConfig config = store_.DeviceMqttCredential();
+  if (mqttUsernameProvided) {
+    mqttUsername.substring(0, sizeof(config.username) - 1)
+        .toCharArray(config.username, sizeof(config.username));
+  }
+  if (mqttPasswordProvided) {
+    mqttPassword.substring(0, sizeof(config.password) - 1)
+        .toCharArray(config.password, sizeof(config.password));
+  }
+  if (activateProvided) config.useForCloudBroker = activateForCloudBroker ? 1 : 0;
+  if (config.username[0] == '\0') {
+    config = config::DefaultMqttDeviceCredentialConfig();
+  } else {
+    config.source = credentialSource;
+  }
+  if (!store_.SaveDeviceMqttCredential(config)) return false;
+  cloud_.ApplyConfig();
+  return true;
+}
+
 bool AppController::RequestOta(const String& url, const String& targetVersion,
                                bool allowDowngrade) {
   const String resolved = url.isEmpty() ? String(store_.Device().otaUrl) : url;
@@ -299,7 +430,11 @@ void AppController::ClearWifiAndEnterProvisioning(const char* reason) {
     return;
   }
   if (app::kBleProvisioningEnabled) {
+#ifndef JENIX_PROV_V2
     ArmBleProvisionWindow(millis(), &bleWindowExpiresAtMs_);
+#else
+    bleWindowExpiresAtMs_ = 0;
+#endif
     ble_.Begin(identity_);
   }
 }
@@ -319,6 +454,12 @@ void AppController::FillProvisioningHello(JsonObject object) const {
   object["firmware_version"] = app::kFirmwareVersion;
   object["hardware_revision"] = app::kHardwareRevision;
   object["matter_enabled"] = app::kMatterEnabled;
+  object["mqtt_auth_source"] = CloudMqttAuthSourceString(
+      config::ResolveCloudMqttAuthSource(store_.Cloud(), store_.DeviceMqttCredential()));
+  object["device_mqtt_credential_configured"] =
+      store_.DeviceMqttCredential().username[0] != '\0';
+  object["device_mqtt_credential_active"] =
+      store_.DeviceMqttCredential().useForCloudBroker != 0;
 }
 
 void AppController::FillStatus(JsonDocument& doc) const {
@@ -345,8 +486,14 @@ void AppController::FillStatus(JsonDocument& doc) const {
   system["freeSketchSpace"] = ESP.getFreeSketchSpace();
   system["cpuFreqMHz"] = getCpuFrequencyMhz();
   system["bleProvisionWindowRemainingMs"] =
-      (app::kBleProvisioningEnabled && wifi_.AccessPointActive() &&
-       bleWindowExpiresAtMs_ > millis())
+      (
+#ifdef JENIX_PROV_V2
+          false
+#else
+          app::kBleProvisioningEnabled && wifi_.AccessPointActive() &&
+          bleWindowExpiresAtMs_ > millis()
+#endif
+      )
           ? (bleWindowExpiresAtMs_ - millis())
           : 0;
   JsonObject localApiAuth = doc.createNestedObject("localApiAuth");
@@ -367,7 +514,14 @@ void AppController::FillStatus(JsonDocument& doc) const {
   provisioning["pilotBuild"] = false;
 #endif
   wifi_.FillJson(doc.createNestedObject("wifi"));
-  cloud_.FillJson(doc.createNestedObject("cloud"));
+  JsonObject cloud = doc.createNestedObject("cloud");
+  cloud_.FillJson(cloud);
+  cloud["deviceMqttCredentialConfigured"] =
+      store_.DeviceMqttCredential().username[0] != '\0';
+  cloud["deviceMqttCredentialSource"] =
+      DeviceMqttCredentialSourceString(store_.DeviceMqttCredential().source);
+  cloud["deviceMqttCredentialActive"] =
+      store_.DeviceMqttCredential().useForCloudBroker != 0;
   relay_.FillJson(doc.createNestedObject("relay"));
   rf_.FillJson(doc.createNestedObject("rf"), millis());
   ble_.FillJson(doc.createNestedObject("ble"));

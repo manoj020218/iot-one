@@ -4,6 +4,47 @@ Saved: 2026-08-20
 
 Read this first if the session closes and the work needs to be resumed.
 
+## READ FIRST — 2026-08-22 incident: prov2 broke the shipping firmware
+
+**`tools/prov2_espidf5_bootstrap.py` must not be run again (i.e. don't
+build `esp32-c3-supermini-prov2`) until it's fixed — see the big comment
+block at the top of `platformio.ini` for the full detail.** Short version:
+that script permanently patches header files inside the SHARED, global
+`framework-arduinoespressif32` package (Arduino.h, esp32-hal-psram.c,
+spinlock.h, compare_set.h, WiFiGeneric.h, WiFiClient.h, ssl_client.h) —
+the same package the shipping `esp32-c3-supermini` env compiles against.
+Nothing reverts the patches afterward. One of them (`compare_set.h`
+rewritten to a bare `#include "soc_memory_types.h"` instead of
+`#include "soc/soc_memory_types.h"`) made the *shipping/production*
+firmware silently unbuildable — `soc_memory_types.h: No such file or
+directory` — for a period, with zero warning, until a truly-clean rebuild
+finally surfaced it on 2026-08-22.
+
+This was fixed by deleting `framework-arduinoespressif32` entirely and
+letting PlatformIO fetch a fresh copy (a manual line-by-line reversal was
+tried first and made things *worse* — the script's assumed "before" text
+isn't reliably the true pristine state, so don't trust that path either).
+Shipping is confirmed clean again: 76.1% flash, 16.2% RAM, reproduced
+across multiple truly-clean rebuilds.
+
+**The real fix, not yet done**: give the prov2 env its own isolated copy of
+`framework-arduinoespressif32` to patch — the exact pattern this project
+already uses correctly for `framework-espidf` (a versioned local copy,
+`platform_packages` pointing at it, never the shared default). Until that
+lands, treat every `pio run -e esp32-c3-supermini-prov2` as something that
+will re-break the shipping build the moment its cache goes cold, with no
+error message warning you it happened.
+
+**Process lesson, worth internalizing**: "the shipping env still builds"
+is not a valid claim unless it was checked against a truly clean cache
+(`rm -rf`/`Remove-Item` the env's folder under `C:\pio-builds\qrunlock\`
+first). This bit twice in the same week — once with the pilot env's own
+build state (see "Tried 2026-08-21" below), once here with a much higher
+blast radius. A warm-cache rebuild reusing already-compiled `.o` files
+proves nothing about whether the *source resolution* is still correct.
+
+---
+
 ## Goal
 
 Migrate QRunlock from the current custom AP/BLE onboarding flow to Espressif's
@@ -26,6 +67,9 @@ The rollout approach is intentionally staged:
    - token is stored/generated in NVS
 2. MQTT credential groundwork:
    - firmware no longer defaults to compiled-in shared MQTT username
+   - separate per-device MQTT credential storage exists in NVS
+   - cloud MQTT auth now prefers that per-device slot and only falls back to
+     legacy `/api/cloud` auth fields for older bench units
    - `/api/cloud` preserves existing fields on partial updates
 3. Task watchdog:
    - `esp_task_wdt` initialized and fed in the main loop

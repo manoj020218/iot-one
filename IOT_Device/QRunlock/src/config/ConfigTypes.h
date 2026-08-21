@@ -21,10 +21,9 @@ struct NetworkConfig {
 // Binds this device to one Jenix One HOME and MQTT broker. `homeId` becomes
 // the `tenantId` segment of the canonical jnx/{tenantId}/{pid}/{deviceId}/
 // {suffix} topic scheme (packages/shared/src/utils/mqtt-topics.ts) — see
-// BRIDGE.md. mqttUsername/mqttPassword are optional (empty = anonymous
-// connect); today's broker runs open, but the fields exist so a future
-// per-device-credential rollout (MQTT_LICENSED_DEVICE_ACCESS_PLAN.md) is a
-// config change here, not a firmware rebuild.
+// BRIDGE.md. mqttUsername/mqttPassword remain only as a legacy compatibility
+// fallback for older bench flows; new per-device broker auth belongs in
+// MqttDeviceCredentialConfig below.
 struct CloudConfig {
   uint32_t schemaVersion;
   uint8_t configured;
@@ -33,6 +32,24 @@ struct CloudConfig {
   uint16_t mqttPort;
   char mqttUsername[32];
   char mqttPassword[64];
+};
+
+enum class MqttDeviceCredentialSource : uint8_t {
+  None = 0,
+  Provisioned = 1,
+  LocalApi = 2,
+  ProvisioningSession = 3,
+};
+
+// Stores the actual MQTT username/password for this physical unit, separate
+// from the HOME/broker binding above so per-device auth can be provisioned,
+// rotated, and activated without overloading `/api/cloud`.
+struct MqttDeviceCredentialConfig {
+  uint32_t schemaVersion;
+  uint8_t source;
+  uint8_t useForCloudBroker;
+  char username[32];
+  char password[64];
 };
 
 enum class LocalAuthTokenSource : uint8_t {

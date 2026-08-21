@@ -48,11 +48,15 @@ class RfLogic {
     if (lineHigh != rawHigh_) {
       rawHigh_ = lineHigh;
       lastEdgeAtMs_ = nowMs;
+      if (rawHigh_) highStartedAtMs_ = nowMs;
     }
     if (nowMs - lastEdgeAtMs_ >= debounceMs_ && stableHigh_ != rawHigh_) {
       stableHigh_ = rawHigh_;
       stableChangedAtMs_ = nowMs;
-      if (!stableHigh_) triggerLatched_ = false;
+      if (!stableHigh_) {
+        triggerLatched_ = false;
+        highStartedAtMs_ = 0;
+      }
     }
 
     if (learningActive_) {
@@ -61,7 +65,7 @@ class RfLogic {
         learningBaselineHigh_ = stableHigh_;
       }
       if (learningBaselineKnown_ && stableHigh_ != learningBaselineHigh_ &&
-          nowMs - stableChangedAtMs_ >= validHighMs_) {
+          nowMs - highStartedAtMs_ >= validHighMs_) {
         learningActive_ = false;
         return {RfEventType::LearningSuccess};
       }
@@ -72,10 +76,11 @@ class RfLogic {
       return {};
     }
 
-    if (stableHigh_ && !triggerLatched_ && nowMs - stableChangedAtMs_ >= validHighMs_ &&
-        nowMs - lastTriggerAtMs_ >= duplicateMs_) {
+    if (stableHigh_ && !triggerLatched_ && nowMs - highStartedAtMs_ >= validHighMs_ &&
+        (!hasTriggered_ || nowMs - lastTriggerAtMs_ >= duplicateMs_)) {
       triggerLatched_ = true;
       lastTriggerAtMs_ = nowMs;
+      hasTriggered_ = true;
       return {RfEventType::Triggered};
     }
     return {};
@@ -88,6 +93,7 @@ class RfLogic {
   uint32_t learnWindowMs_ = 10000;
   uint32_t learnSettleMs_ = 250;
   uint32_t lastEdgeAtMs_ = 0;
+  uint32_t highStartedAtMs_ = 0;
   uint32_t stableChangedAtMs_ = 0;
   uint32_t lastTriggerAtMs_ = 0;
   uint32_t learningStartedAtMs_ = 0;
@@ -95,6 +101,7 @@ class RfLogic {
   bool rawHigh_ = false;
   bool stableHigh_ = false;
   bool triggerLatched_ = false;
+  bool hasTriggered_ = false;
   bool learningActive_ = false;
   bool learningBaselineKnown_ = false;
   bool learningBaselineHigh_ = false;

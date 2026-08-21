@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include <esp_random.h>
 #include <esp_system.h>
 
 #include "config/Defaults.h"
@@ -16,6 +17,8 @@ constexpr char kWifiNs[] = "qru_wifi";
 constexpr char kWifiKey[] = "network";
 constexpr char kCloudNs[] = "qru_cloud";
 constexpr char kCloudKey[] = "cloud";
+constexpr char kDeviceMqttCredentialNs[] = "qru_mqttc";
+constexpr char kDeviceMqttCredentialKey[] = "device_mqtt";
 constexpr char kLocalAuthNs[] = "qru_auth";
 constexpr char kLocalAuthKey[] = "local_auth";
 constexpr char kProvisioningNs[] = "qru_prov";
@@ -38,6 +41,7 @@ bool ConfigStore::Begin() {
   LoadDevice();
   LoadNetwork();
   LoadCloud();
+  LoadDeviceMqttCredential();
   LoadLocalAuth();
   LoadProvisioning();
   return true;
@@ -80,6 +84,50 @@ bool ConfigStore::SaveCloud(const config::CloudConfig& config) {
   if (written != sizeof(next)) return false;
   cloudConfig_ = next;
   return true;
+}
+
+bool ConfigStore::SaveDeviceMqttCredential(
+    const config::MqttDeviceCredentialConfig& config) {
+  const config::MqttDeviceCredentialConfig next =
+      config::SanitizeMqttDeviceCredentialConfig(config);
+  if (config::MqttDeviceCredentialConfigEquals(next, deviceMqttCredentialConfig_)) {
+    return true;
+  }
+  Preferences prefs;
+  prefs.begin(kDeviceMqttCredentialNs, false);
+  const size_t written =
+      prefs.putBytes(kDeviceMqttCredentialKey, &next, sizeof(next));
+  prefs.end();
+  if (written != sizeof(next)) return false;
+  deviceMqttCredentialConfig_ = next;
+  return true;
+}
+
+bool ConfigStore::EnsureDeviceMqttCredential(bool* provisioned) {
+  if (provisioned != nullptr) *provisioned = false;
+  if (config::kProvisionedDeviceMqttUsername[0] == '\0') return true;
+
+  if (std::strcmp(deviceMqttCredentialConfig_.username,
+                  config::kProvisionedDeviceMqttUsername) == 0 &&
+      std::strcmp(deviceMqttCredentialConfig_.password,
+                  config::kProvisionedDeviceMqttPassword) == 0 &&
+      deviceMqttCredentialConfig_.source ==
+          static_cast<uint8_t>(config::MqttDeviceCredentialSource::Provisioned) &&
+      deviceMqttCredentialConfig_.useForCloudBroker != 0) {
+    return true;
+  }
+
+  config::MqttDeviceCredentialConfig next =
+      config::DefaultMqttDeviceCredentialConfig();
+  next.source =
+      static_cast<uint8_t>(config::MqttDeviceCredentialSource::Provisioned);
+  next.useForCloudBroker = 1;
+  std::strncpy(next.username, config::kProvisionedDeviceMqttUsername,
+               sizeof(next.username) - 1);
+  std::strncpy(next.password, config::kProvisionedDeviceMqttPassword,
+               sizeof(next.password) - 1);
+  if (provisioned != nullptr) *provisioned = true;
+  return SaveDeviceMqttCredential(next);
 }
 
 bool ConfigStore::SaveLocalAuth(const config::LocalAuthConfig& config) {
@@ -165,6 +213,9 @@ void ConfigStore::FactoryReset() {
   prefs.begin(kCloudNs, false);
   prefs.clear();
   prefs.end();
+  prefs.begin(kDeviceMqttCredentialNs, false);
+  prefs.clear();
+  prefs.end();
   prefs.begin(kLocalAuthNs, false);
   prefs.clear();
   prefs.end();
@@ -174,6 +225,7 @@ void ConfigStore::FactoryReset() {
   deviceConfig_ = config::DefaultDeviceConfig();
   networkConfig_ = config::DefaultNetworkConfig();
   cloudConfig_ = config::DefaultCloudConfig();
+  deviceMqttCredentialConfig_ = config::DefaultMqttDeviceCredentialConfig();
   localAuthConfig_ = config::DefaultLocalAuthConfig();
   provisioningConfig_ = config::DefaultProvisioningConfig();
 }
@@ -217,6 +269,25 @@ void ConfigStore::LoadCloud() {
     SaveCloud(cloudConfig_);
   } else {
     cloudConfig_ = config::SanitizeCloudConfig(cloudConfig_);
+  }
+}
+
+void ConfigStore::LoadDeviceMqttCredential() {
+  deviceMqttCredentialConfig_ = config::DefaultMqttDeviceCredentialConfig();
+  Preferences prefs;
+  prefs.begin(kDeviceMqttCredentialNs, true);
+  if (prefs.getBytesLength(kDeviceMqttCredentialKey) ==
+      sizeof(deviceMqttCredentialConfig_)) {
+    prefs.getBytes(kDeviceMqttCredentialKey, &deviceMqttCredentialConfig_,
+                   sizeof(deviceMqttCredentialConfig_));
+  }
+  prefs.end();
+  if (deviceMqttCredentialConfig_.schemaVersion != config::kSchemaVersion) {
+    deviceMqttCredentialConfig_ = config::DefaultMqttDeviceCredentialConfig();
+    SaveDeviceMqttCredential(deviceMqttCredentialConfig_);
+  } else {
+    deviceMqttCredentialConfig_ =
+        config::SanitizeMqttDeviceCredentialConfig(deviceMqttCredentialConfig_);
   }
 }
 

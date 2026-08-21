@@ -160,9 +160,22 @@ X-Jenix-Local-Token: <token from GET /api/status, or Serial log on first boot>
 {
   "homeId": "home-user-qrunlock-vendor-jenix-internal",
   "mqttHost": "mqtt.iotsoft.in",
-  "mqttPort": 1883,
-  "mqttUsername": "jenix_platform",
-  "mqttPassword": "anything"
+  "mqttPort": 1883
+}
+```
+
+The broker credential is now a **separate per-device write**, not part of
+the HOME/broker bind payload:
+
+```
+POST http://<device-ip>/api/device-mqtt-credential
+Content-Type: application/json
+X-Jenix-Local-Token: <token>
+
+{
+  "mqttUsername": "device-specific-user-or-current-shared-user",
+  "mqttPassword": "device-specific-password-or-current-shared-password",
+  "activateForCloudBroker": true
 }
 ```
 
@@ -175,24 +188,31 @@ configured and its source (`generated`/`provisioned`) but never the raw
 value — read it off Serial or set one at flash time via
 `JNX_LOCAL_API_TOKEN`. `/api/cloud` also now preserves any field you omit
 instead of blanking it — safe to send only the fields you're changing.
+`/api/device-mqtt-credential` writes the physical unit's broker auth into
+its own NVS slot, and the provisioning-session command
+`set_device_mqtt_credential` writes that same slot over `/provision`.
 
 `mqttHost`/`mqttPort` default to the production broker if omitted — only
 pass them to point at a different broker (e.g. a local bench broker).
 
-**`mqttUsername` is required, not optional — corrected 2026-08-20.** The
-broker's `password_file` is disabled on this listener (any password value
-is accepted, so `mqttPassword` genuinely has no security function right
-now), but its `acl_file` only reliably grants **publish** to a named `user`
+**A configured MQTT username is still required today.** The broker's
+`password_file` is disabled on this listener (any password value is
+accepted, so `mqttPassword` genuinely has no security function right now),
+but its `acl_file` only reliably grants **publish** to a named `user`
 ACL block — the plain "no username" anonymous connection can subscribe to
 `jnx/#` fine but every publish from it (the device's own `status`/`cmd/ack`,
 and the platform's own command dispatch) gets silently denied. This was
 found and fixed live 2026-08-20 (see `/etc/mosquitto/acl` on the VPS — a
 `user jenix_platform` / `topic readwrite jnx/#` block) after a real bench
-test showed `cloud.connected: true` but no command ever arriving. Every
-device using this bridge, and the platform's own MQTT bridge
-(`MQTT_USERNAME=jenix_platform` in the VPS's `api-server.env`), must
-connect as `jenix_platform` until real per-device credentials
-(`MQTT_LICENSED_DEVICE_ACCESS_PLAN.md`) replace this shared one.
+test showed `cloud.connected: true` but no command ever arriving. Until
+the platform ships real per-device ACLs/credentials
+(`MQTT_LICENSED_DEVICE_ACCESS_PLAN.md`), the per-device credential slot
+will often still contain the current shared `jenix_platform` login — but
+the firmware now stores and prefers that auth in a per-device slot, ready
+for real unique credentials when the broker side exists. For older bench
+units that only ever saved auth through `/api/cloud`, firmware keeps a
+legacy fallback to those old fields so they do not silently lose broker
+access on upgrade.
 
 Saving triggers an immediate reconnect with the new topics
 (`ControlApi::SaveCloudConfig` → `CloudBridgeService::ApplyConfig`) — no
@@ -243,13 +263,21 @@ the "cloud connected" indicator is decorative.
       as-is; only `ParseCommandKind`'s command vocabulary should change
       per device.
 - [ ] Add a `CloudConfig` to `ConfigTypes.h`/`Defaults.h`/`ConfigStore` —
-      copy QRunlock's fields (`homeId`, `mqttHost`, `mqttPort`,
-      `mqttUsername`, `mqttPassword`).
+      copy QRunlock's HOME/broker fields (`homeId`, `mqttHost`, `mqttPort`)
+      plus the legacy fallback auth fields if bench compatibility matters.
+- [ ] Add `MqttDeviceCredentialConfig` to
+      `ConfigTypes.h`/`Defaults.h`/`ConfigStore` for the actual per-device
+      broker username/password.
 - [ ] Add `SaveCloudConfig` to the device's `ControlApi` and implement it in
       the app controller, following QRunlock's `AppController::
       SaveCloudConfig` exactly.
+- [ ] Add `SaveDeviceMqttCredential` to the device's `ControlApi` and
+      implement it in the app controller, following QRunlock's
+      `AppController::SaveDeviceMqttCredential`.
 - [ ] Add a local `/api/cloud` POST route to the device's web server, same
       shape as QRunlock's.
+- [ ] Add a local `/api/device-mqtt-credential` POST route to the device's
+      web server for explicit per-device broker auth writes.
 - [ ] Add `knolleary/PubSubClient@^2.8` to `platformio.ini` `lib_deps`.
 - [ ] Wire the real connected state into whatever state machine / status LED
       the device already has — don't leave a hardcoded stub.
@@ -288,12 +316,20 @@ tester.
    Content-Type: application/json
    X-Jenix-Local-Token: <token>
 
-   {"homeId": "home-user-qrunlock-vendor-jenix-internal", "mqttUsername": "jenix_platform", "mqttPassword": "anything"}
+   {"homeId": "home-user-qrunlock-vendor-jenix-internal"}
    ```
-   Expect `{"ok":true}`. `mqttUsername` is required — see §4's 2026-08-20
-   correction; without it the device connects and subscribes fine but every
-   publish (its own status, and any command sent to it) is silently denied
-   by the broker's ACL.
+   Expect `{"ok":true}`. Then set the broker auth explicitly:
+   ```
+   POST http://<device-ip>/api/device-mqtt-credential
+   Content-Type: application/json
+   X-Jenix-Local-Token: <token>
+
+   {"mqttUsername":"jenix_platform","mqttPassword":"anything","activateForCloudBroker":true}
+   ```
+   Until the platform ships real per-device broker ACLs, the credential
+   value will often still be the current shared `jenix_platform` login —
+   what changed is that firmware now stores it in the unit's own
+   device-credential slot instead of overloading `/api/cloud`.
 4. **Confirm the bridge connected**: within ~5 seconds,
    `GET http://<device-ip>/api/status` → `cloud.connected` should be
    `true`, and `cloud.cmdTopic` should read

@@ -12,7 +12,8 @@ class RelayLogic {
   }
 
   bool RequestPulse(uint32_t nowMs) {
-    if (active_ || nowMs - lastFinishedAtMs_ < cooldownMs_) return false;
+    if (active_) return false;
+    if (hasFinishedPulse_ && nowMs - lastFinishedAtMs_ < cooldownMs_) return false;
     active_ = true;
     pulseEndsAtMs_ = nowMs + pulseMs_;
     return true;
@@ -22,6 +23,7 @@ class RelayLogic {
     if (!active_ || nowMs < pulseEndsAtMs_) return false;
     active_ = false;
     lastFinishedAtMs_ = nowMs;
+    hasFinishedPulse_ = true;
     return true;
   }
 
@@ -35,6 +37,7 @@ class RelayLogic {
   uint32_t pulseEndsAtMs_ = 0;
   uint32_t lastFinishedAtMs_ = 0;
   bool active_ = false;
+  bool hasFinishedPulse_ = false;
 };
 
 }  // namespace relay

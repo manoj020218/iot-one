@@ -87,6 +87,21 @@ void WebServerService::Begin(platform::ControlApi& api) {
         ? SendOk()
         : SendError("cloud_save_failed");
   });
+  server_.on("/api/device-mqtt-credential", HTTP_POST, [this]() {
+    if (!EnsureAuthorized()) return;
+    StaticJsonDocument<512> doc;
+    if (!ParseJsonBody(doc)) return;
+    const bool mqttUsernameProvided = doc.containsKey("mqttUsername");
+    const bool mqttPasswordProvided = doc.containsKey("mqttPassword");
+    const bool activateProvided = doc.containsKey("activateForCloudBroker");
+    api_->SaveDeviceMqttCredential(
+        doc["mqttUsername"] | "", mqttUsernameProvided,
+        doc["mqttPassword"] | "", mqttPasswordProvided,
+        doc["activateForCloudBroker"] | false, activateProvided,
+        static_cast<uint8_t>(config::MqttDeviceCredentialSource::LocalApi))
+        ? SendOk()
+        : SendError("device_mqtt_credential_save_failed");
+  });
   server_.on("/api/settings", HTTP_POST, [this]() {
     if (!EnsureAuthorized()) return;
     StaticJsonDocument<512> doc;

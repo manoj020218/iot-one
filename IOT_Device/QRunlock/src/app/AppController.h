@@ -40,6 +40,13 @@ class AppController : public platform::ControlApi {
                        const String& mqttUsername, bool mqttUsernameProvided,
                        const String& mqttPassword,
                        bool mqttPasswordProvided) override;
+  bool SaveDeviceMqttCredential(const String& mqttUsername,
+                                bool mqttUsernameProvided,
+                                const String& mqttPassword,
+                                bool mqttPasswordProvided,
+                                bool activateForCloudBroker,
+                                bool activateProvided,
+                                uint8_t credentialSource) override;
   bool RequestOta(const String& url, const String& targetVersion,
                   bool allowDowngrade) override;
   void Restart() override;
@@ -60,7 +67,7 @@ class AppController : public platform::ControlApi {
   relay::RelayService relay_{logger_};
   rf::RfService rf_{logger_};
   connectivity::WifiManager wifi_{store_, identity_, logger_};
-  connectivity::BleProvisioningService ble_{logger_};
+  connectivity::BleProvisioningService ble_{store_, logger_};
   ota::OtaService ota_{logger_};
   cloud::CloudBridgeService cloud_{store_, identity_, logger_};
   statusled::StatusLedService led_{};

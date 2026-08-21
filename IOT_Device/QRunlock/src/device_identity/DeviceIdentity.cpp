@@ -1,5 +1,7 @@
 #include "device_identity/DeviceIdentity.h"
 
+#include <cstdio>
+
 #include <esp_system.h>
 
 #include "app/ProductIdentity.h"

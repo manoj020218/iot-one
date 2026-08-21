@@ -18,6 +18,9 @@ pre{white-space:pre-wrap;background:#111;color:#e7f7ee;padding:12px;border-radiu
 <button onclick="post('/api/provisioning',{})">Start Provisioning AP</button></section>
 <section><h3>Wi-Fi</h3><input id=ssid placeholder="Wi-Fi SSID"><br><input id=pwd type=password placeholder="Wi-Fi Password"><br>
 <button onclick="post('/api/wifi',{ssid:gid('ssid').value,password:gid('pwd').value})">Save Wi-Fi</button></section>
+<section><h3>Device MQTT Credential</h3><input id=mqttUser placeholder="MQTT username"><br><input id=mqttPass type=password placeholder="MQTT password"><br>
+<label><input id=mqttActive type=checkbox checked> Use for cloud broker</label><br>
+<button onclick="post('/api/device-mqtt-credential',{mqttUsername:gid('mqttUser').value,mqttPassword:gid('mqttPass').value,activateForCloudBroker:gid('mqttActive').checked})">Save Device MQTT Credential</button></section>
 <section><h3>Settings</h3><input id=pulse type=number min=300 max=300 placeholder="Relay pulse ms"><br>
 <input id=cooldown type=number min=0 max=10000 placeholder="Relay cooldown ms"><br>
 <input id=otaUrl placeholder="OTA URL"><br>
@@ -35,7 +38,8 @@ function saveToken(){localStorage.setItem('qruLocalApiToken',gid('apiToken').val
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:authHeaders(),body:JSON.stringify(body)});load();return r.text();}
 async function load(){const r=await fetch('/api/status');const d=await r.json();gid('status').textContent=JSON.stringify(d,null,2);
 if(d.relay){gid('pulse').value=d.relay.pulseMs;gid('cooldown').value=d.relay.cooldownMs}
-if(d.ota&&d.ota.url){gid('otaUrl').value=d.ota.url}}
+if(d.ota&&d.ota.url){gid('otaUrl').value=d.ota.url}
+if(d.cloud){gid('mqttActive').checked=!!d.cloud.deviceMqttCredentialActive}}
 gid('apiToken').value=localStorage.getItem('qruLocalApiToken')||'';
 load();setInterval(load,2000);
 </script></body></html>

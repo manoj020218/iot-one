@@ -318,7 +318,7 @@ This section is the direct gap list for the current `QRunlock` firmware.
     in `WiFiGeneric.h`, `-Werror=overloaded-virtual` failures in the Arduino
     WiFi client headers, and NimBLE-Arduino macro redefinitions while ESP-IDF
     NimBLE is enabled at the same time
-- MQTT / VPS cloud connection is not yet part of *provisioning* (still
+  - MQTT / VPS cloud connection is not yet part of *provisioning* (still
   correct — see item 8), but the device now **can** connect to the platform
   broker once Wi-Fi is up: `src/cloud/CloudBridgeService.*` implements the
   canonical `jnx/{tenantId}/{pid}/{deviceId}/{suffix}` bridge end-to-end
@@ -328,7 +328,11 @@ This section is the direct gap list for the current `QRunlock` firmware.
   reuse pattern for future devices lives there now, not here. What's still
   missing is only the *binding* step (item 8 below) — today `homeId` is set
   via a local `/api/cloud` POST, a bench/pilot mechanism, not the real
-  provisioning-intent flow.
+  provisioning-intent flow. Firmware-side per-device MQTT credential storage
+  also now exists separately from `/api/cloud` (`/api/device-mqtt-credential`
+  locally or `set_device_mqtt_credential` over `/provision`), but broker-side
+  per-device ACLs still have to be built on the platform side before units
+  can stop carrying the shared `jenix_platform` login in that slot.
 
 ### Required firmware changes for QRunlock
 
@@ -380,7 +384,8 @@ This section is the direct gap list for the current `QRunlock` firmware.
      the ONE backend
    - this is not part of BLE or SoftAP provisioning and must stay separate
    - **partial/interim version exists**: a local `POST /api/cloud` route
-     lets a bench operator set `homeId` directly (see `BRIDGE.md` §4) —
+     lets a bench operator set `homeId` directly (see `BRIDGE.md` §4), while
+     a separate local/per-provisioning device-credential write sets MQTT auth —
      this is not the real bind flow (no auth, no provisioning-intent token,
      purely local-network trust) and should be replaced by the real flow
      above, not extended into one
