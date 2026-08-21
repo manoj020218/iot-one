@@ -20,6 +20,12 @@ CONFIG_WIFI_PROV_BLE_SEC_CONN=y
 # arduino+espidf builds remain stable in the existing workspace.
 # CONFIG_COMPILER_HIDE_PATHS_MACROS is not set
 
+# The prov2 pilot currently uses WiFiClientSecure::setInsecure() for OTA and
+# does not rely on the global ESP-IDF root certificate bundle yet. Disabling
+# the bundle avoids an IDF 5.3.1 build-time embed failure while the mixed
+# framework bring-up is still in progress.
+# CONFIG_MBEDTLS_CERTIFICATE_BUNDLE is not set
+
 # Match the esp32-c3-devkitm-1 board definition used by the pilot env.
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"

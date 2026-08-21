@@ -310,10 +310,14 @@ This section is the direct gap list for the current `QRunlock` firmware.
     Arduino+ESP-IDF operation
   - per-device Proof-of-Possession now generates once on first boot if
     absent, persists to NVS, and prints to Serial for bench use
-  - current blocker: `pio run -e esp32-c3-supermini-prov2` still fails inside
-    PlatformIO's Espressif mixed-framework builder with `Error: Couldn't find
-    the main target of the project!`, same class of failure previously seen
-    on the Token Dispenser pilot
+  - as of 2026-08-21, the old `Couldn't find the main target of the project!`
+    blocker is resolved, and the old whitespace / `x509_crt_bundle` /
+    `esp32/spiram.h` build breaks are also worked around
+  - current blocker is now a repeatable Arduino-as-component compatibility
+    wall against ESP-IDF 5.3.1 in the prov2 env: missing WiFi event/ETH types
+    in `WiFiGeneric.h`, `-Werror=overloaded-virtual` failures in the Arduino
+    WiFi client headers, and NimBLE-Arduino macro redefinitions while ESP-IDF
+    NimBLE is enabled at the same time
 - MQTT / VPS cloud connection is not yet part of *provisioning* (still
   correct — see item 8), but the device now **can** connect to the platform
   broker once Wi-Fi is up: `src/cloud/CloudBridgeService.*` implements the

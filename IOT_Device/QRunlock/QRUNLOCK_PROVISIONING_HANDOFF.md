@@ -121,14 +121,62 @@ pio run -e esp32-c3-supermini-prov2
 
 Result:
 
-- CMake configure completes far enough to generate file-API metadata
-- PlatformIO then aborts with:
+- build now gets through CMake configure and into repeatable user-source
+  compilation
+- the current deterministic failures are compile-time Arduino-as-component /
+  IDF-5.3.1 compatibility errors, not the older main-target or whitespace
+  path-splitting failures
+- the two cleanly reproducible error families after session-1 fixes are:
+  - missing WiFi event / ETH types in
+    `framework-arduinoespressif32/libraries/WiFi/src/WiFiGeneric.h`
+  - `-Werror=overloaded-virtual` failures in Arduino WiFi client headers
+- `src/app/AppController.cpp`'s old two-argument
+  `esp_task_wdt_init(...)` call was also updated for IDF 5.x during this
+  session; that local firmware-side incompatibility is no longer part of the
+  frontier
 
-```text
-Error: Couldn't find the main target of the project!
-```
+## Exact Current Blocker (updated 2026-08-21 — session 1 checkpoint)
 
-## Exact Current Blocker (updated 2026-08-21 — the __idf_src issue below is RESOLVED)
+**Update 2026-08-21 (later)**: the failure frontier moved again. The prov2
+build no longer dies on:
+
+1. `Error: Couldn't find the main target of the project!`
+2. the whitespace-split project-path compiler-flag failure
+3. missing `x509_crt_bundle` during certificate-bundle embedding
+4. missing `esp32/spiram.h` from Arduino headers
+5. QRunlock's old IDF-4-style `esp_task_wdt_init(timeout, panic)` call
+
+Changes that got it this far:
+
+1. `tools/prov2_espidf5_bootstrap.py` now runs as a `pre:` script for the
+   prov2 env, pins mixed builds to IDF 5.3.1, forces single-job builds,
+   patches the Arduino-as-component CMake include path so legacy
+   `esp32/spiram.h` can still be found, and patches ESP-IDF 5.3.1's
+   `mbedtls` CMake typo (`cert_bundle` vs `crt_bundle`).
+2. `sdkconfig.defaults` and `sdkconfig.esp32-c3-supermini-prov2` now disable
+   the global certificate bundle for the pilot path. This is acceptable for
+   bring-up because current OTA code already uses
+   `WiFiClientSecure::setInsecure()`.
+3. `src/app/AppController.cpp` now uses the IDF-5 `esp_task_wdt_init(const
+   esp_task_wdt_config_t*)` signature behind an `ESP_IDF_VERSION_MAJOR >= 5`
+   guard while keeping the shipping Arduino-only env on the old call.
+
+**Current deterministic blocker now**: Arduino-esp32 `3.20017.241212`
+running as an ESP-IDF component against IDF `5.3.1` is failing in a
+repeatable way during user-source compilation:
+
+1. `framework-arduinoespressif32/libraries/WiFi/src/WiFiGeneric.h` is missing
+   types such as `ip_event_ap_staipassigned_t`, `ip_event_got_ip_t`,
+   `ip_event_got_ip6_t`, and `esp_eth_handle_t`.
+2. Arduino WiFi client headers hit `-Werror=overloaded-virtual` against the
+   newer toolchain/API surface.
+3. `NimBLE-Arduino` still emits a large set of `CONFIG_BT_NIMBLE_*`
+   redefinition warnings because the prov2 env enables ESP-IDF NimBLE and
+   still links the legacy custom BLE provisioning dependency at the same time.
+
+This is much healthier than the earlier state: the failure is now stable and
+actionable, and the shipping `esp32-c3-supermini` env still builds
+successfully after these changes (re-verified 2026-08-21).
 
 **Update 2026-08-21**: the `__idf_src` vs `_project_elf_src` mismatch
 described in this section is fixed. The fix: point `src_dir = main` at the
@@ -218,14 +266,18 @@ failure reliably, and should keep a copy of `C:\pio-builds\qrunlock\
 esp32-c3-supermini-prov2` from a "furthest reached" run before trying
 anything that might disturb it, since there's no confirmed way back to it.
 
-Next step: figure out why neither space-flag mitigation is taking effect —
-likely either `fix_pio_space_flags.py` is checking the wrong flag key/env
-var, or runs at the wrong phase relative to when ESP-IDF's CMake step adds
-it, or `CONFIG_COMPILER_HIDE_PATHS_MACROS` isn't actually the config
-controlling this flag in this ESP-IDF version. Also worth understanding
-what `component_requires.temp.cmake` needs and why a from-scratch configure
-doesn't produce it, independently of the space-in-path issue — that's the
-real blocker for anyone who can't reuse this exact cached build state.
+Next step: stop treating this like a path/CMake problem — that layer is now
+good enough to expose the real compatibility wall. The next session should:
+
+1. remove `NimBLE-Arduino` from the prov2 env and guard the old
+   `BleProvisioningService` path out under `JENIX_PROV_V2`, since IDF NimBLE
+   is already enabled for Security-2 provisioning work
+2. decide whether to patch the Arduino-as-component headers locally for IDF
+   5.3.1 (`WiFiGeneric.h` missing-type includes and `overloaded-virtual`
+   warnings) or switch the prov2 pilot to a newer Arduino-as-component
+   release that actually targets IDF 5.x
+3. only after the mixed env links cleanly, start the real
+   `wifi_prov_mgr`/Security-2 transport swap
 
 ## Files Generated By The Mixed Build Attempt
 
@@ -256,22 +308,18 @@ actually link.
 
 ### First experiment to try next
 
-See whether the local `src/CMakeLists.txt` can be adjusted to satisfy
-PlatformIO's hardcoded `__idf_src` expectation.
-
 The next experiment should be:
 
-1. inspect how `__idf_main` or component aliases are named in working mixed
-   PlatformIO projects
-2. try adding a local alias or component naming tweak in `src/CMakeLists.txt`
-   so the codemodel exposes `__idf_src`
+1. remove `h2zero/NimBLE-Arduino` from prov2 `lib_deps`
+2. guard the legacy `src/connectivity/BleProvisioningService.*` code out of
+   `JENIX_PROV_V2`
 3. rerun:
 
 ```powershell
 pio run -e esp32-c3-supermini-prov2
 ```
 
-If that works, then the next provisioning slice is:
+If that gets prov2 materially further, then the next provisioning slice is:
 
 1. guard the old NimBLE-based provisioning code out of the prov2 env
 2. remove `NimBLE-Arduino` from prov2 `lib_deps`

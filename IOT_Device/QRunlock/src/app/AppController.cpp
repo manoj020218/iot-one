@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include <esp_idf_version.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
 
@@ -52,8 +53,17 @@ void AppController::Begin() {
   delay(50);
   identity_.Begin();
   store_.Begin();
-  const esp_err_t initWatchdogResult =
-      esp_task_wdt_init(config::kTaskWatchdogTimeoutSec, true);
+  esp_err_t initWatchdogResult = ESP_OK;
+#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
+  const esp_task_wdt_config_t watchdogConfig = {
+      .timeout_ms = config::kTaskWatchdogTimeoutSec * 1000U,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  initWatchdogResult = esp_task_wdt_init(&watchdogConfig);
+#else
+  initWatchdogResult = esp_task_wdt_init(config::kTaskWatchdogTimeoutSec, true);
+#endif
   if (initWatchdogResult == ESP_OK || initWatchdogResult == ESP_ERR_INVALID_STATE) {
     const esp_err_t watchdogStatus = esp_task_wdt_status(nullptr);
     if (watchdogStatus == ESP_OK) {
