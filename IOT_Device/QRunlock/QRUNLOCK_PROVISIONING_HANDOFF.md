@@ -2,6 +2,53 @@
 
 Saved: 2026-08-20
 
+## UPDATE - 2026-08-22 isolation verified by actually building it
+
+The 2026-08-21 update below (isolation "wired" but never build-tested,
+verification "inspection-only") has been superseded — it was tested for
+real, found to have a real bug, and the bug is fixed:
+
+1. **The isolation design itself is correct** and the safety guard (§ point
+   3 below) works exactly as intended: on the first real build attempt, the
+   private-copy wiring was still broken (see #2), and the guard correctly
+   refused to touch the shared package and failed loudly instead — it did
+   not silently fall through to patching the shared copy. Confirmed by
+   checksumming the shared package's known-vulnerable file
+   (`compare_set.h`) before and after every single attempt below: identical
+   every time.
+2. **Real bug found and fixed**: `platform.get_package_dir(name)` (what the
+   bootstrap script used to locate the Arduino framework) does **not**
+   consult this env's `platform_packages` override at all —
+   `PlatformBase.get_package_spec()` builds its spec purely from
+   `self.packages[name]`, the platform's static `platform.json` manifest,
+   confirmed by reading PlatformIO's own source
+   (`platformio/platform/base.py`). So no matter how `platform_packages`
+   was written in `platformio.ini` (several syntaxes were tried, including
+   an INI `%`-escaping bug for the literal `@` in the private copy's
+   directory name, fixed along the way), the script's own lookup always
+   resolved back to the shared default directory. Fixed in
+   `tools/prov2_espidf5_bootstrap.py` by deriving the private copy's path
+   directly (`default_arduino_dir.parent / PRIVATE_ARDUINO_COPY_DIRNAME`)
+   instead of trusting `get_package_dir` for this specific lookup.
+3. **After the fix**: a real `pio run -e esp32-c3-supermini-prov2` used the
+   private copy (guard passed cleanly), got further than any previous
+   attempt — past CMake configure, into a new failure:
+   `Warning! Detected two different targets with project sources. Please
+   use either __idf_src or specify 'main' folder in 'platformio.ini' file.`
+   Removing the stray auto-generated `src/CMakeLists.txt` (left over from
+   an earlier abandoned approach) did **not** fix this — the ambiguity is
+   coming from PlatformIO's own builder logic detecting both `main/` and
+   direct `src/` sources, not from a stray file. Untried next step: an
+   explicit PlatformIO option telling it the component dir is `main` (the
+   warning text itself suggests one exists) rather than relying on
+   auto-detection — worth a docs/source search in
+   `espressif32/builder/frameworks/espidf.py` for how that warning decides
+   between `__idf_src` and `main`.
+4. Immediately after, the shipping env was rebuilt from a **truly clean**
+   cache (`Remove-Item -Recurse -Force
+   C:\pio-builds\qrunlock\esp32-c3-supermini` first): success, 76.1% flash,
+   16.2% RAM. No regression.
+
 Read this first if the session closes and the work needs to be resumed.
 
 ## READ FIRST — 2026-08-22 incident: prov2 broke the shipping firmware
