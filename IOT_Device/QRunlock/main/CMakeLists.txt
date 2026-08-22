@@ -1,3 +1,8 @@
+#
+# This component intentionally gives PlatformIO's ESP-IDF builder the
+# canonical `main` source target while redirecting the real source tree back
+# into `src/`.
+#
 set(qru_src_dir "${CMAKE_SOURCE_DIR}/src")
 
 file(GLOB_RECURSE qru_app_sources

@@ -6,6 +6,9 @@ from pathlib import Path
 
 PRIVATE_ARDUINO_COPY_MARKER = "qrunlock-prov2"
 PRIVATE_ARDUINO_COPY_DIRNAME = (
+    "framework-arduinoespressif32-3.20017.241212+sha.dcc1105b-qrunlock-prov2"
+)
+LEGACY_PRIVATE_ARDUINO_COPY_DIRNAME = (
     "framework-arduinoespressif32@3.20017.241212+sha.dcc1105b-qrunlock-prov2"
 )
 
@@ -53,11 +56,11 @@ def _require_private_arduino_copy(path):
             "prov2 bootstrap resolved the shared framework-arduinoespressif32 "
             f"package at {path}. Refusing to patch the shipping framework in "
             "place. Keep esp32-c3-supermini-prov2 pointed at the private "
-            "framework-arduinoespressif32@...-qrunlock-prov2 copy via "
+            "framework-arduinoespressif32-...-qrunlock-prov2 copy via "
             "platform_packages."
         )
     if (
-        not package_dir_name.startswith("framework-arduinoespressif32@")
+        not package_dir_name.startswith("framework-arduinoespressif32")
         or PRIVATE_ARDUINO_COPY_MARKER not in package_dir_name
     ):
         raise RuntimeError(
@@ -65,6 +68,28 @@ def _require_private_arduino_copy(path):
             f"directory: {path}. Expected a private, versioned prov2-only "
             "copy with a qrunlock-prov2 marker in the directory name."
         )
+
+
+def _resolve_private_arduino_dir(default_arduino_dir):
+    packages_dir = default_arduino_dir.parent
+    private_dir = packages_dir / PRIVATE_ARDUINO_COPY_DIRNAME
+    legacy_private_dir = packages_dir / LEGACY_PRIVATE_ARDUINO_COPY_DIRNAME
+    if not private_dir.is_dir() and legacy_private_dir.is_dir():
+        legacy_private_dir.rename(private_dir)
+    return private_dir
+
+
+def _override_platform_package_dir(platform, arduino_dir):
+    # `pre:` extra scripts run before the platform build script itself, so this
+    # intercepts the same lookup later used by espressif32's espidf.py.
+    original_get_package_dir = platform.get_package_dir
+
+    def _get_package_dir(name):
+        if name == "framework-arduinoespressif32":
+            return str(arduino_dir)
+        return original_get_package_dir(name)
+
+    platform.get_package_dir = _get_package_dir
 
 
 platform = env.PioPlatform()
@@ -80,7 +105,7 @@ platform = env.PioPlatform()
 # the shared default's own parent (the packages storage dir) — that lookup
 # itself is reliable, only the package-NAME resolution isn't.
 default_arduino_dir = Path(platform.get_package_dir("framework-arduinoespressif32"))
-arduino_dir = default_arduino_dir.parent / PRIVATE_ARDUINO_COPY_DIRNAME
+arduino_dir = _resolve_private_arduino_dir(default_arduino_dir)
 if not arduino_dir.is_dir():
     raise RuntimeError(
         f"Private Arduino framework copy not found at {arduino_dir}. "
@@ -92,6 +117,7 @@ espidf_dir = Path(platform.get_package_dir("framework-espidf"))
 arduino_variant = env.BoardConfig().get("build.mcu", "esp32c3")
 
 _require_private_arduino_copy(arduino_dir)
+_override_platform_package_dir(platform, arduino_dir)
 
 # Earlier bring-up attempts widened Arduino's include path to legacy SDK
 # headers. That fixes one header but pollutes unrelated ESP-IDF components on

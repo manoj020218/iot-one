@@ -2,6 +2,56 @@
 
 Saved: 2026-08-20
 
+## UPDATE - 2026-08-22 later: builder-level isolation and src_dir regression fixed
+
+The earlier 2026-08-22 update below is now stale in two important ways:
+
+1. The `__idf_src` vs `main` ambiguity is fixed again. Root cause: while the
+   isolation notes were being rewritten, `src_dir = main` got dropped from
+   the global `[platformio]` block in `platformio.ini`. Restoring that line
+   re-establishes the intended pairing with `main/CMakeLists.txt`, so
+   PlatformIO goes back to the canonical `__idf_main` target instead of
+   synthesizing `__idf_src` and aborting when both are present.
+2. The private-copy isolation now works at the build-system level too, not
+   just inside the bootstrap script. `tools/prov2_espidf5_bootstrap.py` now
+   monkeypatches `platform.get_package_dir("framework-arduinoespressif32")`
+   before `espressif32/builder/frameworks/espidf.py` runs, forcing the mixed
+   build itself to resolve the private Arduino framework copy.
+
+Additional details from the real retest:
+
+1. The canonical private copy path is now:
+   `C:\Users\User\.platformio\packages\framework-arduinoespressif32-3.20017.241212+sha.dcc1105b-qrunlock-prov2`
+   The old `@...-qrunlock-prov2` name was unstable because PlatformIO's
+   `espidf.py` renames any Arduino framework directory containing `@` before
+   passing it to CMake. The bootstrap now auto-migrates the legacy `@` dir
+   name to the hyphenated one.
+2. The first retest after the monkeypatch failed because the original
+   recursive copy had silently timed out earlier and left the private copy
+   incomplete; only the `variants/` tree was missing at the top level. That
+   directory was copied over from the clean shared package and the retest
+   was repeated.
+3. After those fixes, `pio run -e esp32-c3-supermini-prov2` really did
+   compile against the private copy and got far deeper into the Arduino core
+   build. The current deterministic frontier is now a genuine
+   Arduino-core-vs-IDF-5.3.1 compatibility wall inside the private copy:
+   - `cores/esp32/esp32-hal-adc.c`: `driver/adc.h: No such file or directory`
+   - `cores/esp32/esp32-hal-cpu.c`: `xSemaphoreHandle` no longer exists under
+     the newer FreeRTOS headers
+4. Shipping was re-verified after a clean target:
+   `pio run -e esp32-c3-supermini -t clean`
+   followed by
+   `pio run -e esp32-c3-supermini`
+   Result: success, 76.1% flash, 16.2% RAM.
+5. The shared package's vulnerable file stayed unchanged throughout:
+   `compare_set.h` SHA-256
+   `045DC42A3D07AD13E0113E965C2DD0491877C382A2B250069CCC3E16ACDD1B33`
+
+Conclusion: the isolation problem is solved enough to keep debugging prov2
+without risking the shipping framework package. The remaining work is now
+inside Arduino-as-component compatibility against IDF 5.3.1, not in
+PlatformIO package routing or shared-package contamination.
+
 ## UPDATE - 2026-08-22 isolation verified by actually building it
 
 The 2026-08-21 update below (isolation "wired" but never build-tested,
