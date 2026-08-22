@@ -140,6 +140,12 @@ _replace_if_present(
 )
 _ensure_spiram_include_dir(arduino_dir / "CMakeLists.txt")
 _replace_once(
+    arduino_dir / "CMakeLists.txt",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal wifi_provisioning nghttp wpa_supplicant)\n",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal driver wifi_provisioning nghttp wpa_supplicant)\n",
+    "Arduino component driver dependency for legacy ADC/I2C headers",
+)
+_replace_once(
     arduino_dir / "cores" / "esp32" / "Arduino.h",
     "#include \"spiram.h\"\n",
     "#include \"esp32/spiram.h\"\n",
@@ -244,6 +250,18 @@ _replace_once(
     "#include \"mbedtls/net.h\"\n",
     "#include \"mbedtls/net_sockets.h\"\n",
     "Arduino WiFiClientSecure mbedtls net header fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-cpu.c",
+    "static xSemaphoreHandle apb_change_lock = NULL;\n",
+    "static SemaphoreHandle_t apb_change_lock = NULL;\n",
+    "Arduino CPU semaphore typedef fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-adc.c",
+    "static uint8_t __analogReturnedWidth = SOC_ADC_MAX_BITWIDTH; //12 for ESP32/ESP32C3; 13 for ESP32S2\n",
+    "static uint8_t __analogReturnedWidth = SOC_ADC_RTC_MAX_BITWIDTH; //12 for ESP32/ESP32C3; 13 for ESP32S2\n",
+    "Arduino ADC SoC bitwidth compatibility fix",
 )
 
 # ESP-IDF 5.3.1's bundled mbedtls CMake has a typo that prevents the generated
