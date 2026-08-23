@@ -1,6 +1,7 @@
 Import("env")
 
 import os
+import re
 from pathlib import Path
 
 
@@ -27,6 +28,13 @@ def _replace_if_present(path, before, after):
     if before not in text:
         return
     path.write_text(text.replace(before, after), encoding="utf-8")
+
+
+def _replace_regex_if_present(path, pattern, replacement):
+    text = path.read_text(encoding="utf-8")
+    updated, count = re.subn(pattern, replacement, text)
+    if count:
+        path.write_text(updated, encoding="utf-8")
 
 
 def _ensure_spiram_include_dir(path):
@@ -262,6 +270,368 @@ _replace_once(
     "static uint8_t __analogReturnedWidth = SOC_ADC_MAX_BITWIDTH; //12 for ESP32/ESP32C3; 13 for ESP32S2\n",
     "static uint8_t __analogReturnedWidth = SOC_ADC_RTC_MAX_BITWIDTH; //12 for ESP32/ESP32C3; 13 for ESP32S2\n",
     "Arduino ADC SoC bitwidth compatibility fix",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c.c",
+    "portTICK_RATE_MS",
+    "portTICK_PERIOD_MS",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c.c",
+    "    // Freq limitation when using different clock sources\n"
+    "    #define I2C_CLK_LIMIT_REF_TICK            (1 * 1000 * 1000 / 20)    /*!< Limited by REF_TICK, no more than REF_TICK/20*/\n"
+    "    #define I2C_CLK_LIMIT_APB                 (80 * 1000 * 1000 / 20)   /*!< Limited by APB, no more than APB/20*/\n"
+    "    #define I2C_CLK_LIMIT_RTC                 (20 * 1000 * 1000 / 20)   /*!< Limited by RTC, no more than RTC/20*/\n"
+    "    #define I2C_CLK_LIMIT_XTAL                (40 * 1000 * 1000 / 20)   /*!< Limited by RTC, no more than XTAL/20*/\n"
+    "\n"
+    "    typedef struct {\n"
+    "        uint8_t character;          /*!< I2C source clock characteristic */\n"
+    "        uint32_t clk_freq;          /*!< I2C source clock frequency */\n"
+    "    } i2c_clk_alloc_t;\n"
+    "\n"
+    "    // i2c clock characteristic, The order is the same as i2c_sclk_t.\n"
+    "    static i2c_clk_alloc_t i2c_clk_alloc[I2C_SCLK_MAX] = {\n"
+    "        {0, 0},\n"
+    "    #if SOC_I2C_SUPPORT_APB\n"
+    "        {0, I2C_CLK_LIMIT_APB},                                                                /*!< I2C APB clock characteristic*/\n"
+    "    #endif\n"
+    "    #if SOC_I2C_SUPPORT_XTAL\n"
+    "        {0, I2C_CLK_LIMIT_XTAL},                                                               /*!< I2C XTAL characteristic*/\n"
+    "    #endif\n"
+    "    #if SOC_I2C_SUPPORT_RTC\n"
+    "        {I2C_SCLK_SRC_FLAG_LIGHT_SLEEP | I2C_SCLK_SRC_FLAG_AWARE_DFS, I2C_CLK_LIMIT_RTC},      /*!< I2C 20M RTC characteristic*/\n"
+    "    #endif\n"
+    "    #if SOC_I2C_SUPPORT_REF_TICK\n"
+    "        {I2C_SCLK_SRC_FLAG_AWARE_DFS, I2C_CLK_LIMIT_REF_TICK},                                 /*!< I2C REF_TICK characteristic*/\n"
+    "    #endif\n"
+    "    };\n"
+    "\n"
+    "    i2c_sclk_t src_clk = I2C_SCLK_DEFAULT;\n"
+    "    ret = ESP_OK;\n"
+    "    for (i2c_sclk_t clk = I2C_SCLK_DEFAULT + 1; clk < I2C_SCLK_MAX; clk++) {\n"
+    "#if CONFIG_IDF_TARGET_ESP32S3\n"
+    "        if (clk == I2C_SCLK_RTC) { // RTC clock for s3 is unaccessable now.\n"
+    "            continue;\n"
+    "        }\n"
+    "#endif\n"
+    "        if (frequency <= i2c_clk_alloc[clk].clk_freq) {\n"
+    "            src_clk = clk;\n"
+    "            break;\n"
+    "        }\n"
+    "    }\n"
+    "    if(src_clk == I2C_SCLK_MAX){\n"
+    "        log_e(\"clock source could not be selected\");\n"
+    "        ret = ESP_FAIL;\n"
+    "    } else {\n"
+    "        i2c_hal_context_t hal;\n"
+    "        hal.dev = I2C_LL_GET_HW(i2c_num);\n"
+    "        i2c_hal_set_bus_timing(&(hal), frequency, src_clk);\n"
+    "        bus[i2c_num].frequency = frequency;\n"
+    "        //Clock Stretching Timeout: 20b:esp32, 5b:esp32-c3, 24b:esp32-s2\n"
+    "        i2c_set_timeout((i2c_port_t)i2c_num, I2C_LL_MAX_TIMEOUT);\n"
+    "    }\n",
+    "    i2c_clock_source_t src_clk;\n"
+    "    uint32_t src_clk_hz;\n"
+    "\n"
+    "#if SOC_I2C_SUPPORT_APB\n"
+    "    src_clk = SOC_MOD_CLK_APB;\n"
+    "    src_clk_hz = APB_CLK_FREQ;\n"
+    "#elif SOC_I2C_SUPPORT_XTAL\n"
+    "    src_clk = I2C_CLK_SRC_XTAL;\n"
+    "    src_clk_hz = XTAL_CLK_FREQ;\n"
+    "#elif SOC_I2C_SUPPORT_RTC\n"
+    "    src_clk = I2C_CLK_SRC_RC_FAST;\n"
+    "    src_clk_hz = SOC_CLK_RC_FAST_FREQ_APPROX;\n"
+    "#else\n"
+    "#error \"Unsupported I2C source clock configuration for Arduino IDF 5.3 compatibility patch\"\n"
+    "#endif\n"
+    "\n"
+    "    i2c_hal_clk_config_t clk_cal;\n"
+    "    i2c_dev_t *dev = I2C_LL_GET_HW(i2c_num);\n"
+    "\n"
+    "    ret = ESP_OK;\n"
+    "    i2c_ll_set_source_clk(dev, src_clk);\n"
+    "    i2c_ll_master_cal_bus_clk(src_clk_hz, frequency, &clk_cal);\n"
+    "    i2c_ll_master_set_bus_timing(dev, &clk_cal);\n"
+    "    bus[i2c_num].frequency = frequency;\n"
+    "    //Clock Stretching Timeout: 20b:esp32, 5b:esp32-c3, 24b:esp32-s2\n"
+    "    i2c_set_timeout((i2c_port_t)i2c_num, I2C_LL_MAX_TIMEOUT);\n",
+    "Arduino I2C master clock-source compatibility fix",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "xQueueHandle",
+    "QueueHandle_t",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "xSemaphoreHandle",
+    "SemaphoreHandle_t",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "portTICK_RATE_MS",
+    "portTICK_PERIOD_MS",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_ll_set_fifo_mode(i2c->dev, true);",
+    "i2c_ll_slave_set_fifo_mode(i2c->dev, true);",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_ll_clr_intsts_mask",
+    "i2c_ll_clear_intr_mask",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_clk_cal_t",
+    "i2c_hal_clk_config_t",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_ll_cal_bus_clk",
+    "i2c_ll_master_cal_bus_clk",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_ll_set_bus_timing",
+    "i2c_ll_master_set_bus_timing",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "i2c_ll_set_filter",
+    "i2c_ll_master_set_filter",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "I2C_SCLK_APB",
+    "SOC_MOD_CLK_APB",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "I2C_SCLK_XTAL",
+    "SOC_MOD_CLK_XTAL",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?:qrunlock_)+i2c_ll_get_txfifo_len\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_txfifo_len(i2c->dev)",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?<!qrunlock_)i2c_ll_get_txfifo_len\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_txfifo_len(i2c->dev)",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?:qrunlock_)+i2c_ll_get_rxfifo_cnt\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_rxfifo_cnt(i2c->dev)",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?<!qrunlock_)i2c_ll_get_rxfifo_cnt\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_rxfifo_cnt(i2c->dev)",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?:qrunlock_)+i2c_ll_get_intr_mask\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_intr_mask(i2c->dev)",
+)
+_replace_regex_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    r"(?<!qrunlock_)i2c_ll_get_intr_mask\(i2c->dev\)",
+    "qrunlock_i2c_ll_get_intr_mask(i2c->dev)",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-ledc.c",
+    "#define LEDC_MAX_BIT_WIDTH      SOC_LEDC_TIMER_BIT_WIDE_NUM\n",
+    "#define LEDC_MAX_BIT_WIDTH      SOC_LEDC_TIMER_BIT_WIDTH\n",
+    "Arduino LEDC SoC bit width macro compatibility fix",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-sigmadelta.c",
+    "SOC_SIGMADELTA_CHANNEL_NUM",
+    "SIGMADELTA_CHANNEL_MAX",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-spi.c",
+    "xSemaphoreHandle",
+    "SemaphoreHandle_t",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-uart.c",
+    "#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2\n"
+    "    uart_ll_set_baudrate(UART_LL_GET_HW(uart->num), _get_effective_baudrate(baud_rate));\n"
+    "#else\n"
+    "    uart_ll_set_baudrate(UART_LL_GET_HW(uart->num), baud_rate);\n"
+    "#endif\n",
+    "#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2\n"
+    "    uart_ll_set_baudrate(UART_LL_GET_HW(uart->num), _get_effective_baudrate(baud_rate));\n"
+    "#else\n"
+    "    uart_ll_set_baudrate(UART_LL_GET_HW(uart->num), baud_rate, XTAL_CLK_FREQ);\n"
+    "#endif\n",
+    "Arduino UART baud-rate setter compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-uart.c",
+    "    uint32_t baud_rate = uart_ll_get_baudrate(UART_LL_GET_HW(uart->num));\n",
+    "    uint32_t baud_rate = uart_ll_get_baudrate(UART_LL_GET_HW(uart->num), XTAL_CLK_FREQ);\n",
+    "Arduino UART baud-rate getter compatibility fix",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-rmt.c",
+    "xSemaphoreHandle",
+    "SemaphoreHandle_t",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "Esp.cpp",
+    "#include \"esp_spi_flash.h\"\n",
+    "#include \"esp_spi_flash.h\"\n"
+    "#include \"esp_chip_info.h\"\n"
+    "#include \"esp_flash.h\"\n"
+    "#include \"esp_mac.h\"\n",
+    "Arduino Esp.cpp IDF 5.3 header compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "Esp.cpp",
+    "bool EspClass::flashEraseSector(uint32_t sector)\n"
+    "{\n"
+    "    return spi_flash_erase_sector(sector) == ESP_OK;\n"
+    "}\n"
+    "\n"
+    "// Warning: These functions do not work with encrypted flash\n"
+    "bool EspClass::flashWrite(uint32_t offset, uint32_t *data, size_t size)\n"
+    "{\n"
+    "    return spi_flash_write(offset, (uint32_t*) data, size) == ESP_OK;\n"
+    "}\n"
+    "\n"
+    "bool EspClass::flashRead(uint32_t offset, uint32_t *data, size_t size)\n"
+    "{\n"
+    "    return spi_flash_read(offset, (uint32_t*) data, size) == ESP_OK;\n"
+    "}\n",
+    "bool EspClass::flashEraseSector(uint32_t sector)\n"
+    "{\n"
+    "    return esp_flash_erase_region(NULL, sector * SPI_FLASH_SEC_SIZE, SPI_FLASH_SEC_SIZE) == ESP_OK;\n"
+    "}\n"
+    "\n"
+    "// Warning: These functions do not work with encrypted flash\n"
+    "bool EspClass::flashWrite(uint32_t offset, uint32_t *data, size_t size)\n"
+    "{\n"
+    "    return esp_flash_write(NULL, (const void*)data, offset, size) == ESP_OK;\n"
+    "}\n"
+    "\n"
+    "bool EspClass::flashRead(uint32_t offset, uint32_t *data, size_t size)\n"
+    "{\n"
+    "    return esp_flash_read(NULL, (void*)data, offset, size) == ESP_OK;\n"
+    "}\n",
+    "Arduino Esp.cpp flash API compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "HardwareSerial.cpp",
+    "#include <inttypes.h>\n",
+    "#include <inttypes.h>\n"
+    "#include <ctime>\n",
+    "Arduino HardwareSerial time_t include compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "HWCDC.cpp",
+    "#include \"esp_private/startup_internal.h\"\n"
+    "#include \"esp_freertos_hooks.h\"\n",
+    "#include \"esp_private/startup_internal.h\"\n"
+    "#include \"esp_freertos_hooks.h\"\n"
+    "#if CONFIG_IDF_TARGET_ESP32C3\n"
+    "#include \"esp32c3/rom/ets_sys.h\"\n"
+    "#ifndef USB_DM_GPIO_NUM\n"
+    "#define USB_DM_GPIO_NUM GPIO_NUM_18\n"
+    "#endif\n"
+    "#ifndef USB_DP_GPIO_NUM\n"
+    "#define USB_DP_GPIO_NUM GPIO_NUM_19\n"
+    "#endif\n"
+    "#else\n"
+    "#include \"esp32s3/rom/ets_sys.h\"\n"
+    "#ifndef USB_DM_GPIO_NUM\n"
+    "#define USB_DM_GPIO_NUM GPIO_NUM_19\n"
+    "#endif\n"
+    "#ifndef USB_DP_GPIO_NUM\n"
+    "#define USB_DP_GPIO_NUM GPIO_NUM_20\n"
+    "#endif\n"
+    "#endif\n",
+    "Arduino HWCDC ROM and USB pin compatibility fix",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "HWCDC.cpp",
+    "xQueueHandle",
+    "QueueHandle_t",
+)
+_replace_if_present(
+    arduino_dir / "cores" / "esp32" / "HWCDC.cpp",
+    "xSemaphoreHandle",
+    "SemaphoreHandle_t",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "HWCDC.cpp",
+    "ESP_SYSTEM_INIT_FN(usb_serial_jtag_conn_status_init, BIT(0))\n"
+    "{\n"
+    "  s_usb_serial_jtag_conn_status = true;\n"
+    "  remaining_allowed_no_sof_ticks = ALLOWED_NO_SOF_TICKS;\n"
+    "  esp_register_freertos_tick_hook(usb_serial_jtag_sof_tick_hook);\n"
+    "}\n",
+    "ESP_SYSTEM_INIT_FN(usb_serial_jtag_conn_status_init, SECONDARY, BIT(0), 230)\n"
+    "{\n"
+    "  s_usb_serial_jtag_conn_status = true;\n"
+    "  remaining_allowed_no_sof_ticks = ALLOWED_NO_SOF_TICKS;\n"
+    "  return esp_register_freertos_tick_hook(usb_serial_jtag_sof_tick_hook);\n"
+    "}\n",
+    "Arduino HWCDC startup hook compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "WMath.cpp",
+    "#include \"esp_system.h\"\n",
+    "#include \"esp_system.h\"\n"
+    "#include \"esp_random.h\"\n",
+    "Arduino WMath esp_random declaration compatibility fix",
+)
+_replace_once(
+    arduino_dir / "cores" / "esp32" / "esp32-hal-i2c-slave.c",
+    "static inline bool i2c_ll_slave_rw(i2c_dev_t *hw)//not exposed by hal_ll\n"
+    "{\n"
+    "#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3\n"
+    "    return hw->sr.slave_rw;\n"
+    "#else\n"
+    "    return hw->status_reg.slave_rw;\n"
+    "#endif\n"
+    "}\n",
+    "static inline bool i2c_ll_slave_rw(i2c_dev_t *hw)//not exposed by hal_ll\n"
+    "{\n"
+    "#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3\n"
+    "    return hw->sr.slave_rw;\n"
+    "#else\n"
+    "    return hw->status_reg.slave_rw;\n"
+    "#endif\n"
+    "}\n"
+    "\n"
+    "static inline uint32_t qrunlock_i2c_ll_get_intr_mask(i2c_dev_t *hw)\n"
+    "{\n"
+    "    uint32_t intr_status = 0;\n"
+    "    i2c_ll_get_intr_mask(hw, &intr_status);\n"
+    "    return intr_status;\n"
+    "}\n"
+    "\n"
+    "static inline uint32_t qrunlock_i2c_ll_get_rxfifo_cnt(i2c_dev_t *hw)\n"
+    "{\n"
+    "    uint32_t length = 0;\n"
+    "    i2c_ll_get_rxfifo_cnt(hw, &length);\n"
+    "    return length;\n"
+    "}\n"
+    "\n"
+    "static inline uint32_t qrunlock_i2c_ll_get_txfifo_len(i2c_dev_t *hw)\n"
+    "{\n"
+    "    uint32_t length = 0;\n"
+    "    i2c_ll_get_txfifo_len(hw, &length);\n"
+    "    return length;\n"
+    "}\n",
+    "Arduino I2C slave LL compatibility helpers",
 )
 
 # ESP-IDF 5.3.1's bundled mbedtls CMake has a typo that prevents the generated
