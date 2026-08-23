@@ -78,6 +78,51 @@ def _require_private_arduino_copy(path):
         )
 
 
+def _exclude_unused_source_file(path, reason):
+    # Same technique as _exclude_unused_library, scoped to one file inside
+    # an otherwise-needed library (e.g. Update/src/Updater.cpp is required,
+    # but its sibling Update/src/HttpsOTAUpdate.cpp is a separate, unused
+    # convenience wrapper that doesn't compile under IDF 5.3.1).
+    if not path.is_file():
+        return
+    if path.read_text(encoding="utf-8").strip():
+        path.write_text(
+            f"// Emptied by prov2_espidf5_bootstrap.py — {reason}\n",
+            encoding="utf-8",
+        )
+
+
+def _exclude_unused_library(arduino_dir, library_name):
+    # lib_ignore has NO effect on this mixed arduino+espidf build path
+    # (confirmed by testing: AsyncUDP still compiled and failed identically
+    # with lib_ignore = AsyncUDP set) — library discovery here goes through
+    # ESP-IDF's own component/CMake mechanism, not PlatformIO's classic LDF.
+    #
+    # Renaming the whole library folder out of the way does NOT work either
+    # (confirmed by testing): the private copy's own generated CMakeLists.txt
+    # hardcodes `libraries/<name>/src` as an idf_component_register
+    # INCLUDE_DIRS entry, so CMake fails with "Include directory ... is not
+    # a directory" once the folder is gone.
+    #
+    # Instead: keep the directory (and its header) in place so that
+    # INCLUDE_DIRS check keeps passing, but empty out the .cpp source files
+    # so there's nothing left to actually compile. Safe precisely because
+    # this is a private, isolated copy, not the shared package other envs
+    # depend on — nothing in QRunlock's own src/ or main/ includes this
+    # library's header, so an empty implementation is never linked against.
+    library_src_dir = arduino_dir / "libraries" / library_name / "src"
+    if not library_src_dir.is_dir():
+        return
+    for suffix in (".cpp", ".c"):
+        for source_file in library_src_dir.glob(f"*{suffix}"):
+            if source_file.read_text(encoding="utf-8").strip():
+                source_file.write_text(
+                    f"// Emptied by prov2_espidf5_bootstrap.py — {library_name} is "
+                    "unused by QRunlock and does not compile under IDF 5.3.1.\n",
+                    encoding="utf-8",
+                )
+
+
 def _resolve_private_arduino_dir(default_arduino_dir):
     packages_dir = default_arduino_dir.parent
     private_dir = packages_dir / PRIVATE_ARDUINO_COPY_DIRNAME
@@ -126,6 +171,50 @@ arduino_variant = env.BoardConfig().get("build.mcu", "esp32c3")
 
 _require_private_arduino_copy(arduino_dir)
 _override_platform_package_dir(platform, arduino_dir)
+# None of these are referenced anywhere in QRunlock's own src/ or main/
+# (confirmed by grepping every #include across the whole tree and cross-
+# checking against every library folder bundled in the Arduino package).
+# QRunlock's real dependencies are HTTPClient, Preferences, Update,
+# WebServer, WiFi, WiFiClientSecure (all kept), plus ESP-IDF's own native
+# wifi_provisioning/protocomm components for prov2 specifically — not
+# Arduino's WiFiProv wrapper or BLE library, which prov2 replaces. Excluding
+# the rest avoids porting IDF-5.3.1 breakage in code that's never linked in.
+for _unused_library in (
+    "ArduinoOTA",
+    "AsyncUDP",
+    "BLE",
+    "BluetoothSerial",
+    "DNSServer",
+    "EEPROM",
+    "ESPmDNS",
+    "Ethernet",
+    "FFat",
+    "HTTPUpdate",
+    "HTTPUpdateServer",
+    "I2S",
+    "Insights",
+    "LittleFS",
+    "NetBIOS",
+    "RainMaker",
+    "SD",
+    "SD_MMC",
+    "SimpleBLE",
+    "Ticker",
+    "USB",
+    "WiFiProv",
+    "Wire",
+):
+    _exclude_unused_library(arduino_dir, _unused_library)
+# Update/src/HttpsOTAUpdate.cpp is a separate, unused higher-level wrapper
+# living inside the Update library folder QRunlock DOES need (Update.h's
+# core flash-write API, via OtaService.cpp) — exclude only this one file,
+# not the whole library. Doesn't compile under IDF 5.3.1 (esp_http_client_
+# config_t/esp_https_ota_config_t type mismatch) and nothing calls it.
+_exclude_unused_source_file(
+    arduino_dir / "libraries" / "Update" / "src" / "HttpsOTAUpdate.cpp",
+    "HttpsOTAUpdate is unused by QRunlock (OtaService.cpp uses Update.h "
+    "directly) and does not compile under IDF 5.3.1.",
+)
 
 # Earlier bring-up attempts widened Arduino's include path to legacy SDK
 # headers. That fixes one header but pollutes unrelated ESP-IDF components on
@@ -147,11 +236,22 @@ _replace_if_present(
     "",
 )
 _ensure_spiram_include_dir(arduino_dir / "CMakeLists.txt")
-_replace_once(
+# Non-fatal on purpose (unlike _require_private_arduino_copy's hard checks):
+# the CMakeLists.txt "requires" line evolves as more components get added
+# here over time, so a strict single before->after _replace_once would
+# hard-fail every time an EARLIER patch in this same list already landed
+# from a prior run. Cover every state seen so far; each is a no-op if its
+# "before" text isn't present (already-updated or pristine-and-not-yet-
+# reached, both fine).
+_replace_if_present(
     arduino_dir / "CMakeLists.txt",
     "set(requires spi_flash mbedtls mdns esp_adc_cal wifi_provisioning nghttp wpa_supplicant)\n",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal driver esp_eth wifi_provisioning nghttp wpa_supplicant)\n",
+)
+_replace_if_present(
+    arduino_dir / "CMakeLists.txt",
     "set(requires spi_flash mbedtls mdns esp_adc_cal driver wifi_provisioning nghttp wpa_supplicant)\n",
-    "Arduino component driver dependency for legacy ADC/I2C headers",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal driver esp_eth wifi_provisioning nghttp wpa_supplicant)\n",
 )
 _replace_once(
     arduino_dir / "cores" / "esp32" / "Arduino.h",
