@@ -215,6 +215,12 @@ _exclude_unused_source_file(
     "HttpsOTAUpdate is unused by QRunlock (OtaService.cpp uses Update.h "
     "directly) and does not compile under IDF 5.3.1.",
 )
+_exclude_unused_source_file(
+    arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "esp_crt_bundle.c",
+    "esp_crt_bundle is unused by QRunlock (WiFiClientSecure::setInsecure() "
+    "is used everywhere, never certificate-bundle validation) and does not "
+    "compile under IDF 5.3.1's restructured mbedtls_x509_crt.",
+)
 
 # Earlier bring-up attempts widened Arduino's include path to legacy SDK
 # headers. That fixes one header but pollutes unrelated ESP-IDF components on
@@ -252,6 +258,11 @@ _replace_if_present(
     arduino_dir / "CMakeLists.txt",
     "set(requires spi_flash mbedtls mdns esp_adc_cal driver wifi_provisioning nghttp wpa_supplicant)\n",
     "set(requires spi_flash mbedtls mdns esp_adc_cal driver esp_eth wifi_provisioning nghttp wpa_supplicant)\n",
+)
+_replace_if_present(
+    arduino_dir / "CMakeLists.txt",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal driver esp_eth wifi_provisioning nghttp wpa_supplicant)\n",
+    "set(requires spi_flash mbedtls mdns esp_adc_cal driver esp_eth http_parser wifi_provisioning nghttp wpa_supplicant)\n",
 )
 _replace_once(
     arduino_dir / "cores" / "esp32" / "Arduino.h",
@@ -352,12 +363,34 @@ _replace_once(
     "        using Client::connect;\n",
     "Arduino WiFi Client overload visibility fix",
 )
+_replace_if_present(
+    arduino_dir / "libraries" / "WiFi" / "src" / "WiFiGeneric.cpp",
+    '#include "dhcpserver/dhcpserver_options.h"\n',
+    '#include "dhcpserver/dhcpserver_options.h"\n'
+    '#include "dhcpserver/dhcpserver.h"\n',
+)
+_replace_if_present(
+    arduino_dir / "libraries" / "WiFi" / "src" / "WiFiGeneric.cpp",
+    "xQueueHandle",
+    "QueueHandle_t",
+)
+_replace_if_present(
+    arduino_dir / "libraries" / "WiFi" / "src" / "WiFiSTA.cpp",
+    "#include <esp_netif.h>\n",
+    "#include <esp_netif.h>\n"
+    "#include <esp_mac.h>\n",
+)
 
 _replace_once(
     arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "ssl_client.h",
     "#include \"mbedtls/net.h\"\n",
     "#include \"mbedtls/net_sockets.h\"\n",
     "Arduino WiFiClientSecure mbedtls net header fix",
+)
+_replace_if_present(
+    arduino_dir / "libraries" / "WebServer" / "src" / "WebServer.cpp",
+    'sprintf (buffer + (i*8), "%08x", esp_random());',
+    'sprintf (buffer + (i*8), "%08lx", (unsigned long)esp_random());',
 )
 _replace_once(
     arduino_dir / "cores" / "esp32" / "esp32-hal-cpu.c",
@@ -741,6 +774,11 @@ _replace_once(
     "    add_custom_target(custom_bundle DEPENDS ${cert_bundle})\n",
     "    add_custom_target(custom_bundle DEPENDS ${crt_bundle})\n",
     "ESP-IDF crt bundle dependency fix",
+)
+_replace_if_present(
+    espidf_dir / "components" / "wpa_supplicant" / "esp_supplicant" / "include" / "esp_wpa2.h",
+    "#ifdef __cplusplus\n}\n#endif\n#endif\n",
+    "#endif\n",
 )
 
 # QRunlock's prov2 pilot doesn't use managed ESP-IDF components. Disabling the
