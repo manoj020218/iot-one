@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# Factory records contain real per-device secrets (PoP, local API token) -
+# keep them out of git history. Upload to the VPS instead once that
+# endpoint exists.
+records/

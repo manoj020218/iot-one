@@ -1,0 +1,15 @@
+{
+  "models": [
+    {
+      "model_id": "QRU-PSU-RF-C3",
+      "display_name": "QRunlock PSU/RF Controller (ESP32-C3)",
+      "chip": "esp32c3",
+      "manufacturer": "Espressif",
+      "board": "ESP32-C3 SuperMini",
+      "vid_pid": "303A:1001",
+      "project_dir": "../QRunlock",
+      "pio_env": "esp32-c3-supermini-prov2",
+      "notes": "Security Scheme 2 provisioning pilot build. Uses mixed arduino+espidf framework."
+    }
+  ]
+}

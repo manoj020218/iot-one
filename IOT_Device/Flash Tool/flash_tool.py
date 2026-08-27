@@ -1,0 +1,344 @@
+#!/usr/bin/env python3
+"""Factory flash tool.
+
+Hardware models (chip family, manufacturer, PlatformIO project/env) are
+registered once via `register-model`. Flashing a unit always looks up its
+model first, so the right firmware always goes on the right hardware.
+
+Each factory flash does a full chip erase (required for a genuinely fresh
+per-device Security Scheme 2 PoP and local API token to be generated -
+skipping this silently reuses whatever was already in NVS from a previous
+flash/test), then uploads, then captures the boot log directly over a raw
+serial connection to pull out the PoP, the local API token, and the BLE
+service name. The record is saved locally and, if VPS credentials are
+configured, uploaded there too.
+
+Usage:
+    python flash_tool.py list-models
+    python flash_tool.py register-model --model-id ID --display-name NAME \
+        --chip esp32c3 --manufacturer NAME --board NAME \
+        --vid-pid 303A:1001 --project-dir ../QRunlock \
+        --pio-env esp32-c3-supermini-prov2 [--notes TEXT]
+    python flash_tool.py flash --model-id ID [--port COM25] [--skip-erase]
+"""
+
+import argparse
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+import serial.tools.list_ports
+
+from capture import capture_boot_record, missing_fields
+
+TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
+REGISTRY_PATH = os.path.join(TOOL_DIR, "hardware_models.json")
+RECORDS_DIR = os.path.join(TOOL_DIR, "records")
+
+VPS_URL_ENV = "QRUNLOCK_FACTORY_VPS_URL"
+VPS_TOKEN_ENV = "QRUNLOCK_FACTORY_VPS_TOKEN"
+
+
+def find_esptool():
+    packages_dir = os.path.expanduser("~/.platformio/packages")
+    candidates = sorted(glob.glob(os.path.join(packages_dir, "tool-esptoolpy*", "esptool.py")))
+    if not candidates:
+        return None
+    # Prefer the unversioned/current package dir over an older pinned copy.
+    for c in candidates:
+        if "@" not in os.path.basename(os.path.dirname(c)):
+            return c
+    return candidates[0]
+
+
+def lightweight_reset(esptool_path, chip, port):
+    """Trigger a hard reset via esptool directly, without going through a
+    full PlatformIO build/upload cycle. Much lower latency between the
+    reset actually happening and this script being ready to read the
+    resulting boot output, since there's no build system overhead."""
+    cmd = [sys.executable, esptool_path, "--chip", chip, "--port", port,
+           "--before", "default_reset", "--after", "hard_reset", "chip_id"]
+    subprocess.run(cmd, cwd=TOOL_DIR, capture_output=True)
+
+
+def load_registry():
+    if not os.path.isfile(REGISTRY_PATH):
+        return {"models": []}
+    with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_registry(registry):
+    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+        json.dump(registry, f, indent=2)
+        f.write("\n")
+
+
+def find_model(registry, model_id):
+    for model in registry["models"]:
+        if model["model_id"] == model_id:
+            return model
+    return None
+
+
+def cmd_list_models(args):
+    registry = load_registry()
+    if not registry["models"]:
+        print("No hardware models registered yet.")
+        return
+    for model in registry["models"]:
+        print(
+            f"{model['model_id']:<20} {model['chip']:<10} "
+            f"{model['manufacturer']} {model['board']} "
+            f"(VID:PID={model['vid_pid']}, env={model['pio_env']})"
+        )
+
+
+def register_model(model_id, display_name, chip, manufacturer, board, vid_pid,
+                    project_dir, pio_env, notes=""):
+    registry = load_registry()
+    if find_model(registry, model_id):
+        raise FlashError(f"Model '{model_id}' is already registered. "
+                          f"Remove it from {REGISTRY_PATH} first if you want to redefine it.")
+
+    registry["models"].append({
+        "model_id": model_id,
+        "display_name": display_name,
+        "chip": chip,
+        "manufacturer": manufacturer,
+        "board": board,
+        "vid_pid": vid_pid.upper(),
+        "project_dir": project_dir,
+        "pio_env": pio_env,
+        "notes": notes,
+    })
+    save_registry(registry)
+
+
+def cmd_register_model(args):
+    try:
+        register_model(args.model_id, args.display_name, args.chip, args.manufacturer,
+                        args.board, args.vid_pid, args.project_dir, args.pio_env,
+                        args.notes)
+    except FlashError as exc:
+        print(exc)
+        sys.exit(1)
+    print(f"Registered hardware model '{args.model_id}'.")
+
+
+def detect_port(expected_vid_pid):
+    matches = []
+    for p in serial.tools.list_ports.comports():
+        if p.vid is None or p.pid is None:
+            continue
+        vid_pid = f"{p.vid:04X}:{p.pid:04X}"
+        if vid_pid == expected_vid_pid.upper():
+            matches.append(p.device)
+    return matches
+
+
+class FlashError(Exception):
+    pass
+
+
+def run_pio(project_dir, pio_env, target, port, log):
+    cmd = [
+        "pio", "run",
+        "-d", project_dir,
+        "-e", pio_env,
+        "-t", target,
+        "--upload-port", port,
+    ]
+    log(f"$ {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=TOOL_DIR, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True)
+    for line in result.stdout.splitlines():
+        log(line)
+    if result.returncode != 0:
+        raise FlashError(f"'{target}' failed (exit {result.returncode}).")
+
+
+def run_factory_flash(model_id, port=None, skip_erase=False, force=False, log=print):
+    """Erase, flash, and capture a factory record for one unit.
+
+    Returns the factory_record dict on success. Raises FlashError with a
+    human-readable message on any failure - callers (CLI or GUI) decide
+    how to present that.
+    """
+    registry = load_registry()
+    model = find_model(registry, model_id)
+    if model is None:
+        raise FlashError(f"No registered model '{model_id}'.")
+
+    if port is None:
+        matches = detect_port(model["vid_pid"])
+        if len(matches) == 1:
+            port = matches[0]
+            log(f"Auto-detected port {port} for VID:PID {model['vid_pid']}.")
+        elif len(matches) == 0:
+            raise FlashError(f"No connected device matches VID:PID {model['vid_pid']} "
+                              f"for model '{model_id}'. Plug it in or pick a port.")
+        else:
+            raise FlashError(f"Multiple devices match VID:PID {model['vid_pid']}: "
+                              f"{matches}. Pick one explicitly.")
+    else:
+        matches = detect_port(model["vid_pid"])
+        if port not in matches:
+            log(f"WARNING: {port} does not report VID:PID {model['vid_pid']} "
+                f"expected for model '{model_id}'. Detected matching ports: "
+                f"{matches or 'none'}.")
+            if not force:
+                raise FlashError("Refusing to flash a port that doesn't match the "
+                                  "registered hardware model (override if you're sure).")
+
+    project_dir = os.path.normpath(os.path.join(TOOL_DIR, model["project_dir"]))
+    pio_env = model["pio_env"]
+
+    if not skip_erase:
+        log(f"\n== Erasing {port} (full chip erase - required for a fresh "
+            f"PoP/token) ==")
+        run_pio(project_dir, pio_env, "erase", port, log)
+    else:
+        log("\n== Skipping erase - PoP/token capture will reflect whatever is "
+            "already in NVS, not a fresh generation. ==")
+
+    log(f"\n== Flashing {model['model_id']} to {port} ==")
+    run_pio(project_dir, pio_env, "upload", port, log)
+
+    esptool_path = find_esptool()
+    if esptool_path is None:
+        raise FlashError("Could not locate a bundled esptool.py under "
+                          "~/.platformio/packages - can't do a lightweight "
+                          "reset for capture retries.")
+
+    log("\n== Capturing boot log ==")
+    record = {}
+    raw_lines = []
+    max_attempts = 5
+    for attempt in range(1, max_attempts + 1):
+        got, lines = capture_boot_record(port)
+        record.update(got)
+        raw_lines.extend(lines)
+        missing = missing_fields(record)
+        if not missing:
+            break
+        log(f"Attempt {attempt}/{max_attempts}: still missing {missing}. "
+            f"Triggering another reset and retrying...")
+        if attempt < max_attempts:
+            lightweight_reset(esptool_path, model["chip"], port)
+    missing = missing_fields(record)
+    if missing:
+        log(f"\nGiving up after {max_attempts} attempts - still missing {missing}.")
+        log("Raw captured lines:")
+        for line in raw_lines:
+            log(f"  {line}")
+        raise FlashError(
+            "The app is flashed and running - it just wasn't caught mid-boot. "
+            "Retry capture alone (skip erase) without reflashing, or read the "
+            "record from a serial monitor.")
+
+    log(f"BLE name:        {record['ble_name']}")
+    log(f"PID:             {record['pid']}")
+    log(f"PoP username:    {record['username']}")
+    log(f"PoP:             {record['pop']}")
+    log(f"Local API token: {record['token']}")
+
+    factory_record = {
+        "model_id": model["model_id"],
+        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "port": port,
+        "ble_name": record["ble_name"],
+        "pid": record["pid"],
+        "pop_username": record["username"],
+        "pop": record["pop"],
+        "local_api_token": record["token"],
+    }
+
+    os.makedirs(RECORDS_DIR, exist_ok=True)
+    safe_name = record["ble_name"].replace("/", "_")
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    record_path = os.path.join(RECORDS_DIR, f"{safe_name}_{ts}.json")
+    with open(record_path, "w", encoding="utf-8") as f:
+        json.dump(factory_record, f, indent=2)
+    log(f"\nSaved local record: {record_path}")
+    factory_record["record_path"] = record_path
+
+    upload_to_vps(factory_record, log)
+    return factory_record
+
+
+def cmd_flash(args):
+    try:
+        run_factory_flash(args.model_id, port=args.port, skip_erase=args.skip_erase,
+                           force=args.force, log=print)
+    except FlashError as exc:
+        print(f"\n{exc}")
+        sys.exit(1)
+
+
+def upload_to_vps(factory_record, log=print):
+    vps_url = os.environ.get(VPS_URL_ENV)
+    if not vps_url:
+        log(f"{VPS_URL_ENV} not set - skipping VPS upload "
+            f"(local record is still saved).")
+        return
+
+    body = json.dumps(factory_record).encode("utf-8")
+    req = urllib.request.Request(vps_url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    token = os.environ.get(VPS_TOKEN_ENV)
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            log(f"Uploaded to VPS: HTTP {resp.status}")
+    except (urllib.error.URLError, urllib.error.HTTPError) as exc:
+        log(f"VPS upload failed (local record is still saved): {exc}")
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("list-models", help="List registered hardware models.").set_defaults(func=cmd_list_models)
+
+    p_register = sub.add_parser("register-model", help="Register a new hardware model.")
+    p_register.add_argument("--model-id", required=True)
+    p_register.add_argument("--display-name", required=True)
+    p_register.add_argument("--chip", required=True, help="e.g. esp32c3, esp32s3")
+    p_register.add_argument("--manufacturer", required=True)
+    p_register.add_argument("--board", required=True)
+    p_register.add_argument("--vid-pid", required=True, help="e.g. 303A:1001")
+    p_register.add_argument("--project-dir", required=True,
+                             help="Path to the PlatformIO project, relative to this tool's folder")
+    p_register.add_argument("--pio-env", required=True)
+    p_register.add_argument("--notes", default="")
+    p_register.set_defaults(func=cmd_register_model)
+
+    p_flash = sub.add_parser("flash", help="Erase, flash, and capture a factory record for one unit.")
+    p_flash.add_argument("--model-id", required=True)
+    p_flash.add_argument("--port", default=None, help="Serial port; auto-detected if omitted")
+    p_flash.add_argument("--skip-erase", action="store_true",
+                          help="Skip the full chip erase (NOT recommended for real factory units)")
+    p_flash.add_argument("--force", action="store_true",
+                          help="Flash even if the port's VID:PID doesn't match the registered model")
+    p_flash.set_defaults(func=cmd_flash)
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
