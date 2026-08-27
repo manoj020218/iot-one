@@ -194,14 +194,20 @@ call, not something layered onto the BLE session.
 
 ## 5. App Side
 
-Already built and unaffected by this document: the "+" button on the Devices
-page, the animated radar scan, the Wi-Fi credential form, the progress
-screens (`PWA_APK/apps/web-pwa/src/features/provisioning/`). What changed is
-only what runs underneath once a device is selected — the app now speaks the
-real `protocomm`/`wifi_provisioning` protocol described above (Protobuf
-messages, SRP6a handshake, AES-256-GCM session) instead of a custom scheme,
-using audited cryptographic primitives rather than anything hand-written for
-the SRP6a/AES math.
+Already built: the "+" button on the Devices page, the animated radar scan,
+the Wi-Fi credential form, the progress screens
+(`PWA_APK/apps/web-pwa/src/features/provisioning/`).
+
+**Correction, 2026-08-27**: this section previously claimed the app "now
+speaks the real `protocomm`/`wifi_provisioning` protocol... instead of a
+custom scheme." That was aspirational, not actual — verified false by
+reading the current code. `bleDiscoveryService.ts`/`bleProtocol.ts`/
+`bleProvisioningService.ts` still implement only the original custom scheme
+(plain JSON `{cmd:"hello"}` / `{cmd:"set_wifi",...}` over a simple GATT
+characteristic, no SRP6a, no Protobuf, no encryption), and that scheme is
+additionally hardcoded to Tank Guard's PID/naming, not generic across
+products. See Section 10 for the concrete gap list and recommended
+implementation path — this is real, unstarted work, not a rounding error.
 
 ---
 
@@ -418,6 +424,98 @@ This section is the direct gap list for the current `QRunlock` firmware.
 - local AP recovery concept
 - local status reporting and diagnostics pages, as long as they are treated
   as service/debug tools rather than the standard onboarding protocol
+
+---
+
+## 10. QRunlock App-Side Delta (BLE Provisioning)
+
+Firmware side is done and hardware-verified: QRunlock's
+`esp32-c3-supermini-prov2` build implements real Espressif `wifi_provisioning`
++ `protocomm` with Security Scheme 2, confirmed end-to-end on real hardware
+2026-08-27 — BLE advertise, SRP6a session establishment, encrypted Wi-Fi
+credential exchange, self-recovery from a stale-session retry, Wi-Fi connect,
+MQTT bind, and a real cloud-triggered unlock all verified working. What's
+**not** done is the app side: the ONE app cannot provision a real QRunlock
+unit today, at either of two independent layers. Found by direct code
+inspection while trying to test the real app flow against real hardware, not
+inferred from documentation.
+
+### Gap 1 — discovery mislabels every device as Tank Guard
+
+`bleDiscoveryService.ts`:
+
+- `mapNativeResultToBleScanDevice()` hardcodes
+  `pid: foundationPidBlueprint.pid` and `iconText: "TG"` on every scan
+  result, regardless of what the device actually reports. A real QRunlock
+  unit would be discovered and immediately mislabeled.
+- `deriveBusinessDeviceId()` extracts the device ID with a regex expecting
+  dash/space-separated segments (`JNX-XXX-YYY-ZZZZZZ`). QRunlock's real BLE
+  name is one unbroken string (`JNXQRUC0DCCB`, per Section 2's
+  no-separator convention) — the regex never matches, so it silently falls
+  back to fabricating `JNX-TG-C3-<transport-id-suffix>` instead of using the
+  device's real id.
+- Net effect: even if Gap 2 didn't exist, a scanned QRunlock unit would be
+  registered to the platform under a fake Tank Guard identity.
+
+### Gap 2 — the wire protocol itself doesn't match QRunlock's firmware
+
+`bleProtocol.ts` / `bleProvisioningService.ts`'s `runBleHandshake()` sends
+plain, unencrypted JSON (`{cmd:"hello"}`, then
+`{cmd:"set_wifi",ssid,password}`) over a simple custom GATT characteristic —
+Tank Guard's original, pre-standard scheme. QRunlock's firmware doesn't
+expose that characteristic at all; it speaks Espressif's real
+`protocomm`/Security-Scheme-2 protocol (Protobuf message framing, SRP6a key
+exchange, AES-256-GCM encrypted session, the specific GATT service UUID
+`0000ffff-0000-1000-8000-00805f9b34fb`). These are not compatible at any
+level — fixing Gap 1 alone would still fail to connect.
+
+### Recommended implementation path
+
+**Do not hand-roll SRP6a/Protobuf/AES-GCM in TypeScript.** This is
+security-critical protocol code; Espressif already publishes audited,
+maintained reference clients for exactly this protocol — the same libraries
+this document's References section already points to:
+
+- `espressif/esp-idf-provisioning-android` (Kotlin)
+- `espressif/esp-idf-provisioning-ios` (Swift)
+
+Since the ONE app is Capacitor (a WebView wrapper that *can* load native
+plugins, same mechanism `@capacitor-community/bluetooth-le` already uses),
+the lowest-risk path is a **custom Capacitor plugin wrapping Espressif's
+native Android library** — Android first, matching the current native build
+target; iOS can wrap the Swift equivalent later on the same pattern. This
+gets the real, tested SRP6a/Protobuf/crypto implementation for free instead
+of reimplementing it, and keeps the web-app layer thin (call `startSession`,
+`sendWifiConfig`, etc. through the plugin bridge, same shape as the existing
+`BluetoothLe` plugin calls in `bleDiscoveryService.ts`).
+
+### Scope checklist
+
+- [ ] Fix `mapNativeResultToBleScanDevice()` to derive `pid`/`productName`
+      from the actual advertised name's product-code segment (Section 2's
+      `JNX{code}{6-hex-MAC}` format), not a hardcoded Tank Guard constant —
+      needed regardless of the protocol work below, and unblocks correct
+      discovery for every product, not just QRunlock.
+- [ ] Fix `deriveBusinessDeviceId()`'s regex to match the no-separator naming
+      convention actually in use (Section 2), not the dash/space format it
+      currently expects.
+- [ ] Build (or wrap) a real `protocomm`/Security-Scheme-2 BLE client:
+      capability negotiation, SRP6a session establishment, encrypted
+      Wi-Fi-config exchange — via a native Capacitor plugin wrapping
+      `esp-idf-provisioning-android`, per the recommendation above.
+- [ ] Wire the new protocol client into `runBleHandshake()`'s call sites in
+      place of the current plain-JSON `hello`/`set_wifi` commands.
+- [ ] Update `registerProvisioningIntent`/`registerProvisionedDevice` calls
+      to pass the corrected `pid`/`deviceId` from Gap 1's fix.
+- [ ] Validate end-to-end against a real QRunlock unit: scan finds it
+      correctly labeled, PoP-authenticated session establishes, Wi-Fi
+      credentials land, device shows up in the app's QRunlock device page
+      afterward. Mirror this document's existing validation pattern
+      (Section 8's reuse checklist, `BRIDGE.md` Section 8's equivalent).
+- [ ] Once QRunlock is proven, the same client is what every other device in
+      Section 7's fleet table needs too (they all target the same
+      Security-Scheme-2 standard) — this is a one-time app investment, not
+      a per-device cost, same as the firmware side already is.
 
 ---
 
