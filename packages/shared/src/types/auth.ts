@@ -1,4 +1,4 @@
-import type { HomeRecord } from "./home";
+import type { HomeRecord } from "./home.js";
 
 export type AuthProvider = "email" | "google" | "facebook";
 

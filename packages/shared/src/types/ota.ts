@@ -1,4 +1,4 @@
-import type { TimestampedRecord } from "./platform";
+import type { TimestampedRecord } from "./platform.js";
 
 export type OtaReleaseStatus = "draft" | "published" | "retired";
 

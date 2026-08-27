@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "8.3.0",
+    "@capacitor/core": "8.5.0",
     "@jenix/shared": "workspace:*"
   },
   "scripts": {
@@ -12,5 +14,9 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "lint": "eslint src capacitor.config.ts tests --ext .ts"
+  },
+  "devDependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/cli": "8.5.0"
   }
 }

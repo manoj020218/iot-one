@@ -1,4 +1,4 @@
-import type { DeviceRecord, RegisterDeviceInput } from "../types/device";
+import type { DeviceRecord, RegisterDeviceInput } from "../types/device.js";
 
 function optionalProp<K extends string, V>(
   key: K,
