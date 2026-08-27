@@ -1,19 +1,71 @@
-import { foundationPidBlueprint } from "@jenix/device-schemas";
+import { allPidBlueprints, type CreatePidInput } from "@jenix/device-schemas";
 
 import type { BleScanDevice } from "../../provisioning.types";
 import { BLE_SERVICE_UUID } from "./bleProtocol";
 
 /**
  * Naming/UUID scheme defined in PROVISIONING.md (repo root) -- "JNX" is the
- * brand-wide prefix every product's BLE name starts with
- * (JNX{ProductCode}{6-hex-MAC}); the exact product is identified from the
- * `hello` response's `pid` field once connected, not from the advertised
- * name alone.
+ * brand-wide prefix every product's BLE name starts with, followed by a
+ * 2-4 letter product code and the last 6 hex digits of the device's Wi-Fi
+ * STA MAC, no separators (Section 2's table: JNXTGBAF968, JNXQRUC0DCCB,
+ * etc.). This is a best-effort *discovery-time* guess at product identity,
+ * looked up generically against every known PID blueprint instead of one
+ * hardcoded product (see PROVISIONING.md's onboarding-readiness plan,
+ * Workstream A, for the mislabeling bug this replaces) -- the real,
+ * authenticated product identity still only comes from the `hello`
+ * response once connected (Section 10's protocomm work), which is what
+ * actually needs to confirm this guess before anything sensitive happens.
  */
 const BLE_NAME_PREFIX = "JNX";
+const BLE_NAME_PATTERN = /^JNX([A-Z0-9]{2,4})([0-9A-F]{6})$/;
 const BLE_NAME_KEYWORDS = ["JENIX", "TANK GUARD", "SMART TANK GUARD"];
 const DEFAULT_SCAN_WINDOW_MS = 3500;
 const DEMO_SCAN_DELAY_MS = 1200;
+
+interface ProductCatalogEntry {
+  pid: string;
+  productName: string;
+  iconText: string;
+}
+
+/**
+ * Product-code segment of a PID ("JNX-QRU-C3-001" -> "QRU") mapped to the
+ * blueprint's real identity. Built from packages/device-schemas'
+ * allPidBlueprints, so registering a new device there (Workstream B) is the
+ * only step needed to make BLE discovery recognize it correctly too -- no
+ * second, hand-maintained copy of this mapping to drift out of sync.
+ */
+function buildProductCatalog(): Map<string, ProductCatalogEntry> {
+  const catalog = new Map<string, ProductCatalogEntry>();
+
+  for (const blueprint of allPidBlueprints as CreatePidInput[]) {
+    const code = blueprint.pid.split("-")[1];
+
+    if (!code) {
+      continue;
+    }
+
+    catalog.set(code, {
+      pid: blueprint.pid,
+      productName: blueprint.productName,
+      iconText: (blueprint.dashboard.icon ?? code).slice(0, 2).toUpperCase()
+    });
+  }
+
+  return catalog;
+}
+
+const productCatalog = buildProductCatalog();
+
+/**
+ * "JNX-QRU-C3-001" + "C0DCCB" -> "JNX-QRU-C3-C0DCCB", matching the real
+ * device-id format firmware itself builds (DeviceIdentity.cpp's
+ * kDeviceIdPrefix + "-" + macSuffix) -- strips the PID's trailing
+ * product-instance number, not something derivable from the BLE name alone.
+ */
+function deriveDeviceIdFromPid(pid: string, macSuffix: string): string {
+  return `${pid.replace(/-\d+$/, "")}-${macSuffix}`;
+}
 
 function normalizeUuid(uuid: string): string {
   return uuid.trim().toLowerCase();
@@ -139,25 +191,6 @@ function isLikelyJenixDevice(
   return serviceIds.includes(normalizeUuid(BLE_SERVICE_UUID));
 }
 
-function deriveBusinessDeviceId(rawName: string, transportId: string): string {
-  const normalizedName = rawName
-    .toUpperCase()
-    .replace(/[^A-Z0-9- ]/g, " ")
-    .trim();
-  const match = normalizedName.match(/JNX(?:[- ][A-Z0-9]+){2,4}/);
-
-  if (match?.[0]) {
-    return match[0].replace(/ /g, "-");
-  }
-
-  const cleanTransportId = transportId
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(-4);
-
-  return `JNX-TG-C3-${cleanTransportId || "DEMO"}`;
-}
-
 function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDevice | null {
   const transportId = String(result.device?.deviceId || "").trim();
 
@@ -166,16 +199,64 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
   }
 
   const rawName = String(normalizeDeviceName(result) || "").trim();
-  const deviceId = deriveBusinessDeviceId(rawName, transportId);
-  const productName =
-    rawName && rawName !== "Unknown" ? rawName : foundationPidBlueprint.productName;
+  const match = rawName.toUpperCase().match(BLE_NAME_PATTERN);
+
+  if (!match) {
+    // Doesn't follow the canonical JNX{code}{6-hex-MAC} format, but the
+    // caller (runNativeScanPass's broader pass) only reaches this function
+    // at all when isLikelyJenixDevice() already matched -- typically the
+    // provisioning service UUID, with the advertised name not yet readable.
+    // Surface it as present-but-unidentified instead of either fabricating
+    // a name-derived identity or silently dropping a real device.
+    if (isLikelyJenixDevice(result, rawName)) {
+      return {
+        transportId,
+        deviceId: transportId,
+        pid: "",
+        productName: "Unidentified Jenix device",
+        iconText: "?",
+        rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
+        provisioningReady: false
+      };
+    }
+
+    // Not a Jenix device by any signal -- don't fabricate an identity for
+    // it (this is exactly what the old code did, hardcoding Tank Guard's
+    // onto everything regardless of what was actually scanned).
+    return null;
+  }
+
+  const [, code, macSuffix] = match;
+
+  if (!code || !macSuffix) {
+    return null;
+  }
+
+  const product = productCatalog.get(code);
+
+  if (!product) {
+    // A compliant name, but not one we have a catalog entry for -- surface
+    // it as a real, distinct entry so it's visibly unrecognized rather than
+    // silently mislabeled as some other product. provisioningReady: false
+    // keeps the UI's existing "disable Add for non-ready devices" behavior
+    // (BleDeviceCard.tsx) as the safety net.
+    return {
+      transportId,
+      deviceId: `JNX-${code}-${macSuffix}`,
+      pid: "",
+      productName: `Unrecognized Jenix device (${code})`,
+      iconText: "?",
+      rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
+      provisioningReady: false
+    };
+  }
 
   return {
     transportId,
-    deviceId,
-    pid: foundationPidBlueprint.pid,
-    productName,
-    iconText: "TG",
+    deviceId: deriveDeviceIdFromPid(product.pid, macSuffix),
+    pid: product.pid,
+    productName: product.productName,
+    iconText: product.iconText,
     rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
     provisioningReady: true
   };

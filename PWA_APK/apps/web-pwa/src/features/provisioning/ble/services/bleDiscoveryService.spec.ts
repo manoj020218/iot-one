@@ -69,7 +69,10 @@ describe("bleDiscoveryService", () => {
               device: {
                 deviceId: "AA:BB:CC:DD:EE:01"
               },
-              localName: "JNX-TG-C3-A7F2",
+              // Canonical JNX{code}{6-hex-MAC} format (PROVISIONING.md §2) --
+              // "TG" is Tank Guard's real product code, matching
+              // foundationPidBlueprint's PID "JNX-TG-C3-001".
+              localName: "JNXTGA7F2C3",
               rssi: -68
             });
             emit({
@@ -94,7 +97,7 @@ describe("bleDiscoveryService", () => {
             device: {
               deviceId: "AA:BB:CC:DD:EE:01"
             },
-            localName: "JNX-TG-C3-A7F2",
+            localName: "JNXTGA7F2C3",
             rssi: -41
           });
         }
@@ -115,8 +118,10 @@ describe("bleDiscoveryService", () => {
     expect(getBleDiscoveryMode()).toBe("native");
     expect(plugin.requestLEScan).toHaveBeenCalledTimes(1);
     expect(result.devices).toHaveLength(1);
-    expect(result.devices[0]?.deviceId).toBe("JNX-TG-C3-A7F2");
+    expect(result.devices[0]?.pid).toBe("JNX-TG-C3-001");
+    expect(result.devices[0]?.deviceId).toBe("JNX-TG-C3-A7F2C3");
     expect(result.devices[0]?.transportId).toBe("AA:BB:CC:DD:EE:01");
+    expect(result.devices[0]?.provisioningReady).toBe(true);
   });
 
   it("retries with the broader matcher when the prefix pass finds nothing", async () => {
@@ -177,6 +182,12 @@ describe("bleDiscoveryService", () => {
     expect(plugin.requestLEScan).toHaveBeenCalledTimes(2);
     expect(result.devices).toHaveLength(1);
     expect(result.devices[0]?.transportId).toBe("AA:BB:CC:DD:EE:04");
+    // Matched only via the provisioning service UUID, not a readable
+    // compliant name -- surfaced as unidentified rather than fabricating a
+    // PID or dropping it (the broader pass's whole point is catching
+    // devices exactly like this one).
+    expect(result.devices[0]?.pid).toBe("");
+    expect(result.devices[0]?.provisioningReady).toBe(false);
   });
 
   it("reports bluetoothEnabled=false without scanning when the adapter is off", async () => {

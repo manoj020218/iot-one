@@ -328,3 +328,18 @@ export const qrunlockPidBlueprint: CreatePidInput = {
     ]
   }
 };
+
+/**
+ * Every locally-known PID blueprint in one place. Consumers that need to go
+ * from "a product code segment" (e.g. the advertised BLE name's `QRU` in
+ * `JNXQRUC0DCCB`, per QRunlock/PROVISIONING.md §2) back to a real PID should
+ * derive their lookup from this array rather than hardcoding one product's
+ * blueprint - that hardcoding is exactly what caused the app's BLE discovery
+ * code to mislabel every scanned device as Tank Guard (see
+ * QRunlock/PROVISIONING.md's onboarding-readiness plan, Workstream A).
+ */
+export const allPidBlueprints: CreatePidInput[] = [
+  foundationPidBlueprint,
+  smartStreamerPidBlueprint,
+  qrunlockPidBlueprint
+];
