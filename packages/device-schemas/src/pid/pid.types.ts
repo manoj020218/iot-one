@@ -248,3 +248,67 @@ export const smartStreamerPidBlueprint: CreatePidInput = {
     ]
   }
 };
+
+export const qrunlockPidRecord: PidIdentity = {
+  pid: "JNX-QRU-C3-001",
+  productName: "QRUnlock Smart RF Door Lock PSU",
+  productCategory: "Lock",
+  productLine: "RIM Lock",
+  status: "draft",
+  matterMode: "NONE"
+};
+
+export const qrunlockPidBlueprint: CreatePidInput = {
+  ...qrunlockPidRecord,
+  brand: "JENIX",
+  description:
+    "RIM-latch electric strike lock controller: momentary relay unlock pulse, " +
+    "RF remote learning, Wi-Fi + BLE Security Scheme 2 provisioning.",
+  hardware: {
+    mcu: "ESP32-C3",
+    hardwareRevision: "HW-C3-PSU-RF-01",
+    hasRs485: false,
+    hasBle: true,
+    hasWifi: true,
+    hasMatter: false,
+    hasThread: false,
+    hasEthernet: false,
+    relayCount: 1,
+    notes: "Shared GPIO learn-mode input assumes a 3.3V-only RF receiver module."
+  },
+  firmware: {
+    firmwareFamily: "qrunlock",
+    otaChannel: "beta",
+    betaVersion: "1.1.1",
+    rollbackAllowed: true
+  },
+  matter: {
+    enabled: false,
+    mode: "NONE",
+    certificationStatus: "not_required",
+    bridgeSupported: false
+  },
+  api: {
+    enabled: false,
+    sellable: false,
+    allowedScopes: []
+  },
+  ui: {
+    // Real state, not aspirational: features/qrunlock/ is bundled into the
+    // app itself, not a dynamically loaded remote package (see
+    // QRunlock/PROVISIONING.md's Workstream B architecture note before
+    // changing this to "remote-package").
+    uiMode: "builtin"
+  },
+  dashboard: {
+    templateId: "qrunlock-default",
+    dynamicPages: ["lock-control", "activity", "rf-remotes", "settings"]
+  },
+  automation: {
+    commands: [
+      { command: "unlock", label: "Unlock", restricted: true },
+      { command: "start_learning", label: "Start RF learning" },
+      { command: "cancel_learning", label: "Cancel RF learning" }
+    ]
+  }
+};

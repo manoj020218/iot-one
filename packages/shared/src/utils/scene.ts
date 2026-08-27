@@ -8,7 +8,8 @@ const restrictedSceneCommands = new Set<SceneActionCommand>([
   "factory_reset",
   "ota_force",
   "matter_commission",
-  "matter_bridge_sync"
+  "matter_bridge_sync",
+  "unlock"
 ]);
 
 export function isRestrictedSceneCommand(command: SceneActionCommand): boolean {
@@ -38,11 +39,13 @@ export const allSceneActionCommands: SceneActionCommand[] = [
   "matter_bridge_sync",
   "attend_call",
   "start_learning",
+  "cancel_learning",
   "restart",
   "trigger_alarm",
   "stop_alarm",
   "start_stream",
-  "stop_stream"
+  "stop_stream",
+  "unlock"
 ];
 
 const sceneActionCommandLabels: Partial<Record<SceneActionCommand, string>> = {
@@ -61,11 +64,13 @@ const sceneActionCommandLabels: Partial<Record<SceneActionCommand, string>> = {
   matter_bridge_sync: "Matter bridge sync",
   attend_call: "Attend call",
   start_learning: "Start RF learning",
+  cancel_learning: "Cancel RF learning",
   restart: "Restart device",
   trigger_alarm: "Trigger alarm",
   stop_alarm: "Stop alarm",
   start_stream: "Start stream",
-  stop_stream: "Stop stream"
+  stop_stream: "Stop stream",
+  unlock: "Unlock"
 };
 
 export function describeSceneActionCommand(command: SceneActionCommand): string {

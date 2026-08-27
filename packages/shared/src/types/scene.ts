@@ -48,11 +48,13 @@ export type SceneActionCommand =
   | "matter_bridge_sync"
   | "attend_call"
   | "start_learning"
+  | "cancel_learning"
   | "restart"
   | "trigger_alarm"
   | "stop_alarm"
   | "start_stream"
-  | "stop_stream";
+  | "stop_stream"
+  | "unlock";
 
 export interface SceneAction {
   actionId: string;
