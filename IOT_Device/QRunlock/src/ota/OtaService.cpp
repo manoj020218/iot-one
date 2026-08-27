@@ -41,9 +41,19 @@ void OtaService::RunInstall() {
   lastStatus_ = "downloading";
   logger_.Info(String("Starting OTA from ") + requestUrl_);
 
-  HTTPClient http;
+  // Declaration order matters here: locals destruct in reverse order, and
+  // HTTPClient::~HTTPClient() calls _client->stop() on whichever client
+  // http.begin() was pointed at. HTTPClient::disconnect() only nulls
+  // _client if connected() is still true at http.end()'s call site - by
+  // the time RunInstall() calls it, the download loop has already exited
+  // because the server closed the connection, so _client is never nulled.
+  // http must be declared (and therefore destroyed) before the client
+  // objects it references, or ~HTTPClient() dereferences already-freed
+  // stack memory - reproduced live as a Guru Meditation instruction-fetch
+  // panic (jump to 0x0) on every real OTA install.
   WiFiClient plainClient;
   WiFiClientSecure secureClient;
+  HTTPClient http;
   const bool secure = requestUrl_.startsWith("https://");
   if (secure) secureClient.setInsecure();
   const bool began =
