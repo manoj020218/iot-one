@@ -249,21 +249,31 @@ export const smartStreamerPidBlueprint: CreatePidInput = {
   }
 };
 
+/**
+ * Mirrors the real, already-live PID record (created 2026-08-20 by
+ * platform-lead-provisioning, confirmed via GET /api/v1/admin/pids/JNX-QRU-C3-001
+ * on 2026-08-27) - this constant did NOT create that record, and creating it
+ * via POST correctly gets rejected as a duplicate. Keep this in sync with the
+ * live record rather than letting a second, divergent "QRunlock PID" exist
+ * between the static package and the database - that drift is exactly what
+ * caused Tank Guard's own discovery code to hardcode stale product data
+ * (see QRunlock/PROVISIONING.md's onboarding-readiness plan, Workstream A).
+ * `automation.commands` was empty on the live record until this same pass
+ * patched it with the three commands below.
+ */
 export const qrunlockPidRecord: PidIdentity = {
   pid: "JNX-QRU-C3-001",
-  productName: "QRUnlock Smart RF Door Lock PSU",
+  productName: "QRunlock Smart RF Door Lock",
   productCategory: "Lock",
   productLine: "RIM Lock",
-  status: "draft",
+  status: "beta",
   matterMode: "NONE"
 };
 
 export const qrunlockPidBlueprint: CreatePidInput = {
   ...qrunlockPidRecord,
   brand: "JENIX",
-  description:
-    "RIM-latch electric strike lock controller: momentary relay unlock pulse, " +
-    "RF remote learning, Wi-Fi + BLE Security Scheme 2 provisioning.",
+  description: "QRunlock RIM-lock door strike power supply — momentary relay unlock only.",
   hardware: {
     mcu: "ESP32-C3",
     hardwareRevision: "HW-C3-PSU-RF-01",
@@ -272,14 +282,18 @@ export const qrunlockPidBlueprint: CreatePidInput = {
     hasWifi: true,
     hasMatter: false,
     hasThread: false,
-    hasEthernet: false,
-    relayCount: 1,
-    notes: "Shared GPIO learn-mode input assumes a 3.3V-only RF receiver module."
+    hasEthernet: false
   },
   firmware: {
-    firmwareFamily: "qrunlock",
-    otaChannel: "beta",
-    betaVersion: "1.1.1",
+    // The live record's stableVersion is still "1.0.0" as of 2026-08-27 -
+    // stale relative to the actually-verified-on-hardware 1.1.1 build (the
+    // OTA crash fix), and firmwareFamily/otaChannel below match the live
+    // record's real values, not the pilot naming used during development.
+    // Flagged, not silently corrected here - see the onboarding-readiness
+    // plan's Workstream B note before bumping this.
+    firmwareFamily: "qrunlock-psu-rf",
+    otaChannel: "stable",
+    stableVersion: "1.0.0",
     rollbackAllowed: true
   },
   matter: {
@@ -289,9 +303,9 @@ export const qrunlockPidBlueprint: CreatePidInput = {
     bridgeSupported: false
   },
   api: {
-    enabled: false,
+    enabled: true,
     sellable: false,
-    allowedScopes: []
+    allowedScopes: ["devices:read", "devices:write"]
   },
   ui: {
     // Real state, not aspirational: features/qrunlock/ is bundled into the
@@ -302,7 +316,9 @@ export const qrunlockPidBlueprint: CreatePidInput = {
   },
   dashboard: {
     templateId: "qrunlock-default",
-    dynamicPages: ["lock-control", "activity", "rf-remotes", "settings"]
+    dynamicPages: [],
+    icon: "lock",
+    cardLayout: "default"
   },
   automation: {
     commands: [
