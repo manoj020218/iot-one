@@ -215,12 +215,25 @@ _exclude_unused_source_file(
     "HttpsOTAUpdate is unused by QRunlock (OtaService.cpp uses Update.h "
     "directly) and does not compile under IDF 5.3.1.",
 )
-_exclude_unused_source_file(
-    arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "esp_crt_bundle.c",
-    "esp_crt_bundle is unused by QRunlock (WiFiClientSecure::setInsecure() "
-    "is used everywhere, never certificate-bundle validation) and does not "
-    "compile under IDF 5.3.1's restructured mbedtls_x509_crt.",
+_crt_bundle_stub_path = (
+    arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "esp_crt_bundle.c"
 )
+if _crt_bundle_stub_path.is_file():
+    _crt_bundle_stub_path.write_text(
+        "// Stubbed by prov2_espidf5_bootstrap.py  esp_crt_bundle is unused by\n"
+        "// QRunlock (WiFiClientSecure::setInsecure() is used everywhere, never\n"
+        "// certificate-bundle validation) and the real implementation does not\n"
+        "// compile under IDF 5.3.1's restructured mbedtls_x509_crt. ssl_client.cpp\n"
+        "// still has a call site for this symbol in its unused useRootCABundle\n"
+        "// branch, so a stub definition is needed instead of an empty file.\n"
+        "#include \"esp_err.h\"\n"
+        "\n"
+        "esp_err_t arduino_esp_crt_bundle_attach(void *conf) {\n"
+        "    (void)conf;\n"
+        "    return ESP_ERR_NOT_SUPPORTED;\n"
+        "}\n",
+        encoding="utf-8",
+    )
 
 # Earlier bring-up attempts widened Arduino's include path to legacy SDK
 # headers. That fixes one header but pollutes unrelated ESP-IDF components on
@@ -386,6 +399,21 @@ _replace_once(
     "#include \"mbedtls/net.h\"\n",
     "#include \"mbedtls/net_sockets.h\"\n",
     "Arduino WiFiClientSecure mbedtls net header fix",
+)
+_replace_once(
+    arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "ssl_client.cpp",
+    "/* Provide SSL/TLS functions to ESP32 with Arduino IDE\n",
+    "#define MBEDTLS_ALLOW_PRIVATE_ACCESS\n"
+    "\n"
+    "/* Provide SSL/TLS functions to ESP32 with Arduino IDE\n",
+    "Arduino WiFiClientSecure mbedtls private access fix",
+)
+_replace_once(
+    arduino_dir / "libraries" / "WiFiClientSecure" / "src" / "ssl_client.cpp",
+    "        ret = mbedtls_pk_parse_key(&ssl_client->client_key, (const unsigned char *)cli_key, strlen(cli_key) + 1, NULL, 0);\n",
+    "        ret = mbedtls_pk_parse_key(&ssl_client->client_key, (const unsigned char *)cli_key, strlen(cli_key) + 1, NULL, 0,\n"
+    "                                    mbedtls_ctr_drbg_random, &ssl_client->drbg_ctx);\n",
+    "Arduino WiFiClientSecure mbedtls pk parse signature fix",
 )
 _replace_if_present(
     arduino_dir / "libraries" / "WebServer" / "src" / "WebServer.cpp",
