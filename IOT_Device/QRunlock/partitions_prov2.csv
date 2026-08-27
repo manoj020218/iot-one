@@ -1,8 +1,14 @@
 # QRunlock provisioning-v2 pilot env only.
-# Single app slot for flash headroom while bringing up esp-idf
-# wifi_provisioning/protocomm, plus a coredump partition for crash capture.
+# Real A/B OTA layout (matches the shipping env's safety model, not the
+# single-slot bring-up layout this used to be). SPIFFS was inherited from
+# the shipping partition template but is unreferenced anywhere in
+# QRunlock's own code, so it's dropped here to make room for a second OTA
+# slot instead. Each app slot is ~1.94MB vs. the current binary's ~1.45MB
+# (~40% growth headroom), bigger than the shipping build's 1.5MB slots
+# even though this pilot's mixed arduino+espidf binary runs larger.
 # Name,     Type, SubType,  Offset,   Size,    Flags
 nvs,        data, nvs,      0x9000,   0x5000,
-app0,       app,  factory,  0x10000,  0x300000,
-spiffs,     data, spiffs,   0x310000, 0xE0000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x1F0000,
+app1,       app,  ota_1,    0x200000, 0x1F0000,
 coredump,   data, coredump, 0x3F0000, 0x10000,
