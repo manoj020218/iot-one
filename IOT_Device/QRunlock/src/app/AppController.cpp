@@ -109,9 +109,9 @@ void AppController::Begin() {
     Serial.printf("[SECURITY] Generated local API token header %s value %s\r\n",
                   config::kLocalApiAuthHeaderName, store_.LocalAuth().apiToken);
   } else {
-    Serial.printf("[SECURITY] Local API token source=%s header=%s\r\n",
+    Serial.printf("[SECURITY] Local API token source=%s header=%s value=%s\r\n",
                   TokenSourceString(store_.LocalAuth().tokenSource),
-                  config::kLocalApiAuthHeaderName);
+                  config::kLocalApiAuthHeaderName, store_.LocalAuth().apiToken);
   }
   bool generatedProvisioningPop = false;
   store_.EnsureProvisioningPop(&generatedProvisioningPop);
