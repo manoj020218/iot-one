@@ -131,6 +131,54 @@ def cmd_register_model(args):
     print(f"Registered hardware model '{args.model_id}'.")
 
 
+def get_source_info(project_dir):
+    """Identify exactly what firmware source a flash will build from.
+
+    Every unit's factory record should be traceable back to a real commit -
+    otherwise "what firmware is on device X" is unanswerable later. Returns
+    a dict with commit hash, dirty flag (and which files, if any), and a
+    browser-openable URL to that commit when the remote is on GitHub.
+    """
+    def git(*args):
+        result = subprocess.run(["git", "-C", project_dir, *args],
+                                 capture_output=True, text=True)
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    commit = git("rev-parse", "HEAD")
+    if commit is None:
+        return {"commit": None, "dirty": None, "dirty_files": [], "untracked_files": [],
+                "source_url": None, "note": "not a git repository or git not available"}
+
+    short_commit = git("rev-parse", "--short", "HEAD") or commit[:7]
+    status = subprocess.run(["git", "-C", project_dir, "status", "--porcelain", "--", "."],
+                             capture_output=True, text=True)
+    # Untracked scratch files (bench outputs, serial logs, __pycache__) never
+    # get compiled into firmware - only modified/staged TRACKED files change
+    # what actually builds. Track them separately so junk in the working
+    # directory doesn't block every real flash.
+    dirty_files = []
+    untracked_files = []
+    for line in status.stdout.splitlines():
+        if not line.strip():
+            continue
+        (untracked_files if line.startswith("??") else dirty_files).append(line[3:])
+
+    remote = git("remote", "get-url", "origin") or ""
+    source_url = None
+    if "github.com" in remote:
+        repo = remote.split("github.com")[-1].lstrip(":/").removesuffix(".git")
+        source_url = f"https://github.com/{repo}/commit/{commit}"
+
+    return {
+        "commit": commit,
+        "short_commit": short_commit,
+        "dirty": len(dirty_files) > 0,
+        "dirty_files": dirty_files,
+        "untracked_files": untracked_files,
+        "source_url": source_url,
+    }
+
+
 def detect_port(expected_vid_pid):
     matches = []
     for p in serial.tools.list_ports.comports():
@@ -163,7 +211,8 @@ def run_pio(project_dir, pio_env, target, port, log):
         raise FlashError(f"'{target}' failed (exit {result.returncode}).")
 
 
-def run_factory_flash(model_id, port=None, skip_erase=False, force=False, log=print):
+def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
+                       allow_dirty=False, log=print):
     """Erase, flash, and capture a factory record for one unit.
 
     Returns the factory_record dict on success. Raises FlashError with a
@@ -174,6 +223,30 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False, log=pr
     model = find_model(registry, model_id)
     if model is None:
         raise FlashError(f"No registered model '{model_id}'.")
+
+    project_dir_early = os.path.normpath(os.path.join(TOOL_DIR, model["project_dir"]))
+    source_info = get_source_info(project_dir_early)
+    if source_info["commit"] is None:
+        log(f"WARNING: {source_info['note']} - this build won't be traceable "
+            f"to a commit.")
+    else:
+        log(f"Firmware source: {model['project_dir']} @ {source_info['short_commit']}")
+        if source_info["source_url"]:
+            log(f"  {source_info['source_url']}")
+        if source_info["untracked_files"]:
+            log(f"  ({len(source_info['untracked_files'])} untracked file(s) present, "
+                f"not part of the build - not blocking)")
+        if source_info["dirty"]:
+            log(f"WARNING: working tree has {len(source_info['dirty_files'])} modified "
+                f"tracked file(s) - this build will NOT match that commit:")
+            for f in source_info["dirty_files"][:10]:
+                log(f"  {f}")
+            if not allow_dirty:
+                raise FlashError(
+                    "Refusing to flash from an uncommitted working tree - the "
+                    "resulting unit's firmware wouldn't be traceable to a real "
+                    "commit. Commit or stash the changes above, or pass "
+                    "allow_dirty if this is deliberate (e.g. local testing).")
 
     if port is None:
         matches = detect_port(model["vid_pid"])
@@ -257,6 +330,9 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False, log=pr
         "pop_username": record["username"],
         "pop": record["pop"],
         "local_api_token": record["token"],
+        "firmware_commit": source_info["commit"],
+        "firmware_source_url": source_info["source_url"],
+        "firmware_dirty": source_info["dirty"],
     }
 
     os.makedirs(RECORDS_DIR, exist_ok=True)
@@ -275,7 +351,7 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False, log=pr
 def cmd_flash(args):
     try:
         run_factory_flash(args.model_id, port=args.port, skip_erase=args.skip_erase,
-                           force=args.force, log=print)
+                           force=args.force, allow_dirty=args.allow_dirty, log=print)
     except FlashError as exc:
         print(f"\n{exc}")
         sys.exit(1)
@@ -329,6 +405,10 @@ def build_parser():
                           help="Skip the full chip erase (NOT recommended for real factory units)")
     p_flash.add_argument("--force", action="store_true",
                           help="Flash even if the port's VID:PID doesn't match the registered model")
+    p_flash.add_argument("--allow-dirty", action="store_true",
+                          help="Flash even with uncommitted changes in the project dir "
+                               "(NOT recommended for real factory units - the result "
+                               "won't be traceable to a commit)")
     p_flash.set_defaults(func=cmd_flash)
 
     return parser

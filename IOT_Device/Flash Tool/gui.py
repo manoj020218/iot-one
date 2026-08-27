@@ -6,9 +6,11 @@ need to know the command line. Flashing runs on a background thread so the
 window stays responsive; log output streams into the text box live.
 """
 
+import os
 import queue
 import threading
 import tkinter as tk
+import webbrowser
 from tkinter import messagebox, ttk
 
 import serial.tools.list_ports
@@ -25,10 +27,12 @@ class FlashToolApp(tk.Tk):
 
         self.log_queue = queue.Queue()
         self.busy = False
+        self.current_source_info = None
 
         self._build_widgets()
         self.refresh_models()
         self.refresh_ports()
+        self.refresh_source_info()
         self.after(100, self._drain_log_queue)
 
     # -- layout -----------------------------------------------------
@@ -42,6 +46,7 @@ class FlashToolApp(tk.Tk):
         self.model_combo = ttk.Combobox(top, textvariable=self.model_var,
                                          state="readonly", width=45)
         self.model_combo.grid(row=0, column=1, sticky="w", padx=5)
+        self.model_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_source_info())
         ttk.Button(top, text="Register New Model...",
                    command=self.open_register_dialog).grid(row=0, column=2, padx=5)
 
@@ -51,6 +56,18 @@ class FlashToolApp(tk.Tk):
         self.port_combo.grid(row=1, column=1, sticky="w", padx=5, pady=(8, 0))
         ttk.Button(top, text="Refresh Ports",
                    command=self.refresh_ports).grid(row=1, column=2, padx=5, pady=(8, 0))
+
+        source = ttk.Frame(self, padding=(10, 6))
+        source.pack(fill="x")
+        ttk.Label(source, text="Firmware source:").pack(side="left")
+        self.source_link_var = tk.StringVar(value="(select a model)")
+        self.source_link = ttk.Label(source, textvariable=self.source_link_var,
+                                      foreground="#0645AD", cursor="hand2")
+        self.source_link.pack(side="left", padx=(5, 0))
+        self.source_link.bind("<Button-1>", self._open_source_link)
+        self.source_warning_var = tk.StringVar(value="")
+        ttk.Label(source, textvariable=self.source_warning_var,
+                  foreground="#B00020").pack(side="left", padx=(10, 0))
 
         opts = ttk.Frame(self, padding=(10, 0))
         opts.pack(fill="x")
@@ -99,6 +116,38 @@ class FlashToolApp(tk.Tk):
         if not self.port_var.get():
             self.port_var.set("(auto-detect)")
 
+    def refresh_source_info(self):
+        model_id = self.model_var.get()
+        registry = ft.load_registry()
+        model = ft.find_model(registry, model_id) if model_id else None
+        if model is None:
+            self.current_source_info = None
+            self.source_link_var.set("(select a model)")
+            self.source_warning_var.set("")
+            return
+
+        project_dir = os.path.normpath(os.path.join(ft.TOOL_DIR, model["project_dir"]))
+        info = ft.get_source_info(project_dir)
+        self.current_source_info = info
+
+        if info["commit"] is None:
+            self.source_link_var.set(f"{model['project_dir']} (not a git repo)")
+            self.source_warning_var.set("")
+            return
+
+        self.source_link_var.set(f"{model['project_dir']} @ {info['short_commit']}")
+        if info["dirty"]:
+            self.source_warning_var.set(
+                f"UNCOMMITTED CHANGES ({len(info['dirty_files'])} file(s)) - "
+                f"won't match this commit")
+        else:
+            self.source_warning_var.set("")
+
+    def _open_source_link(self, _event):
+        info = self.current_source_info
+        if info and info.get("source_url"):
+            webbrowser.open(info["source_url"])
+
     # -- logging --------------------------------------------------------
 
     def log(self, line):
@@ -140,6 +189,18 @@ class FlashToolApp(tk.Tk):
                 "Continue?"):
                 return
 
+        allow_dirty = False
+        info = self.current_source_info
+        if info and info.get("dirty"):
+            if not messagebox.askyesno(
+                "Uncommitted changes",
+                f"The firmware source has {len(info['dirty_files'])} uncommitted "
+                f"change(s) - this build will NOT match commit {info['short_commit']}, "
+                f"and the resulting unit won't be traceable to a real commit.\n\n"
+                f"Flash anyway?"):
+                return
+            allow_dirty = True
+
         self.busy = True
         self.flash_btn.configure(state="disabled")
         self.status_var.set("Flashing...")
@@ -153,15 +214,15 @@ class FlashToolApp(tk.Tk):
 
         thread = threading.Thread(
             target=self._flash_worker,
-            args=(model_id, port, skip_erase, force),
+            args=(model_id, port, skip_erase, force, allow_dirty),
             daemon=True,
         )
         thread.start()
 
-    def _flash_worker(self, model_id, port, skip_erase, force):
+    def _flash_worker(self, model_id, port, skip_erase, force, allow_dirty):
         try:
             record = ft.run_factory_flash(model_id, port=port, skip_erase=skip_erase,
-                                           force=force, log=self.log)
+                                           force=force, allow_dirty=allow_dirty, log=self.log)
         except ft.FlashError as exc:
             self.log(f"\nFAILED: {exc}")
             self.after(0, lambda: self._flash_done(None, str(exc)))
@@ -180,12 +241,15 @@ class FlashToolApp(tk.Tk):
             messagebox.showerror("Flash failed", error)
             return
         self.status_var.set("Done.")
+        commit = (record.get("firmware_commit") or "?")[:7]
         self.result_var.set(
             f"BLE name:        {record['ble_name']}\n"
             f"PID:             {record['pid']}\n"
             f"PoP username:    {record['pop_username']}\n"
             f"PoP:             {record['pop']}\n"
             f"Local API token: {record['local_api_token']}\n"
+            f"Firmware commit: {commit}"
+            f"{' (DIRTY BUILD)' if record.get('firmware_dirty') else ''}\n"
             f"Saved to:        {record['record_path']}"
         )
 
