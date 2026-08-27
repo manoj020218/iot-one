@@ -74,6 +74,8 @@ void AppController::Begin() {
   delay(50);
   identity_.Begin();
   store_.Begin();
+  sketchSizeBytes_ = ESP.getSketchSize();
+  freeSketchSpaceBytes_ = ESP.getFreeSketchSpace();
   esp_err_t initWatchdogResult = ESP_OK;
 #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
   const esp_task_wdt_config_t watchdogConfig = {
@@ -482,8 +484,8 @@ void AppController::FillStatus(JsonDocument& doc) const {
   system["resetReason"] = ResetReasonString();
   system["freeHeap"] = ESP.getFreeHeap();
   system["minFreeHeap"] = ESP.getMinFreeHeap();
-  system["sketchSize"] = ESP.getSketchSize();
-  system["freeSketchSpace"] = ESP.getFreeSketchSpace();
+  system["sketchSize"] = sketchSizeBytes_;
+  system["freeSketchSpace"] = freeSketchSpaceBytes_;
   system["cpuFreqMHz"] = getCpuFrequencyMhz();
   system["bleProvisionWindowRemainingMs"] =
       (

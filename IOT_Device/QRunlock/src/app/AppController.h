@@ -79,6 +79,11 @@ class AppController : public platform::ControlApi {
   bool factoryResetPending_ = false;
   bool lastApActive_ = false;
   AppState state_ = AppState::Boot;
+  // ESP.getSketchSize()/getFreeSketchSpace() run a full esp_image_verify()
+  // flash checksum internally. Cache once at boot instead of recomputing on
+  // every /api/status hit (these never change while the app is running).
+  uint32_t sketchSizeBytes_ = 0;
+  uint32_t freeSketchSpaceBytes_ = 0;
 };
 
 }  // namespace app
