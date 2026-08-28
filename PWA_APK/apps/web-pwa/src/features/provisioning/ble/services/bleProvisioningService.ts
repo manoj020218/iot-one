@@ -108,7 +108,11 @@ export async function provisionBleDevice({
 
   await runBleHandshake(
     device,
-    { ssid: normalizedSsid, password: normalizedPassword },
+    {
+      ssid: normalizedSsid,
+      password: normalizedPassword,
+      ...(wifi.proofOfPossession ? { proofOfPossession: wifi.proofOfPossession } : {})
+    },
     onStatusChange
   );
 

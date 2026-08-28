@@ -864,6 +864,8 @@ button, input, select, textarea { font: inherit; }
 .progress-step span { color: var(--muted); font-size: 0.85rem; }
 .progress-step[data-state="complete"] { background: var(--success-tint); border-color: rgba(47, 184, 126, 0.28); }
 .progress-step[data-state="current"] { background: var(--info-tint); border-color: rgba(47, 128, 237, 0.28); }
+.progress-step[data-state="pending"] { opacity: 0.5; }
+.progress-step[data-state="pending"] strong { color: var(--muted); }
 
 .summary-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 0; }
 .summary-grid dt {
