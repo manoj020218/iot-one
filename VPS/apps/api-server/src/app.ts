@@ -47,10 +47,45 @@ import { sceneRouter } from "./modules/scenes/scene.routes";
 import { otaRouter } from "./modules/ota/ota.routes";
 import { uiPackageRouter } from "./modules/ui-packages/ui-package.routes";
 
+/**
+ * The hosted PWA (one.jenix.in) calls this API same-origin (nginx proxies
+ * /api/ -> this server), so no CORS was ever needed. The Capacitor app is
+ * served from https://localhost/ instead, which has no backend of its own
+ * (see PWA_APK/apps/web-pwa's apiOrigin.ts) -- its calls to this API are
+ * genuinely cross-origin and get rejected by the browser's CORS check
+ * without this. A small fixed allowlist rather than the `cors` package:
+ * the set of origins is tiny and won't grow often, and it avoids a new
+ * dependency for something this narrow.
+ */
+const CORS_ALLOWED_ORIGINS = new Set([
+  "https://localhost", // Capacitor Android (and iOS, same origin scheme)
+  "capacitor://localhost" // iOS Capacitor's WKWebView custom scheme
+]);
+
+function applyCors(app: Express) {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && CORS_ALLOWED_ORIGINS.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Jenix-Local-Token"
+      );
+    }
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+}
+
 export function createApp(): Express {
   const app = express();
 
   app.disable("x-powered-by");
+  applyCors(app);
   app.use(express.json());
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/homes", requireAuthenticatedUser, homeRouter);
