@@ -7,6 +7,7 @@ import type {
 } from "@jenix/shared";
 
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
+import { apiOrigin } from "../../../app/apiOrigin";
 import {
   fetchAuthenticatedJson,
   shouldUseDemoFallback
@@ -28,7 +29,7 @@ import {
   updateDemoHomeMemberRole
 } from "./homeDemoStore";
 
-const homeEndpoint = "/api/v1/homes";
+const homeEndpoint = `${apiOrigin}/api/v1/homes`;
 
 export interface CreateHomeShareCodeInput {
   role: "admin" | "member" | "viewer";

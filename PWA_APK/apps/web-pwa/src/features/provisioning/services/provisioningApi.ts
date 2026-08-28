@@ -10,11 +10,12 @@ import {
   type ProvisioningStatus
 } from "@jenix/shared";
 
+import { apiOrigin } from "../../../app/apiOrigin";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import { upsertDemoDevice } from "../../dashboard/services/deviceDemoStore";
 
-const provisioningEndpoint = "/api/v1/provisioning";
-const devicesEndpoint = "/api/v1/devices";
+const provisioningEndpoint = `${apiOrigin}/api/v1/provisioning`;
+const devicesEndpoint = `${apiOrigin}/api/v1/devices`;
 const localIntentStore = new Map<string, ProvisioningIntent>();
 
 interface RegisterProvisioningIntentInput {

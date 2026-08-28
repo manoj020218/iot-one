@@ -13,12 +13,13 @@ import {
   upsertDemoNotification
 } from "./notificationDemoStore";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
+import { apiOrigin } from "../../../app/apiOrigin";
 import {
   fetchAuthenticatedJson,
   shouldUseDemoFallback
 } from "../../../app/authenticatedRequest";
 
-const notificationEndpoint = "/api/v1/notifications";
+const notificationEndpoint = `${apiOrigin}/api/v1/notifications`;
 
 function getCurrentHome(session: AuthSession) {
   return getSelectedHome(

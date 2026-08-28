@@ -23,6 +23,7 @@ import {
   resetDemoDevices,
   setDemoDevices
 } from "../../dashboard/services/deviceDemoStore";
+import { apiOrigin } from "../../../app/apiOrigin";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 
 export interface ManagedDeviceSummary {
@@ -65,9 +66,9 @@ export interface RequestFirmwareUpdateInput {
 export type DevicePidProfile = CreatePidInput;
 export type DeviceFirmwareRollout = DeviceFirmwareRolloutRecord;
 
-const deviceEndpoint = "/api/v1/devices";
-const matterEndpoint = "/api/v1/matter/devices";
-const pidEndpoint = "/api/v1/pids";
+const deviceEndpoint = `${apiOrigin}/api/v1/devices`;
+const matterEndpoint = `${apiOrigin}/api/v1/matter/devices`;
+const pidEndpoint = `${apiOrigin}/api/v1/pids`;
 const demoPidProfiles = new Map<string, DevicePidProfile>([
   [foundationPidBlueprint.pid, structuredClone(foundationPidBlueprint)]
 ]);

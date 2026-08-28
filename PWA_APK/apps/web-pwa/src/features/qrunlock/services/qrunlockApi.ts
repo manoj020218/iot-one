@@ -5,6 +5,7 @@ import {
   type DeviceRecord
 } from "@jenix/shared";
 
+import { apiOrigin } from "../../../app/apiOrigin";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import { fetchAuthenticatedJson } from "../../../app/authenticatedRequest";
 
@@ -14,8 +15,8 @@ import { fetchAuthenticatedJson } from "../../../app/authenticatedRequest";
 // dashboard, so real errors surface to the caller instead of masking them
 // behind fabricated local state.
 
-const qrunlockEndpoint = "/api/v1/qrunlock";
-const deviceActionEndpoint = "/api/v1/devices";
+const qrunlockEndpoint = `${apiOrigin}/api/v1/qrunlock`;
+const deviceActionEndpoint = `${apiOrigin}/api/v1/devices`;
 
 export type QrunlockRfLearnStatus = "idle" | "learning" | "learned" | "cancelled" | "timeout";
 export type RelayPowerRestoreMode = "on" | "off" | "remember";

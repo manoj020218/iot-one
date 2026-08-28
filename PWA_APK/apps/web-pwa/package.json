@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:capacitor": "vite build --base=/ --outDir dist-capacitor",
+    "build:capacitor": "vite build --mode capacitor --base=/ --outDir dist-capacitor",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --environment jsdom",
     "test:unit": "vitest run --environment jsdom",

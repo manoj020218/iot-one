@@ -27,12 +27,13 @@ import {
   upsertDemoScene
 } from "./sceneDemoStore";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
+import { apiOrigin } from "../../../app/apiOrigin";
 import {
   fetchAuthenticatedJson,
   shouldUseDemoFallback
 } from "../../../app/authenticatedRequest";
 
-const sceneEndpoint = "/api/v1/scenes";
+const sceneEndpoint = `${apiOrigin}/api/v1/scenes`;
 
 export interface SceneTriggerInput extends Omit<SceneTrigger, "triggerId"> {
   triggerId?: string;

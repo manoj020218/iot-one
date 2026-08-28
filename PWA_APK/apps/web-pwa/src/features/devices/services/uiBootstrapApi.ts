@@ -6,10 +6,11 @@ import type {
 } from "@jenix/shared";
 import { createUiPackageKey } from "@jenix/shared";
 
+import { apiOrigin } from "../../../app/apiOrigin";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 import { getCurrentHome } from "../../dashboard/services/dashboardApi";
 
-const homeEndpoint = "/api/v1/homes";
+const homeEndpoint = `${apiOrigin}/api/v1/homes`;
 const demoBootstrapStore = new Map<string, HomeUiBootstrapResponse>();
 
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {

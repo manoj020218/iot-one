@@ -9,6 +9,7 @@ import {
 } from "@jenix/shared";
 
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
+import { apiOrigin } from "../../../app/apiOrigin";
 import {
   fetchAuthenticatedJson,
   shouldUseDemoFallback
@@ -29,7 +30,7 @@ export interface DashboardDevice {
   telemetryPreview: string;
 }
 
-const deviceEndpoint = "/api/v1/devices";
+const deviceEndpoint = `${apiOrigin}/api/v1/devices`;
 function optionalProp<K extends string, V>(
   key: K,
   value: V | undefined

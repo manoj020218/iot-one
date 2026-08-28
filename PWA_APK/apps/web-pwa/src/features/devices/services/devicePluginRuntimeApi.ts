@@ -8,9 +8,10 @@ import {
   type DeviceUiRuntimeState
 } from "@jenix/shared";
 
+import { apiOrigin } from "../../../app/apiOrigin";
 import { createAuthenticatedHeaders } from "../../../app/apiHeaders";
 
-const deviceEndpoint = "/api/v1/devices";
+const deviceEndpoint = `${apiOrigin}/api/v1/devices`;
 const demoRuntimeStore = new Map<string, DeviceUiRuntimeState>();
 
 function getCurrentHome(session: AuthSession) {

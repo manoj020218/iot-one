@@ -5,9 +5,10 @@ import {
   type TokenPair
 } from "@jenix/shared";
 
+import { apiOrigin } from "../../../app/apiOrigin";
 import { ApiResponseError, shouldUseDemoFallback } from "../../../app/authenticatedRequest";
 
-const authEndpoint = "/api/v1/auth";
+const authEndpoint = `${apiOrigin}/api/v1/auth`;
 
 function createUserId(email: string): string {
   return `user-${email.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
