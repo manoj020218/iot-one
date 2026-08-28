@@ -97,6 +97,59 @@ Marketing site (`Marekting/`) deploys separately — its own
 into `/var/www/one.jenix.in/` (the `--exclude=app/` is mandatory, that
 directory holds the live PWA on the same domain root).
 
+`deploy-iot-one.sh` automates steps 1–4 (and the device-registry sync,
+§5) but **not** step 5 above — the frontend rsync to `/var/www/` is
+still a separate manual command after it finishes.
+
+## 5. Adding a New Device — Minimum Code Edits
+
+Full detail: [PLATFORM_HANDOFF.md](./PLATFORM_HANDOFF.md) (ownership
+zones) and [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md)
+(the protocol contract). This is the short version so a new device
+doesn't turn into edits to shared platform code — **a device is a
+plugin, never a fork.**
+
+Everything below except the "Zone 2" list is a **new folder/file you own
+outright** — no existing file is touched:
+
+| What | Where | Zone |
+|---|---|---|
+| Backend endpoints (if you need more than generic telemetry/register/command) | new folder `VPS/apps/api-server/src/modules/<your-device>/` | 1 — yours |
+| Device UI (if the generic telemetry dashboard isn't enough) | new folder `PWA_APK/apps/web-pwa/src/features/<your-device>/`, built as a **remote package** (see below) | 1 — yours |
+| Firmware | your own firmware repo, not this monorepo | 1 — yours |
+
+**Building the UI as a remote package** (don't ship it inside the base
+app bundle): follow `features/qrunlock/remotePackage/` as the template —
+real `.tsx`, a `register.ts` that calls `host.registerPackage(...)`, and
+a `vite.config.ts` built on the shared factory
+`platform/remotePackageBuild/createRemotePackageConfig.ts`. Building it
+(`pnpm --filter @jenix/web-pwa build:<your-package>`) outputs a
+self-contained `remoteEntry.js` under `public/ui-packages/<your-plugin>/`
+that loads on demand — see
+[DEVICE_PACKAGE_RUNTIME.md](./DEVICE_PACKAGE_RUNTIME.md).
+
+**The only touches to shared files** (each is a small, additive
+line/entry referencing only your own PID — never an edit to existing
+device behavior):
+
+1. Register your PID — one new exported constant in
+   `packages/device-schemas/src/pid/pid.types.ts` (copy an existing
+   blueprint's shape), or `POST /api/v1/admin/pids`.
+2. One new tile in `features/devices/deviceCatalog.ts`.
+3. One new route line in `PWA_APK/apps/web-pwa/src/app/AppRouter.tsx`.
+4. One new ownership-gated bottom-nav entry, following
+   `features/qrunlock/useHasQrunlockDevice.ts`.
+5. If you're publishing a package artifact: your own PID folder under
+   the separate `IOT_Devices` repo
+   (`devices/<PID>/ui-packages/<package>/<version>/`), then
+   `sync-device-registry.sh`.
+
+If a task seems to require editing `AppRouter.tsx` beyond one line,
+`AppBottomNav.tsx`, `DeviceDetailPage.tsx`'s shared rendering logic, the
+scene engine, or the `auth`/`homes`/`notifications` core modules —
+that's Zone 3 in PLATFORM_HANDOFF.md: stop, it needs the platform
+maintainer, not a workaround inside your own module.
+
 **Before any deploy, take a backup** of whatever you're about to
 overwrite (`cp -r` the static dir, or a source tarball) — this has saved
 a rollback at least once already.
