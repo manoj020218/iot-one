@@ -191,6 +191,23 @@ function isLikelyJenixDevice(
   return serviceIds.includes(normalizeUuid(BLE_SERVICE_UUID));
 }
 
+/**
+ * The primary GATT service UUID this device actually advertised. Espressif's
+ * protocomm_ble scheme randomizes this per boot session rather than using
+ * the fixed constant from firmware source, so espProvisioningPlugin.ts's
+ * connect() needs the live value, not a hardcoded one.
+ */
+function extractServiceUuid(result: NativeBleScanResult): string | undefined {
+  const serviceIds = [
+    ...(Array.isArray(result.uuids) ? result.uuids : []),
+    ...(Array.isArray(result.serviceUuids) ? result.serviceUuids : [])
+  ]
+    .map((item) => normalizeUuid(String(item || "")))
+    .filter(Boolean);
+
+  return serviceIds[0];
+}
+
 function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDevice | null {
   const transportId = String(result.device?.deviceId || "").trim();
 
@@ -209,6 +226,7 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
     // Surface it as present-but-unidentified instead of either fabricating
     // a name-derived identity or silently dropping a real device.
     if (isLikelyJenixDevice(result, rawName)) {
+      const serviceUuid = extractServiceUuid(result);
       return {
         transportId,
         deviceId: transportId,
@@ -216,7 +234,8 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
         productName: "Unidentified Jenix device",
         iconText: "?",
         rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
-        provisioningReady: false
+        provisioningReady: false,
+        ...(serviceUuid ? { serviceUuid } : {})
       };
     }
 
@@ -240,6 +259,7 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
     // silently mislabeled as some other product. provisioningReady: false
     // keeps the UI's existing "disable Add for non-ready devices" behavior
     // (BleDeviceCard.tsx) as the safety net.
+    const unrecognizedServiceUuid = extractServiceUuid(result);
     return {
       transportId,
       deviceId: `JNX-${code}-${macSuffix}`,
@@ -247,9 +267,12 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
       productName: `Unrecognized Jenix device (${code})`,
       iconText: "?",
       rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
-      provisioningReady: false
+      provisioningReady: false,
+      ...(unrecognizedServiceUuid ? { serviceUuid: unrecognizedServiceUuid } : {})
     };
   }
+
+  const serviceUuid = extractServiceUuid(result);
 
   return {
     transportId,
@@ -258,7 +281,8 @@ function mapNativeResultToBleScanDevice(result: NativeBleScanResult): BleScanDev
     productName: product.productName,
     iconText: product.iconText,
     rssi: Number.isFinite(result.rssi) ? Math.round(result.rssi ?? 0) : -999,
-    provisioningReady: true
+    provisioningReady: true,
+    ...(serviceUuid ? { serviceUuid } : {})
   };
 }
 

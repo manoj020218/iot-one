@@ -20,13 +20,15 @@ export interface ProvisionBleDeviceInput {
 }
 
 /**
- * Espressif's own default provisioning service UUID and Security Scheme 2
- * username -- confirmed against QRunlock's real prov2 firmware
- * (BleProvisioningService.cpp: kProvisioningServiceUuid,
- * config::kProvisioningSec2Username), and shared by every device that uses
- * the stock esp-idf `wifi_provisioning` component unmodified.
+ * Security Scheme 2 username -- confirmed against QRunlock's real prov2
+ * firmware (config::kProvisioningSec2Username), and shared by every device
+ * that uses the stock esp-idf `wifi_provisioning` component unmodified.
+ * There's no equivalent fixed constant for the service UUID -- confirmed
+ * live against real hardware that Espressif's protocomm_ble scheme
+ * randomizes the actually-advertised UUID per boot session, so
+ * device.serviceUuid (captured live from the scan result) has to be used
+ * instead of firmware source's kProvisioningServiceUuid constant.
  */
-const ESP_PROVISIONING_SERVICE_UUID = "0000ffff-0000-1000-8000-00805f9b34fb";
 const ESP_PROVISIONING_USERNAME = "wifiprov";
 
 /**
@@ -56,9 +58,15 @@ async function runBleHandshake(
     );
   }
 
+  if (!device.serviceUuid) {
+    throw new Error(
+      "This device didn't advertise a provisioning service -- try scanning again."
+    );
+  }
+
   await esp.connect({
     macAddress: device.transportId,
-    serviceUuid: ESP_PROVISIONING_SERVICE_UUID
+    serviceUuid: device.serviceUuid
   });
 
   try {
