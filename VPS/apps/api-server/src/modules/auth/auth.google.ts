@@ -19,6 +19,14 @@ interface GoogleUserInfo {
   name?: string;
 }
 
+interface GoogleIdTokenInfo {
+  aud?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  name?: string;
+}
+
 function configuredGoogleClientId(): string | undefined {
   const value = process.env.GOOGLE_CLIENT_ID?.trim();
   return value && value.length > 0 ? value : undefined;
@@ -82,5 +90,55 @@ export async function verifyGoogleAccessToken(
     email: profile.email,
     name: profile.name?.trim() || profile.email.split("@")[0]!,
     providerId: profile.sub
+  };
+}
+
+/**
+ * Verifies a Google ID token obtained natively (Play Services Sign-In on the
+ * Capacitor app) -- see PWA_APK/apps/android's GoogleSignInPlugin.java for
+ * why the native app uses a different credential type than the web PWA's
+ * access-token flow above. tokeninfo's id_token variant returns the token's
+ * verified claims directly (no separate userinfo call needed), and reports
+ * email_verified as the string "true"/"false" rather than a real boolean.
+ */
+export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoogleProfile> {
+  const expectedClientId = configuredGoogleClientId();
+
+  if (!expectedClientId) {
+    throw new AuthModuleError(503, "Google sign-in is not configured on this server");
+  }
+
+  const trimmedToken = idToken.trim();
+
+  if (!trimmedToken) {
+    throw new AuthModuleError(400, "Missing Google ID token");
+  }
+
+  const tokenInfoResponse = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(trimmedToken)}`
+  );
+
+  if (!tokenInfoResponse.ok) {
+    throw new AuthModuleError(401, "Invalid Google ID token");
+  }
+
+  const tokenInfo = (await tokenInfoResponse.json()) as GoogleIdTokenInfo;
+
+  if (tokenInfo.aud !== expectedClientId) {
+    throw new AuthModuleError(401, "Google ID token was not issued for this app");
+  }
+
+  if (!tokenInfo.email || String(tokenInfo.email_verified) !== "true") {
+    throw new AuthModuleError(401, "Google account email is not verified");
+  }
+
+  if (!tokenInfo.sub) {
+    throw new AuthModuleError(401, "Google ID token is missing a subject claim");
+  }
+
+  return {
+    email: tokenInfo.email,
+    name: tokenInfo.name?.trim() || tokenInfo.email.split("@")[0]!,
+    providerId: tokenInfo.sub
   };
 }

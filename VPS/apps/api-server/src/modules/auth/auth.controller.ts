@@ -65,6 +65,11 @@ function readGoogleAuthPayload(body: unknown): GoogleAuthPayload | null {
     return null;
   }
 
+  const idToken = readStringField((body as Record<string, unknown>).idToken);
+  if (idToken) {
+    return { idToken };
+  }
+
   const accessToken = readStringField((body as Record<string, unknown>).accessToken);
   return accessToken ? { accessToken } : null;
 }
@@ -126,7 +131,7 @@ export async function googleLoginController(request: Request, response: Response
 
   try {
     response.status(200).json({
-      data: await loginWithGoogle(payload.accessToken)
+      data: await loginWithGoogle(payload)
     });
   } catch (error) {
     sendError(response, error);

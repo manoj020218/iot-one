@@ -2,9 +2,11 @@ import { platformIdentity } from "@jenix/shared";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "./hooks/useAuth";
+import { isNativeShell } from "./nativeShell";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthLoginCard } from "./components/AuthLoginCard";
 import { requestGoogleAccessToken } from "./services/googleIdentity";
+import { requestNativeGoogleIdToken } from "./services/nativeGoogleSignIn";
 
 export function AuthPage() {
   const auth = useAuth();
@@ -16,6 +18,14 @@ export function AuthPage() {
   }
 
   async function handleGoogle() {
+    if (isNativeShell()) {
+      // The web popup flow (below) never renders inside a plain Capacitor
+      // WebView -- see nativeGoogleSignIn.ts.
+      const idToken = await requestNativeGoogleIdToken();
+      await auth.loginWithGoogleIdToken(idToken);
+      return;
+    }
+
     const accessToken = await requestGoogleAccessToken();
     await auth.loginWithGoogle(accessToken);
   }

@@ -108,6 +108,22 @@ export async function loginWithGoogle(accessToken: string): Promise<AuthSession>
   });
 }
 
+/**
+ * Native Google Sign-In (Capacitor's GoogleSignIn plugin) yields an ID token,
+ * not an OAuth access token like the web popup flow above -- see
+ * nativeGoogleSignIn.ts and PROVISIONING.md-adjacent notes in AuthPage.tsx
+ * for why the native app needs a different credential type.
+ */
+export async function loginWithGoogleIdToken(idToken: string): Promise<AuthSession> {
+  return fetchJson<AuthSession>(`${authEndpoint}/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ idToken })
+  });
+}
+
 export async function loginWithProvider(provider: AuthProvider) {
   try {
     return await fetchJson<AuthSession>(`${authEndpoint}/${provider}`, {

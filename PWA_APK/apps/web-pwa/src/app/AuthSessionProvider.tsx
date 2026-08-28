@@ -9,6 +9,7 @@ import {
 import {
   loginWithEmail as loginWithEmailRequest,
   loginWithGoogle as loginWithGoogleRequest,
+  loginWithGoogleIdToken as loginWithGoogleIdTokenRequest,
   loginWithProvider as loginWithProviderRequest,
   logoutSession as logoutSessionRequest,
   refreshAuthSession as refreshAuthSessionRequest,
@@ -34,6 +35,7 @@ export interface AuthContextValue {
   }) => Promise<void>;
   loginWithProvider: (provider: AuthProvider) => Promise<void>;
   loginWithGoogle: (accessToken: string) => Promise<void>;
+  loginWithGoogleIdToken: (idToken: string) => Promise<void>;
   replaceHomes: (homes: HomeRecord[], activeHomeId?: string) => void;
   setActiveHome: (homeId: string) => void;
   logout: () => void;
@@ -189,6 +191,9 @@ export function AuthSessionProvider({
     },
     async loginWithGoogle(accessToken) {
       setSessionState(createSessionState(await loginWithGoogleRequest(accessToken)));
+    },
+    async loginWithGoogleIdToken(idToken) {
+      setSessionState(createSessionState(await loginWithGoogleIdTokenRequest(idToken)));
     },
     replaceHomes(homes, activeHomeId) {
       setSessionState((current) => {

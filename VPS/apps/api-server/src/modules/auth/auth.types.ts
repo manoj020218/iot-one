@@ -13,9 +13,15 @@ export interface ProviderAuthPayload {
   token: string;
 }
 
-export interface GoogleAuthPayload {
-  accessToken: string;
-}
+/**
+ * accessToken: the web PWA's popup-based Google Identity Services flow.
+ * idToken: the native app's real Google Sign-In (Play Services), used
+ * instead since GIS's popup never renders inside a Capacitor WebView. See
+ * PWA_APK/apps/android's GoogleSignInPlugin.java.
+ */
+export type GoogleAuthPayload =
+  | { accessToken: string; idToken?: undefined }
+  | { idToken: string; accessToken?: undefined };
 
 export interface AuthSessionResponse {
   data: AuthSession;
