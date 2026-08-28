@@ -109,6 +109,12 @@ zones) and [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md)
 doesn't turn into edits to shared platform code — **a device is a
 plugin, never a fork.**
 
+Note for whoever is building the device: this is usually **one person
+doing firmware, UI/UX, and the VPS backend module together**, not a
+handoff between three specialists. All three rows in the table below are
+typically all yours — the split is by *area of the codebase*, not by
+who's doing it.
+
 Everything below except the "Zone 2" list is a **new folder/file you own
 outright** — no existing file is touched:
 

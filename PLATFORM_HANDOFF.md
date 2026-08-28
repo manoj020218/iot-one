@@ -1,8 +1,13 @@
 # Platform Handoff — Who Owns What
 
-Audience: firmware developers, IoT device UI developers, and IoT device
-backend developers bringing a **new product** onto Jenix One (or extending
-an existing one). This is not a protocol reference — see
+Audience: whoever is bringing a **new product** onto Jenix One (or
+extending an existing one). In practice this is usually **one developer
+covering all three roles** below for their own device — firmware, device
+UI/UX, and the device's own VPS backend module — not three separate
+specialists handing work to each other. The zone breakdown still splits
+by role because that's what maps to "which files," but read all three
+Zone 1 bullets as yours if you're that one developer. This is not a
+protocol reference — see
 [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md) for the APIs
 and MQTT payload shapes, and [SCHEDULE.md](./SCHEDULE.md) for how a
 device's commands plug into scenes/automation. This document answers a
@@ -150,6 +155,9 @@ near-duplicate.
 ---
 
 ## Quick reference by role
+
+Rows are by *area of work*, not separate people — if you're the one
+developer building this device end-to-end, all three rows are yours.
 
 | Role | Lives mostly in (Zone 1) | May also touch (Zone 2) | Needs a PR for (Zone 3) |
 |---|---|---|---|
