@@ -47,6 +47,16 @@ export function createRemotePackageConfig({
     // output, and since outDir already lives *inside* public/, letting
     // Vite do that copy recurses into itself indefinitely.
     publicDir: false,
+    // Vite's normal app build (vite.config.ts at the project root) defines
+    // process.env.NODE_ENV itself as part of its standard mode handling.
+    // This is a standalone lib build with no "mode" of its own, so without
+    // this the real (unaliased -- see the react-router-dom alias comment
+    // below) react/jsx-runtime package's own `process.env.NODE_ENV` check
+    // ships as a literal, unreplaced reference -- there's no `process`
+    // global in a browser, so it throws at script load.
+    define: {
+      "process.env.NODE_ENV": JSON.stringify("production")
+    },
     plugins: [react()],
     resolve: {
       alias: [
