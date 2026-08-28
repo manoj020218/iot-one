@@ -13,6 +13,13 @@ export interface BleScanDevice {
 export interface WifiCredentialPayload {
   ssid: string;
   password: string;
+  /**
+   * Per-device Security Scheme 2 pairing secret, required for BLE
+   * provisioning only (the AP flow doesn't use it). See
+   * QRunlock/PROVISIONING.md Section 10 -- printed on every device boot as
+   * "[PROVISIONING] Security2 username wifiprov PoP source=... value=...".
+   */
+  proofOfPossession?: string;
 }
 
 export interface ProvisioningProgressModel {

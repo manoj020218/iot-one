@@ -10,14 +10,7 @@ import {
   registerProvisioningIntent
 } from "../../services/provisioningApi";
 import type { BleScanDevice } from "../../provisioning.types";
-import { getBlePlugin } from "./bleDiscoveryService";
-import {
-  connectToDevice,
-  disconnectFromDevice,
-  isHelloResponse,
-  isSetWifiResponse,
-  sendJsonCommand
-} from "./bleProtocol";
+import { getEspProvisioningPlugin } from "./espProvisioningPlugin";
 
 export interface ProvisionBleDeviceInput {
   session: AuthSession;
@@ -27,52 +20,71 @@ export interface ProvisionBleDeviceInput {
 }
 
 /**
- * Runs the real BLE credential exchange against a connected device, per
- * PROVISIONING.md (repo root): hello -> set_wifi -> confirm the device
- * joined Wi-Fi, then disconnect. That is the full scope of BLE provisioning
- * -- MQTT/cloud connection happens on the device's own afterward, over its
- * new Wi-Fi link, independent of the phone. This code has no business
- * waiting around for that.
+ * Espressif's own default provisioning service UUID and Security Scheme 2
+ * username -- confirmed against QRunlock's real prov2 firmware
+ * (BleProvisioningService.cpp: kProvisioningServiceUuid,
+ * config::kProvisioningSec2Username), and shared by every device that uses
+ * the stock esp-idf `wifi_provisioning` component unmodified.
+ */
+const ESP_PROVISIONING_SERVICE_UUID = "0000ffff-0000-1000-8000-00805f9b34fb";
+const ESP_PROVISIONING_USERNAME = "wifiprov";
+
+/**
+ * Runs the real Espressif protocomm + Security Scheme 2 (SRP6a) BLE
+ * handshake against a connected device, via EspProvisioningPlugin.java
+ * (native Android, wrapping Espressif's esp-idf-provisioning-android SDK).
+ * See QRunlock/PROVISIONING.md Section 10. MQTT/cloud connection happens on
+ * the device's own afterward, over its new Wi-Fi link, independent of the
+ * phone -- this code has no business waiting around for that.
  */
 async function runBleHandshake(
   device: BleScanDevice,
   wifi: WifiCredentialPayload,
   onStatusChange?: (status: ProvisioningStatus) => void
 ) {
-  const ble = getBlePlugin();
+  const esp = getEspProvisioningPlugin();
 
-  if (!ble) {
+  if (!esp) {
     throw new Error(
       "Bluetooth is only available inside the Jenix One app, not in a browser."
     );
   }
 
-  await connectToDevice(ble, device.transportId);
+  if (!wifi.proofOfPossession) {
+    throw new Error(
+      "This device's pairing code is required to provision it over BLE."
+    );
+  }
+
+  await esp.connect({
+    macAddress: device.transportId,
+    serviceUuid: ESP_PROVISIONING_SERVICE_UUID
+  });
 
   try {
-    await sendJsonCommand(ble, device.transportId, { cmd: "hello" }, {
-      timeoutMs: 6000,
-      validate: isHelloResponse
-    });
-
-    const setWifiResult = await sendJsonCommand(
-      ble,
-      device.transportId,
-      { cmd: "set_wifi", ssid: wifi.ssid, password: wifi.password },
-      { timeoutMs: 25000, validate: isSetWifiResponse }
+    const progressListener = await esp.addListener(
+      "provisioningProgress",
+      ({ stage }) => {
+        if (stage === "wifiConfigSent") {
+          onStatusChange?.("WIFI_SENT");
+        } else if (stage === "wifiConfigApplied") {
+          onStatusChange?.("DEVICE_CONNECTING_WIFI");
+        }
+      }
     );
 
-    onStatusChange?.("WIFI_SENT");
-
-    if (!setWifiResult.wifi_connected) {
-      throw new Error(
-        "The device could not join that Wi-Fi network. Check the password and try again."
-      );
+    try {
+      await esp.provision({
+        username: ESP_PROVISIONING_USERNAME,
+        pop: wifi.proofOfPossession,
+        ssid: wifi.ssid,
+        passphrase: wifi.password
+      });
+    } finally {
+      await progressListener.remove();
     }
-
-    onStatusChange?.("DEVICE_CONNECTING_WIFI");
   } finally {
-    await disconnectFromDevice(ble, device.transportId);
+    await esp.disconnect();
   }
 }
 

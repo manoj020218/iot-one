@@ -187,6 +187,7 @@ export function BleProvisioningPage() {
             initialSsid="Factory 2.4 GHz"
             loading={submitting}
             onSubmit={handleSubmitWifi}
+            requireProofOfPossession
             submitLabel="Send Wi-Fi over BLE"
             title="Network credentials"
           />
