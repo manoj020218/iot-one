@@ -5,6 +5,7 @@ import { defineConfig, type UserConfig } from "vite";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const reactShimPath = path.join(here, "reactHostShim.ts");
+const reactJsxRuntimeShimPath = path.join(here, "reactJsxRuntimeHostShim.ts");
 const reactRouterDomShimPath = path.join(here, "reactRouterDomHostShim.ts");
 
 export interface RemotePackageConfigOptions {
@@ -61,10 +62,16 @@ export function createRemotePackageConfig({
     resolve: {
       alias: [
         // Anchored regexes on purpose: a plain string key aliases by
-        // prefix in Vite (like webpack), which would also redirect
-        // "react/jsx-runtime" here and break the JSX transform's own
-        // (harmless, tiny, unrelated-to-hooks) internal "react" import.
+        // prefix in Vite (like webpack), which would silently swallow
+        // "react/jsx-runtime" into the "react" alias target too.
         { find: /^react$/, replacement: reactShimPath },
+        // The real npm "react/jsx-runtime" reads React's internal
+        // __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED shape, which
+        // reactHostShim.ts doesn't replicate -- aliased to its own shim
+        // (implemented on top of createElement) instead of bundling the
+        // real thing. See reactJsxRuntimeHostShim.ts.
+        { find: /^react\/jsx-runtime$/, replacement: reactJsxRuntimeShimPath },
+        { find: /^react\/jsx-dev-runtime$/, replacement: reactJsxRuntimeShimPath },
         { find: /^react-router-dom$/, replacement: reactRouterDomShimPath }
       ]
     },
