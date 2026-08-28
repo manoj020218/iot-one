@@ -6,9 +6,9 @@ This document explains why the dynamic device-package runtime was added, how it 
 
 Jenix One should stay a thin platform shell while device-specific pages are loaded only when a HOME actually owns that device type.
 
-Current example:
-- PID: `JNX-TG-C3-001`
-- package: `tank-guard-mobile@1.0.0`
+Current examples:
+- PID: `JNX-TG-C3-001`, package: `tank-guard-mobile@1.0.0` (per-device dynamic page, hand-written)
+- PID: `JNX-QRU-C3-001`, package: `qrunlock-mobile@1.0.0` (full routed product package, real TSX build -- see "Two ways to build a package" below)
 
 ## Why this was added
 
@@ -59,6 +59,20 @@ Responsibilities:
 - device detail resolves the HOME bootstrap package record
 - browser loads `/ui-packages/.../remoteEntry.js`
 - remote script registers the exported React page
+
+### Two ways to build a package
+
+**Per-device dynamic page** (`tank-guard-mobile`, `sos-siren-mobile`, `p10-display-mobile`, `smart-rf-transmitter-mobile`, `token-dispenser-mobile`, `nurse-call-receiver-mobile`): one card mounted inside the platform's own `DeviceDetailPage` via `PidDynamicPageRenderer.tsx`, exporting a `DevicePackageComponent`. These were all hand-authored directly as plain `React.createElement()` JavaScript with no build step -- workable for one embedded panel, but it doesn't scale to real authoring (no JSX, no type-checking, easy to drift from the platform's actual React/type versions).
+
+**Full routed product package** (`smart-streamer-plugin`, `qrunlock-mobile`): a whole mounted sub-app with its own internal navigation, reached via `RemoteProductMount.tsx` and exporting a `RemoteProductPackageComponent`. `qrunlock-mobile` is the reference implementation for how these should be built going forward:
+
+- Real `.tsx` source, authored and type-checked like any other platform code -- see `PWA_APK/apps/web-pwa/src/features/qrunlock/remotePackage/`.
+- A dedicated Vite lib-mode config (`.../remotePackage/vite.config.ts`) built on the shared factory `PWA_APK/apps/web-pwa/src/platform/remotePackageBuild/createRemotePackageConfig.ts`, compiling that source to a single self-registering `remoteEntry.js` IIFE.
+- `react` and `react-router-dom` are aliased at build time (`platform/remotePackageBuild/reactHostShim.ts`, `reactRouterDomHostShim.ts`) to read off `window.__JENIX_DEVICE_PACKAGE_HOST__` instead of bundling their own copies -- required for hooks and nested `<Routes>` to work against the host app's single React/router instance. `devicePackageRegistry.ts` exposes both `React` and `ReactRouterDOM` on that host object for exactly this purpose.
+- CSS ships via the same script tag: the entry imports its stylesheet with Vite's `?inline` query and injects a `<style>` tag itself, since `devicePackageRegistry.ts`'s loader only ever inserts a `<script>`, never a `<link>`.
+- Run with `pnpm --filter @jenix/web-pwa build:qrunlock-package`; a new package following this pattern adds its own `vite.config.ts` calling `createRemotePackageConfig()` and its own npm script.
+
+New product-level packages should follow the `qrunlock-mobile` pattern, not the older hand-written dynamic-page one. The dynamic-page packages are not on a forced migration path, but if one grows past "a single embedded panel," moving it to this build is the recommended direction.
 
 ### Authoring copy of package artifacts
 

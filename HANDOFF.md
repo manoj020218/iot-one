@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-08-09
+> Last updated: 2026-08-28
 
 ---
 
@@ -34,7 +34,11 @@ safe to self-serve vs. needs review) and
 [DEVICE_INTEGRATION_GUIDE.md](./DEVICE_INTEGRATION_GUIDE.md) (the full
 protocol contract: APIs, MQTT payloads, provisioning, OTA). For how a
 device's commands become schedulable, see
-[SCHEDULE.md](./SCHEDULE.md).
+[SCHEDULE.md](./SCHEDULE.md). For how a device's own UI gets loaded
+dynamically instead of shipping inside the base app bundle, see
+[DEVICE_PACKAGE_RUNTIME.md](./DEVICE_PACKAGE_RUNTIME.md) — `qrunlock-mobile`
+is the reference package (real TSX + a Vite build pipeline, not
+hand-authored JS) to copy for a new full-routed device app.
 
 ## 2. URLs
 

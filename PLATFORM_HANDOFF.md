@@ -38,14 +38,21 @@ yours.
   `*.controller.ts`, `*.routes.ts`, `*.test.ts` — Tank Guard's siblings
   like `sos-siren/`, `token-dispenser/`, `p10-display/` are all templates
   to copy from). Everything inside this folder is yours.
-- **UI developer:** a new remote UI package —
-  `PWA_APK/apps/web-pwa/public/ui-packages/<your-device>-plugin/` plus a
-  matching feature folder (e.g. `features/streamer/` for Smart Streamer).
-  Set your PID's `ui.uiMode: "remote-package"` and it mounts generically
+- **UI developer:** a new remote UI package — a feature folder (e.g.
+  `features/qrunlock/`) with its screens as real `.tsx`, plus a
+  `remotePackage/` subfolder holding the entry component, a
+  `register.ts`, and a `vite.config.ts` built on the shared factory
+  `platform/remotePackageBuild/createRemotePackageConfig.ts`. Building it
+  (`pnpm --filter @jenix/web-pwa build:<your-package>`) produces a
+  self-registering `remoteEntry.js` under
+  `PWA_APK/apps/web-pwa/public/ui-packages/<your-device>-plugin/`. Set
+  your PID's `ui.uiMode: "remote-package"` and it mounts generically
   through `RemoteProductMount.tsx` — the platform never needs to know
-  your plugin's internals. This is the current recommended pattern (see
-  Smart Streamer as the reference example) and needs **zero edits** to
-  any shared page.
+  your plugin's internals. `features/qrunlock/remotePackage/` is the
+  current reference example (real TSX compiled by a real build, not
+  hand-authored `React.createElement()` calls — see
+  [DEVICE_PACKAGE_RUNTIME.md](./DEVICE_PACKAGE_RUNTIME.md)'s "Two ways to
+  build a package") and needs **zero edits** to any shared page.
 
 If your device's dashboard need is simple (a tank-style gauge, a signal
 bar, a sparkline), you may not need a plugin at all —
