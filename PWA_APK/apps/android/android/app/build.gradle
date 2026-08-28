@@ -40,6 +40,13 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Espressif's real BLE provisioning SDK (protocomm + Security Scheme 2 /
+    // SRP6a), wrapped by EspProvisioningPlugin.java -- see
+    // QRunlock/PROVISIONING.md Section 10 for why we wrap the native SDK
+    // instead of hand-rolling SRP6a/protobuf crypto in TypeScript.
+    implementation 'com.github.espressif:esp-idf-provisioning-android:lib-2.4.4'
+    implementation 'org.greenrobot:eventbus:3.3.1'
 }
 
 apply from: 'capacitor.build.gradle'

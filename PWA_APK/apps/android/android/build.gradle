@@ -21,6 +21,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Espressif's esp-idf-provisioning-android SDK is only published via JitPack.
+        maven { url 'https://jitpack.io' }
     }
 }
 
