@@ -7,7 +7,7 @@ import "./styles.css";
 export function App() {
   return (
     <BrowserRouter
-      basename="/app"
+      basename={import.meta.env.BASE_URL}
       future={{
         v7_relativeSplatPath: true,
         v7_startTransition: true

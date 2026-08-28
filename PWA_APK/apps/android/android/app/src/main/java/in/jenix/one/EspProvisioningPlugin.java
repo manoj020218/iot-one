@@ -1,4 +1,4 @@
-package in.iotsoft.jenix.one;
+package in.jenix.one;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;

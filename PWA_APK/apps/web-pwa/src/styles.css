@@ -276,6 +276,12 @@ button, input, select, textarea { font: inherit; }
   height: 52px;
   justify-content: center;
   position: relative;
+  /* Without this, mobile WebViews treat a horizontal drag on the thumb as a
+     page-pan gesture and cancel the pointer stream mid-swipe (pointerup
+     never fires with a useful position) instead of delivering pointermove
+     events to this element -- only surfaces on a real touchscreen, not
+     mouse-driven desktop testing. */
+  touch-action: none;
   width: 52px;
   z-index: 1;
 }

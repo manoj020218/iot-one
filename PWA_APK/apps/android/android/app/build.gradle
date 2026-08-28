@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "in.iotsoft.jenix.one"
+    namespace = "in.jenix.one"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "in.iotsoft.jenix.one"
+        applicationId "in.jenix.one"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -47,6 +47,11 @@ dependencies {
     // instead of hand-rolling SRP6a/protobuf crypto in TypeScript.
     implementation 'com.github.espressif:esp-idf-provisioning-android:lib-2.4.4'
     implementation 'org.greenrobot:eventbus:3.3.1'
+
+    // Real native Google Sign-In (account-picker UI) -- see
+    // GoogleSignInPlugin.java for why this replaces the WebView-popup-based
+    // Google Identity Services JS flow used on the hosted web PWA.
+    implementation 'com.google.android.gms:play-services-auth:21.0.0'
 }
 
 apply from: 'capacitor.build.gradle'
