@@ -70,7 +70,7 @@ function applyCors(app: Express) {
       res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Jenix-Local-Token"
+        "Content-Type, Authorization, X-Home-Id, X-Jenix-Local-Token"
       );
     }
     if (req.method === "OPTIONS") {

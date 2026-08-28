@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -38,4 +39,20 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- @capacitor-community/bluetooth-le's own AAR manifest declares these
+         with maxSdkVersion="30" (correct per Android's own BLUETOOTH_SCAN/
+         BLUETOOTH_CONNECT migration guidance), but Capacitor's generic
+         requestPermissions() checks every alias in the plugin's
+         @CapacitorPlugin(permissions=[...]) annotation for bare presence in
+         the merged manifest, and BLUETOOTH/BLUETOOTH_ADMIN, which are capped
+         at API 30, are correctly absent from PackageManager's
+         requestedPermissions on newer devices, so that check always fails
+         there and requestPermissions() rejects before any real (Scan/
+         Connect) permission dialog appears. Declaring them here without
+         the cap is a harmless no-op on API 31+ (BLUETOOTH_SCAN/CONNECT are
+         what the OS actually enforces) but satisfies the presence check on
+         every API level. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="replace" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" tools:node="replace" />
 </manifest>
