@@ -74,6 +74,8 @@ Responsibilities:
 
 New product-level packages should follow the `qrunlock-mobile` pattern, not the older hand-written dynamic-page one. The dynamic-page packages are not on a forced migration path, but if one grows past "a single embedded panel," moving it to this build is the recommended direction.
 
+Three real bugs only surfaced testing `qrunlock-mobile` on an actual phone (a hosted-PWA-only test wouldn't have caught any of them, since the hosted PWA is same-origin and the dev/prod React split behaves differently in a normal app build) -- all three are now handled by `createRemotePackageConfig`/`apiOrigin.ts` automatically, so a new package built the same way gets the fix for free, but it's worth knowing they exist if a package build ever behaves oddly only on-device: an unreplaced `process.env.NODE_ENV` reference (no `process` global in a browser), the real `react/jsx-runtime`'s dependency on React's internal shape (fixed by aliasing it to its own shim, not just aliasing `react`), and `apiOrigin` needing runtime detection instead of a build-time env var (a remote package is one artifact shared by the hosted PWA and the native app, so it can't bake in a fixed target the way the main app's own `build`/`build:capacitor` split does).
+
 ### Authoring copy of package artifacts
 
 Path:
