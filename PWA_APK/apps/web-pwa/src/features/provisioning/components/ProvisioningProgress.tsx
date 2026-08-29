@@ -4,7 +4,7 @@ import { StatusPill } from "@jenix/ui";
 import type { ProvisioningProgressModel } from "../provisioning.types";
 
 const statusCopy: Record<ProvisioningStatus, string> = {
-  BLE_CONNECTED: "Device is paired over BLE",
+  BLE_CONNECTED: "Device found and paired",
   WIFI_SENT: "Wi-Fi credentials delivered",
   DEVICE_CONNECTING_WIFI: "Device is joining the Wi-Fi network",
   DEVICE_CONNECTING_CLOUD: "Device is linking to Jenix Cloud",
@@ -55,7 +55,7 @@ export function ProvisioningProgress({
           <p>{description}</p>
         </div>
         <StatusPill
-          label={progress.method === "ble" ? "BLE Flow" : "AP Flow"}
+          label={progress.method === "ble" ? "Smart Mode" : "AP Mode"}
           tone={error ? "warning" : "success"}
         />
       </div>

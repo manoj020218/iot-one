@@ -105,13 +105,13 @@ export function ApProvisioningPage() {
   return (
     <AppShell
       eyebrow="Provisioning"
-      title="AP Fallback Provisioning"
-      description="The fallback flow keeps installers moving when Bluetooth is not viable, using the device hotspot to deliver Wi-Fi and cloud onboarding."
+      title="AP Mode Setup"
+      description="Connect using the device's own Wi-Fi hotspot to deliver Wi-Fi credentials and cloud setup."
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">
         <div className="top-bar-meta">
-          <StatusPill label="Fallback Flow" tone="warning" />
+          <StatusPill label="AP Mode" tone="warning" />
           <StatusPill label={descriptor.apSsid} tone="neutral" />
         </div>
         <div className="top-bar-meta">
@@ -127,16 +127,16 @@ export function ApProvisioningPage() {
             onClick={() => navigate("/provisioning/ble")}
             type="button"
           >
-            Return to BLE
+            Try Smart Mode
           </button>
         </div>
       </section>
       {mismatchedTarget ? (
         <section className="panel">
-          <h2>AP fallback isn&apos;t available yet for {targetProduct?.name ?? "this product"}</h2>
+          <h2>AP Mode isn&apos;t available yet for {targetProduct?.name ?? "this product"}</h2>
           <p>
             This flow currently only supports {descriptor.productName}&apos;s own hotspot.
-            Use BLE instead to set up {targetProduct?.name ?? "this device"}.
+            Use Smart Mode instead to set up {targetProduct?.name ?? "this device"}.
           </p>
           <div className="card-actions">
             <button
@@ -146,7 +146,7 @@ export function ApProvisioningPage() {
               }
               type="button"
             >
-              Use BLE instead
+              Use Smart Mode instead
             </button>
           </div>
         </section>
@@ -194,7 +194,7 @@ export function ApProvisioningPage() {
             <section className="panel">
               <h2>Operator actions</h2>
               <p>
-                Retry the Wi-Fi handoff or switch back to BLE if hotspot setup is no
+                Retry the Wi-Fi handoff or switch to Smart Mode if hotspot setup is no
                 longer required.
               </p>
               <div className="card-actions">
@@ -210,7 +210,7 @@ export function ApProvisioningPage() {
                   onClick={() => navigate("/provisioning/ble")}
                   type="button"
                 >
-                  Switch to BLE
+                  Switch to Smart Mode
                 </button>
               </div>
             </section>

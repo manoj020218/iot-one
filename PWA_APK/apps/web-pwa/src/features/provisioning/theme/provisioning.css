@@ -1,0 +1,65 @@
+/* Tuya-style provisioning flow — Smart Mode (BLE, never named as such to the
+   user) as the primary path, AP Mode demoted to a small fallback row.
+   Reuses the global token set from src/styles.css (--success/--danger/
+   --card/--line/etc.) — no new palette. See VPS/HANDOFF.md for the
+   approved mockup this was built from. */
+
+.prov-product-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 22px; }
+.prov-product-icon { width: 46px; height: 46px; border-radius: 13px; background: var(--success-tint); color: var(--success); display: grid; place-items: center; flex-shrink: 0; }
+.prov-product-icon svg { width: 24px; height: 24px; }
+.prov-product-head h2 { font-size: 1.1rem; font-weight: 800; margin: 0; letter-spacing: -0.01em; }
+.prov-product-head p { font-size: 0.78rem; color: var(--muted); margin: 2px 0 0; }
+
+.prov-smart-card { background: var(--card); border: 1.5px solid var(--success); border-radius: var(--radius-card); padding: 18px; box-shadow: var(--shadow-card); margin-bottom: 14px; }
+.prov-smart-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.prov-smart-icon { width: 42px; height: 42px; border-radius: 13px; background: var(--success-tint); color: var(--success); display: grid; place-items: center; flex-shrink: 0; }
+.prov-smart-icon svg { width: 22px; height: 22px; }
+.prov-smart-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prov-smart-title { font-weight: 800; font-size: 1rem; }
+.prov-badge { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 999px; background: var(--success-tint); color: var(--success); }
+.prov-smart-sub { font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin: 0; }
+.prov-smart-cta { margin-top: 14px; background: var(--ink); color: var(--bg); border: none; border-radius: 13px; height: 46px; width: 100%; font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+.prov-smart-cta:disabled { opacity: 0.6; cursor: default; }
+
+.prov-divider-label { font-size: 0.68rem; font-weight: 700; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 2px 8px; }
+.prov-ap-row { display: flex; align-items: center; gap: 10px; background: var(--card2); border: 1px dashed var(--line-strong); border-radius: 13px; padding: 10px 12px; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit; }
+.prov-ap-icon { width: 26px; height: 26px; border-radius: 8px; background: var(--card); color: var(--faint); display: grid; place-items: center; flex-shrink: 0; }
+.prov-ap-icon svg { width: 14px; height: 14px; }
+.prov-ap-text { flex: 1; min-width: 0; }
+.prov-ap-title { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.prov-ap-sub { font-size: 0.7rem; color: var(--faint); margin-top: 1px; }
+.prov-ap-chevron { color: var(--faint); flex-shrink: 0; }
+.prov-ap-chevron svg { width: 15px; height: 15px; }
+
+/* Preflight check gate */
+.prov-check-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 20px; }
+.prov-check-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.prov-check-row.bad { border-color: var(--danger); background: var(--danger-tint); }
+.prov-check-row.ok { opacity: 0.65; }
+.prov-check-status { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.prov-check-row.bad .prov-check-status { background: var(--danger); color: #fff; }
+.prov-check-row.ok .prov-check-status { background: var(--success); color: #fff; }
+.prov-check-status svg { width: 14px; height: 14px; }
+.prov-check-text { flex: 1; min-width: 0; }
+.prov-check-title { font-size: 0.84rem; font-weight: 700; }
+.prov-check-row.bad .prov-check-title { color: var(--danger); }
+.prov-check-sub { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+
+/* LED-meaning help sheet */
+.prov-led-intro { font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+.prov-led-list { display: flex; flex-direction: column; gap: 10px; }
+.prov-led-row { display: flex; align-items: flex-start; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.prov-led-swatch { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; margin-top: 1px; display: grid; place-items: center; background: var(--card2); }
+.prov-led-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--success); }
+.prov-led-dot.slow { animation: prov-ledblink 2s steps(1) infinite; }
+.prov-led-dot.fast { animation: prov-ledblink 0.28s steps(1) infinite; }
+.prov-led-dot.error { background: var(--danger); animation: prov-ledblink 0.35s steps(1) infinite; }
+@keyframes prov-ledblink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) { .prov-led-dot { animation: none !important; opacity: 1; } }
+.prov-led-text { flex: 1; min-width: 0; }
+.prov-led-title { font-size: 0.84rem; font-weight: 700; }
+.prov-led-sub { font-size: 0.74rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+.prov-links { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.prov-links p { font-size: 0.76rem; color: var(--faint); margin: 0; }
+.prov-links button { font: inherit; color: var(--ink); font-weight: 700; background: none; border: none; padding: 0; cursor: pointer; }

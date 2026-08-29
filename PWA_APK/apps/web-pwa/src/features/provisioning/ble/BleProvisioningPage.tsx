@@ -20,12 +20,14 @@ import {
   getInitialProvisioningStatus,
   getProvisioningSequence
 } from "../services/provisioningStateMachine";
+import "../theme/provisioning.css";
 import { BleDeviceScanList } from "./components/BleDeviceScanList";
 import { BleRadarScanner } from "./components/BleRadarScanner";
+import { PreflightCheckList } from "./components/PreflightCheckList";
 import { useBleScan } from "./hooks/useBleScan";
 import { provisionBleDevice } from "./services/bleProvisioningService";
 
-type BleScreen = "permission" | "scan" | "wifi" | "progress" | "success";
+type BleScreen = "preflight" | "scan" | "wifi" | "progress" | "success";
 
 function createInitialProgress(): ProvisioningProgressModel {
   return {
@@ -44,7 +46,13 @@ export function BleProvisioningPage() {
     ? deviceCatalog.find((entry) => entry.pid === targetPid)
     : undefined;
   const scan = useBleScan();
-  const [screen, setScreen] = useState<BleScreen>("permission");
+  const [screen, setScreen] = useState<BleScreen>("preflight");
+  // scan.bluetoothEnabled/permissionDenied both default to "looks fine"
+  // before the first real check ever runs (useBleScan's initial state) --
+  // without this, the preflight effect below would read those optimistic
+  // defaults and skip straight to "scan" before scan.enable() has actually
+  // checked anything.
+  const [checked, setChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDevice, setSelectedDevice] = useState<BleScanDevice | null>(null);
   const [progress, setProgress] = useState<ProvisioningProgressModel>(
@@ -68,15 +76,33 @@ export function BleProvisioningPage() {
     return targetPid ? `${route}?pid=${encodeURIComponent(targetPid)}` : route;
   }
 
+  // Smart Mode is gated behind Bluetooth + permission being ready --
+  // starting a scan that can never find anything and showing a warning
+  // next to an empty list was the previous behavior. scan.enable() itself
+  // already prompts the OS to fix both (bleDiscoveryService.ts's
+  // ensureBleReady), so a single check after it resolves is enough to know
+  // whether to move on to the device list or show the blocking preflight
+  // screen instead.
   async function handleEnableScan() {
     await scan.enable();
     setSearchQuery("");
-    setScreen("scan");
+    setChecked(true);
   }
 
   useEffect(() => {
     void handleEnableScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!checked || screen !== "preflight" || scan.scanning) {
+      return;
+    }
+    if (scan.bluetoothEnabled && !scan.permissionDenied) {
+      setScreen("scan");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checked, scan.scanning, scan.bluetoothEnabled, scan.permissionDenied, screen]);
 
   function handleSelectDevice(device: BleScanDevice) {
     setSelectedDevice(device);
@@ -113,7 +139,7 @@ export function BleProvisioningPage() {
       setError(
         provisionError instanceof Error
           ? provisionError.message
-          : "BLE provisioning failed."
+          : "Smart Mode setup failed."
       );
     } finally {
       setSubmitting(false);
@@ -132,17 +158,17 @@ export function BleProvisioningPage() {
   return (
     <AppShell
       eyebrow="Provisioning"
-      title={targetProduct ? `Find your ${targetProduct.name}` : "BLE Device Provisioning"}
+      title={targetProduct ? `Find your ${targetProduct.name}` : "Smart Mode Setup"}
       description={
         targetProduct
-          ? `Scanning for a nearby ${targetProduct.name} over Bluetooth to connect it to this home's Wi-Fi.`
-          : "Discover nearby Jenix devices over Bluetooth and connect them to this home's Wi-Fi."
+          ? `Searching for a nearby ${targetProduct.name} to connect it to this home's Wi-Fi.`
+          : "Discover nearby Jenix devices and connect them to this home's Wi-Fi."
       }
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">
         <div className="top-bar-meta">
-          <StatusPill label="Primary Flow" tone="success" />
+          <StatusPill label="Smart Mode" tone="success" />
           <StatusPill
             label={selectedDevice ? selectedDevice.productName : "Waiting for scan"}
             tone="neutral"
@@ -161,16 +187,24 @@ export function BleProvisioningPage() {
             onClick={() => navigate(routeFor("/provisioning/ap"))}
             type="button"
           >
-            Use AP fallback
+            Use AP Mode
           </button>
         </div>
       </section>
-      {screen === "permission" ? (
-        <BleRadarScanner
-          bluetoothEnabled={scan.bluetoothEnabled}
-          permissionDenied={scan.permissionDenied}
-          scanning={scan.scanning}
-        />
+      {screen === "preflight" ? (
+        scan.scanning ? (
+          <BleRadarScanner
+            bluetoothEnabled={scan.bluetoothEnabled}
+            permissionDenied={scan.permissionDenied}
+            scanning={scan.scanning}
+          />
+        ) : (
+          <PreflightCheckList
+            bluetoothEnabled={scan.bluetoothEnabled}
+            onRetry={() => void handleEnableScan()}
+            permissionDenied={scan.permissionDenied}
+          />
+        )
       ) : null}
       {screen === "scan" ? (
         <BleDeviceScanList
@@ -200,12 +234,12 @@ export function BleProvisioningPage() {
             </div>
           </section>
           <WifiCredentialForm
-            description="Send the installer Wi-Fi credentials over BLE so the device can join the cloud and register its telemetry stream."
+            description="Send the Wi-Fi credentials so the device can join the cloud and register its telemetry stream."
             initialSsid="Factory 2.4 GHz"
             loading={submitting}
             onSubmit={handleSubmitWifi}
             requireProofOfPossession
-            submitLabel="Send Wi-Fi over BLE"
+            submitLabel="Send Wi-Fi"
             title="Network credentials"
           />
         </div>
@@ -213,7 +247,7 @@ export function BleProvisioningPage() {
       {screen === "progress" ? (
         <div className="content-grid">
           <ProvisioningProgress
-            description="Provisioning is running through BLE handoff, Wi-Fi join, cloud link, and dashboard registration."
+            description="Provisioning is running through device handoff, Wi-Fi join, cloud link, and dashboard registration."
             error={error}
             progress={progress}
             title={selectedDevice?.productName ?? "Provisioning device"}
@@ -222,8 +256,8 @@ export function BleProvisioningPage() {
             <section className="panel">
               <h2>What you can do</h2>
               <p>
-                Retry the Wi-Fi step or switch to the AP path if this browser cannot
-                keep the device session stable.
+                Retry the Wi-Fi step or switch to AP Mode if this browser cannot keep
+                the device session stable.
               </p>
               <div className="card-actions">
                 <button
@@ -238,7 +272,7 @@ export function BleProvisioningPage() {
                   onClick={() => navigate(routeFor("/provisioning/ap"))}
                   type="button"
                 >
-                  Switch to AP fallback
+                  Switch to AP Mode
                 </button>
               </div>
             </section>
