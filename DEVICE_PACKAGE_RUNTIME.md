@@ -130,7 +130,30 @@ Purpose:
 - device git clone: `/root/repos/IOT_Devices`
 - live runtime folder: `/root/projects/IOT_one`
 - live registry folder: `/root/projects/IOT_one/device-registry`
-- secrets: `/root/secrets/iot-one`
+- secrets: `/root/secrets/iot-one` (outside git — **not** carried over by a
+  repo transfer; see the migration note below)
+
+### Migrating to a new VPS
+
+A migration is DNS + repo transfer only *for platform code*. It is **not**
+only that for the live secrets env file, which lives outside git by design
+(see "Why this deploy model was chosen" above) and therefore does not
+travel with `git clone`/`git pull` at all. On 2026-08-29,
+`MQTT_RUNTIME_ENABLED` was found missing/false on the live VPS's
+`/root/secrets/iot-one/api-server.env` — the platform's MQTT bridge never
+started, so every device command (QRunlock's unlock included) was accepted
+and logged as success but silently never dispatched to any device, with no
+error and no crash (`device.service.ts`'s dispatch does
+`if (bridge) { publish }` with no `else`). The code-level default for this
+flag is `false` (`src/config/env.ts`), so a fresh secrets file that omits
+it reintroduces the exact same bug with zero signal.
+
+`VPS/apps/api-server/.env.example` is the checked-in reference for every
+required var, filled in with real values, for exactly this reason. On any
+new VPS: recreate `/root/secrets/iot-one/api-server.env` **from that file**,
+not from memory or a blank slate, before starting `jenix-one-api` — and
+confirm `MQTT_RUNTIME_ENABLED=true` specifically before considering the
+migration done, since nothing will crash or error if it's wrong.
 
 ### VPS scripts
 
