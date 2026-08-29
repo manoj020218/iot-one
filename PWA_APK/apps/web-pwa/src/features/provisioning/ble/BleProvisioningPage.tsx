@@ -1,9 +1,10 @@
 import { AppShell, StatusPill } from "@jenix/ui";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/hooks/useAuth";
 import { getHomes } from "../../dashboard/services/dashboardApi";
+import { deviceCatalog } from "../../devices/deviceCatalog";
 import {
   ProvisioningProgress
 } from "../components/ProvisioningProgress";
@@ -37,6 +38,11 @@ function createInitialProgress(): ProvisioningProgressModel {
 export function BleProvisioningPage() {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetPid = searchParams.get("pid") ?? undefined;
+  const targetProduct = targetPid
+    ? deviceCatalog.find((entry) => entry.pid === targetPid)
+    : undefined;
   const scan = useBleScan();
   const [screen, setScreen] = useState<BleScreen>("permission");
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,6 +60,13 @@ export function BleProvisioningPage() {
 
   const activeSession = session;
   const currentHome = getHomes(activeSession)[0]!;
+  const scannedDevices = targetPid
+    ? scan.devices.filter((device) => device.pid === targetPid)
+    : scan.devices;
+
+  function routeFor(route: string) {
+    return targetPid ? `${route}?pid=${encodeURIComponent(targetPid)}` : route;
+  }
 
   async function handleEnableScan() {
     await scan.enable();
@@ -119,8 +132,12 @@ export function BleProvisioningPage() {
   return (
     <AppShell
       eyebrow="Provisioning"
-      title="BLE Device Provisioning"
-      description="Discover nearby Jenix devices over Bluetooth and connect them to this home's Wi-Fi."
+      title={targetProduct ? `Find your ${targetProduct.name}` : "BLE Device Provisioning"}
+      description={
+        targetProduct
+          ? `Scanning for a nearby ${targetProduct.name} over Bluetooth to connect it to this home's Wi-Fi.`
+          : "Discover nearby Jenix devices over Bluetooth and connect them to this home's Wi-Fi."
+      }
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="top-bar">
@@ -134,14 +151,14 @@ export function BleProvisioningPage() {
         <div className="top-bar-meta">
           <button
             className="text-button"
-            onClick={() => navigate("/provisioning")}
+            onClick={() => navigate(routeFor("/provisioning"))}
             type="button"
           >
             Change method
           </button>
           <button
             className="text-button"
-            onClick={() => navigate("/provisioning/ap")}
+            onClick={() => navigate(routeFor("/provisioning/ap"))}
             type="button"
           >
             Use AP fallback
@@ -157,7 +174,7 @@ export function BleProvisioningPage() {
       ) : null}
       {screen === "scan" ? (
         <BleDeviceScanList
-          devices={scan.devices}
+          devices={scannedDevices}
           error={scan.error}
           onRefresh={scan.refresh}
           onSearchChange={setSearchQuery}
@@ -218,7 +235,7 @@ export function BleProvisioningPage() {
                 </button>
                 <button
                   className="text-button"
-                  onClick={() => navigate("/provisioning/ap")}
+                  onClick={() => navigate(routeFor("/provisioning/ap"))}
                   type="button"
                 >
                   Switch to AP fallback

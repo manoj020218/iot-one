@@ -70,9 +70,6 @@ export function DeviceManagementPage() {
     >
       {loading ? <section className="panel">Loading managed devices...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
-      {!loading && !devices.length ? (
-        <DeviceCatalogGrid onSelect={() => navigate("/provisioning/ble")} />
-      ) : null}
       {!loading && devices.length ? (
         <section className="content-grid">
           {devices.map((device) => (
@@ -125,6 +122,11 @@ export function DeviceManagementPage() {
             </article>
           ))}
         </section>
+      ) : null}
+      {!loading ? (
+        <DeviceCatalogGrid
+          onSelect={(pid) => navigate(`/provisioning?pid=${encodeURIComponent(pid)}`)}
+        />
       ) : null}
     </AppShell>
   );

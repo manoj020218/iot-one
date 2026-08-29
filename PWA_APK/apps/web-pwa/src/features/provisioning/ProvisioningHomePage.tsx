@@ -1,8 +1,9 @@
 import { AppShell, StatusPill } from "@jenix/ui";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
 import { getHomes } from "../dashboard/services/dashboardApi";
+import { deviceCatalog } from "../devices/deviceCatalog";
 
 const provisioningOptions = [
   {
@@ -26,6 +27,11 @@ const provisioningOptions = [
 export function ProvisioningHomePage() {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetPid = searchParams.get("pid") ?? undefined;
+  const targetProduct = targetPid
+    ? deviceCatalog.find((entry) => entry.pid === targetPid)
+    : undefined;
 
   if (!session) {
     throw new Error("ProvisioningHomePage requires an authenticated session");
@@ -33,11 +39,21 @@ export function ProvisioningHomePage() {
 
   const currentHome = getHomes(session)[0]!;
 
+  function routeFor(route: string) {
+    return targetPid ? `${route}?pid=${encodeURIComponent(targetPid)}` : route;
+  }
+
   return (
     <AppShell
       eyebrow="Provisioning"
-      title="Choose a provisioning path"
-      description="Add a new device using Bluetooth, or fall back to Wi-Fi hotspot mode if needed."
+      title={
+        targetProduct ? `Set up: ${targetProduct.name}` : "Choose a provisioning path"
+      }
+      description={
+        targetProduct
+          ? `Add a ${targetProduct.name} to this home using Bluetooth, or fall back to Wi-Fi hotspot mode if needed.`
+          : "Add a new device using Bluetooth, or fall back to Wi-Fi hotspot mode if needed."
+      }
       aside={<StatusPill label={currentHome.name} tone="neutral" />}
     >
       <section className="provisioning-method-grid">
@@ -49,7 +65,7 @@ export function ProvisioningHomePage() {
             <p className="provisioning-note">{option.checkpoints}</p>
             <button
               className="primary-button"
-              onClick={() => navigate(option.route)}
+              onClick={() => navigate(routeFor(option.route))}
               type="button"
             >
               Open {option.method}

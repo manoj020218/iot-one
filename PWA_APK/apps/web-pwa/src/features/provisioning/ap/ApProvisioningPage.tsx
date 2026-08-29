@@ -1,9 +1,10 @@
 import { AppShell, StatusPill } from "@jenix/ui";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/hooks/useAuth";
 import { getHomes } from "../../dashboard/services/dashboardApi";
+import { deviceCatalog } from "../../devices/deviceCatalog";
 import { ProvisioningSuccess } from "../components/ProvisioningSuccess";
 import type {
   ProvisionedDeviceSummary,
@@ -35,7 +36,19 @@ function createInitialProgress(): ProvisioningProgressModel {
 export function ApProvisioningPage() {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetPid = searchParams.get("pid") ?? undefined;
   const descriptor = getApSetupDescriptor();
+  // AP fallback only knows one device's real SoftAP SSID/PID today (Tank
+  // Guard, see apProvisioningService.ts's hardcoded apSetupDescriptor) --
+  // silently running a different product through it would provision the
+  // wrong device. A targeted pid that doesn't match gets a clear "not
+  // available yet" screen instead of walking the user through Tank
+  // Guard's own hotspot by mistake.
+  const targetProduct = targetPid
+    ? deviceCatalog.find((entry) => entry.pid === targetPid)
+    : undefined;
+  const mismatchedTarget = targetPid !== undefined && targetPid !== descriptor.pid;
   const [screen, setScreen] = useState<ApScreen>("instructions");
   const [summary, setSummary] = useState<ProvisionedDeviceSummary | null>(null);
   const [progress, setProgress] = useState<ProvisioningProgressModel>(
@@ -118,7 +131,27 @@ export function ApProvisioningPage() {
           </button>
         </div>
       </section>
-      {screen === "instructions" ? (
+      {mismatchedTarget ? (
+        <section className="panel">
+          <h2>AP fallback isn&apos;t available yet for {targetProduct?.name ?? "this product"}</h2>
+          <p>
+            This flow currently only supports {descriptor.productName}&apos;s own hotspot.
+            Use BLE instead to set up {targetProduct?.name ?? "this device"}.
+          </p>
+          <div className="card-actions">
+            <button
+              className="primary-button"
+              onClick={() =>
+                navigate(`/provisioning/ble?pid=${encodeURIComponent(targetPid!)}`)
+              }
+              type="button"
+            >
+              Use BLE instead
+            </button>
+          </div>
+        </section>
+      ) : null}
+      {!mismatchedTarget && screen === "instructions" ? (
         <ApInstructionStep
           descriptor={descriptor}
           onContinue={() => setScreen("wifi")}
