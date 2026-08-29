@@ -16,6 +16,7 @@ import { useToast } from "./hooks/useToast";
 import { HomeSelectorSheet } from "../homes/components/HomeSelectorSheet";
 import { HomeFormSheet } from "../homes/components/HomeFormSheet";
 import { createHome, listHomes, type HomeUpsertInput } from "../homes/services/homeApi";
+import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
 import "./theme/home.css";
 
 export function HomeDashboardPage() {
@@ -36,6 +37,21 @@ export function HomeDashboardPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const online = devices.filter((device) => device.online).length;
   const alerts = devices.filter((device) => metrics[device.deviceId]?.alert).length;
+
+  // QRunlock (and any future "full routed product package" PID) has its
+  // own dedicated route with its own internal navigation, not the generic
+  // per-device dynamic-page panel (PidDynamicPageRenderer) every other PID
+  // uses -- opening it through /devices/:deviceId mounts the wrong props
+  // shape for that component (RemoteProductMount's session/homeId vs.
+  // PidDynamicPageRenderer's device/pidProfile/runtime) and renders blank.
+  function openDevice(deviceId: string) {
+    const device = devices.find((entry) => entry.deviceId === deviceId);
+    if (device?.pid === QRUNLOCK_PID) {
+      navigate(`/qrunlock/${encodeURIComponent(deviceId)}`);
+      return;
+    }
+    navigate(`/devices/${encodeURIComponent(deviceId)}`);
+  }
 
   async function handleCreateHome(input: HomeUpsertInput) {
     setSaving(true); setSaveError(null);
@@ -78,7 +94,7 @@ export function HomeDashboardPage() {
     >
       <StatStrip online={online} total={devices.length} alerts={alerts} />
       {error ? <section className="panel">{error}</section> : null}
-      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection devices={devices} filter={filter} homeName={currentHome.name} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={(deviceId) => navigate(`/devices/${encodeURIComponent(deviceId)}`)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
+      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection devices={devices} filter={filter} homeName={currentHome.name} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={openDevice} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
       {toast ? <div className="jx-toast"><div><strong>{toast.title}</strong>{toast.detail ? <div style={{ color: "var(--muted)", fontSize: 12 }}>{toast.detail}</div> : null}</div></div> : null}
       <HomeSelectorSheet currentHomeId={currentHome.homeId} homes={activeSession.homes} onClose={() => setSelectorOpen(false)} onCreate={() => { setSelectorOpen(false); setFormOpen(true); }} onSelect={setActiveHome} open={selectorOpen} />
       <HomeFormSheet open={formOpen} title="Create Home" subtitle="Create a new home with its own device list, timezone, and member access." submitting={saving} error={saveError} onClose={() => setFormOpen(false)} onSubmit={handleCreateHome} />

@@ -9,6 +9,7 @@ import {
   listManagedDevices,
   type ManagedDeviceSummary
 } from "./services/deviceManagementApi";
+import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
 
 export function DeviceManagementPage() {
   const { session } = useAuth();
@@ -110,7 +111,13 @@ export function DeviceManagementPage() {
                 <button
                   className="text-button"
                   type="button"
-                  onClick={() => navigate(`/devices/${device.deviceId}`)}
+                  onClick={() =>
+                    navigate(
+                      device.pid === QRUNLOCK_PID
+                        ? `/qrunlock/${device.deviceId}`
+                        : `/devices/${device.deviceId}`
+                    )
+                  }
                 >
                   Open Details
                 </button>
