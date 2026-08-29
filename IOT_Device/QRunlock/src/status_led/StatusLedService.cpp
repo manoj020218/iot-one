@@ -35,10 +35,30 @@ void StatusLedService::ClearRfLearnQuietHold() {
 }
 
 void StatusLedService::Tick(uint32_t nowMs) {
-  if (relayFlashActive_ && nowMs - relayFlashStartedAtMs_ >= kRelayFlashTotalMs) {
+  if (relayFlashActive_ && ElapsedSinceFlashStart(nowMs) >= kRelayFlashTotalMs) {
     relayFlashActive_ = false;
   }
   Write(PatternOn(nowMs));
+}
+
+uint32_t StatusLedService::ElapsedSinceFlashStart(uint32_t nowMs) const {
+  // AppController::Tick() captures its own `nowMs` once at the top of the
+  // loop and only reaches this call after cloud_.Tick() (MQTT) may have
+  // already run — and AppController::Unlock() stamps
+  // relayFlashStartedAtMs_ with its own fresh millis() read from *inside*
+  // that MQTT handling. Parsing the incoming command is not free, so by
+  // the time control returns here, that fresh timestamp can already be
+  // later than the nowMs this Tick() call was given, making a plain
+  // `nowMs - relayFlashStartedAtMs_` underflow to ~2^32 and instantly
+  // read as "window long expired" — cancelling the flash before it ever
+  // renders a single frame. This never showed up on the local HTTP
+  // unlock path only because web_.Tick() runs after led_.Tick() in that
+  // same loop, so the same-iteration ordering hazard never applied there.
+  // Treat "hasn't happened yet from this Tick's point of view" as 0
+  // elapsed rather than wrapping — the next Tick() call's fresher nowMs
+  // resolves it correctly.
+  if (nowMs < relayFlashStartedAtMs_) return 0;
+  return nowMs - relayFlashStartedAtMs_;
 }
 
 void StatusLedService::FillJson(JsonObject object) const {
@@ -50,7 +70,7 @@ void StatusLedService::FillJson(JsonObject object) const {
 
 bool StatusLedService::PatternOn(uint32_t nowMs) const {
   if (relayFlashActive_) {
-    const uint32_t elapsedMs = nowMs - relayFlashStartedAtMs_;
+    const uint32_t elapsedMs = ElapsedSinceFlashStart(nowMs);
     const bool firstFlashOn =
         elapsedMs >= kRelayFlashLeadOffMs &&
         elapsedMs < (kRelayFlashLeadOffMs + kRelayFlashOnMs);

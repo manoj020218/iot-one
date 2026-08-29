@@ -19,6 +19,7 @@ class StatusLedService {
 
  private:
   bool PatternOn(uint32_t nowMs) const;
+  uint32_t ElapsedSinceFlashStart(uint32_t nowMs) const;
   void Write(bool on);
 
   uint8_t pin_ = 0;
