@@ -12,6 +12,11 @@ CloudBridgeService* CloudBridgeService::instance_ = nullptr;
 
 namespace {
 
+// Must exceed StatusLedService::kRelayFlashTotalMs (340ms) with margin —
+// see the pendingAck* fields' doc comment in CloudBridgeService.h for why
+// the ack publish is deferred at all.
+constexpr uint32_t kAckDeferMs = 500;
+
 const char* CloudMqttAuthSourceString(config::CloudMqttAuthSource source) {
   switch (source) {
     case config::CloudMqttAuthSource::DeviceCredential:
@@ -48,6 +53,7 @@ void CloudBridgeService::ApplyConfig() {
 }
 
 void CloudBridgeService::Tick(uint32_t nowMs, bool wifiConnected) {
+  FlushPendingAck(nowMs);
   if (!wifiConnected) {
     if (mqtt_.connected()) mqtt_.disconnect();
     connected_ = false;
@@ -79,6 +85,7 @@ void CloudBridgeService::RebuildTopics() {
   BuildTopic(cmdTopic_, sizeof(cmdTopic_), tenantId, app::kPid, deviceId, "cmd");
   BuildTopic(cmdAckTopic_, sizeof(cmdAckTopic_), tenantId, app::kPid, deviceId, "cmd/ack");
   BuildTopic(statusTopic_, sizeof(statusTopic_), tenantId, app::kPid, deviceId, "status");
+  BuildTopic(eventsTopic_, sizeof(eventsTopic_), tenantId, app::kPid, deviceId, "events");
   BuildTopic(lwtTopic_, sizeof(lwtTopic_), tenantId, app::kPid, deviceId, "lwt");
 }
 
@@ -141,6 +148,18 @@ void CloudBridgeService::HandleMessage(char* topic, uint8_t* payload, unsigned i
   const char* command = doc["command"] | "";
   const CommandKind kind = ParseCommandKind(command);
 
+  if (kind == CommandKind::RfLearnStart) {
+    const bool ok = api_->StartRfLearning();
+    PublishAck(deliveryId, ok, ok ? nullptr : "rf_learn_start_rejected");
+    return;
+  }
+
+  if (kind == CommandKind::RfLearnCancel) {
+    api_->CancelRfLearning();
+    PublishAck(deliveryId, true, nullptr);
+    return;
+  }
+
   if (kind != CommandKind::Unlock) {
     logger_.Warn(String("MQTT unsupported command: ") + command);
     PublishAck(deliveryId, false, "unsupported_command");
@@ -149,7 +168,44 @@ void CloudBridgeService::HandleMessage(char* topic, uint8_t* payload, unsigned i
 
   const char* reason = doc["payload"]["reason"] | "mqtt";
   const bool ok = api_->Unlock(reason);
-  PublishAck(deliveryId, ok, ok ? nullptr : "unlock_rejected");
+  ScheduleAck(deliveryId, ok, ok ? nullptr : "unlock_rejected");
+}
+
+void CloudBridgeService::PublishRfLearnResult(const char* result) {
+  if (!mqtt_.connected()) return;
+  StaticJsonDocument<192> doc;
+  doc["deviceId"] = identity_.DeviceId();
+  doc["eventType"] = std::strcmp(result, "learned") == 0 ? "rf_learned" : "rf_learn_timeout";
+  char nowIso[24];
+  systemtime::NowIso8601(nowIso, sizeof(nowIso));
+  doc["occurredAt"] = nowIso;
+  char buf[192];
+  const size_t written = serializeJson(doc, buf, sizeof(buf));
+  mqtt_.publish(eventsTopic_, reinterpret_cast<const uint8_t*>(buf), written, false);
+}
+
+void CloudBridgeService::ScheduleAck(const char* deliveryId, bool success,
+                                     const char* errorMessage) {
+  std::strncpy(pendingAckDeliveryId_, deliveryId, sizeof(pendingAckDeliveryId_) - 1);
+  pendingAckDeliveryId_[sizeof(pendingAckDeliveryId_) - 1] = '\0';
+  pendingAckSuccess_ = success;
+  pendingAckHasError_ = errorMessage != nullptr;
+  if (pendingAckHasError_) {
+    std::strncpy(pendingAckError_, errorMessage, sizeof(pendingAckError_) - 1);
+    pendingAckError_[sizeof(pendingAckError_) - 1] = '\0';
+  } else {
+    pendingAckError_[0] = '\0';
+  }
+  pendingAckRequestedAtMs_ = millis();
+  pendingAckActive_ = true;
+}
+
+void CloudBridgeService::FlushPendingAck(uint32_t nowMs) {
+  if (!pendingAckActive_) return;
+  if (nowMs - pendingAckRequestedAtMs_ < kAckDeferMs) return;
+  pendingAckActive_ = false;
+  PublishAck(pendingAckDeliveryId_, pendingAckSuccess_,
+             pendingAckHasError_ ? pendingAckError_ : nullptr);
 }
 
 void CloudBridgeService::PublishAck(const char* deliveryId, bool success,

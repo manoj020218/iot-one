@@ -80,6 +80,36 @@ export async function startRfLearning(
   return rfLearningRepository.save({ deviceId, status: "learning", startedAt: now, updatedAt: now });
 }
 
+/**
+ * Applies a REAL result reported by the device's own MQTT events topic
+ * (see CloudBridgeService::PublishRfLearnResult on the firmware side) —
+ * this is what the doc comment on currentState() above says to add once
+ * firmware publishes one. Deliberately does not call requireQrunlockDevice
+ * or throw on an unexpected state: this is fed by an inbound MQTT event
+ * with no HTTP caller to report an error to, so it just applies the result
+ * if a "learning" session is still on record, and no-ops otherwise (e.g. a
+ * late/duplicate event after the session already resolved another way).
+ */
+export async function applyRfLearnResult(
+  deviceId: string,
+  result: "learned" | "timeout"
+): Promise<void> {
+  const state = await rfLearningRepository.getState(deviceId);
+  if (!state || state.status !== "learning") return;
+
+  const updated: RfLearnStateRecord = {
+    ...state,
+    status: result,
+    updatedAt: new Date().toISOString()
+  };
+  await rfLearningRepository.save(updated);
+  await activityRepository.record(
+    deviceId,
+    result === "learned" ? "rf_learn_success" : "rf_learn_timeout",
+    "device"
+  );
+}
+
 export async function cancelRfLearning(
   deps: QrunlockPlatformDeps,
   deviceId: string,

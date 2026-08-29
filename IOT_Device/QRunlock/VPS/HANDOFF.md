@@ -377,6 +377,123 @@ on this ESP32-C3 revision when Wi-Fi was already configured —
 `AppController::Begin()`/`Tick()` now only arm the BLE provisioning window
 when `!store_.Network().configured`.
 
+## Round 6 — mobile app unlock was silently no-op'ing, two real bugs fixed, 2026-08-29
+
+While testing the new `qrunlock-mobile` Lock tab (see "Round 5" and
+`DEVICE_PACKAGE_RUNTIME.md`'s package-runtime section) against the same
+bench unit (`JNX-QRU-C3-3B0010` / deviceId `JNX-QRU-C3-C0DCCB`) over USB +
+serial, tapping Unlock in the app showed a success toast and a real
+"Unlocked" activity-log entry every time, but the relay never physically
+pulsed — the ESP32-C3's serial console stayed completely silent. Two
+independent, unrelated bugs, both now fixed and live-verified:
+
+1. **`MQTT_RUNTIME_ENABLED` was false on the live VPS.** The platform's
+   MQTT bridge never started, so `getRuntimeMqttBridge()` returned `null`
+   everywhere, and `device.service.ts`'s command dispatch
+   (`if (bridge) { await bridge.publishDeviceCommand(...) }`) has no
+   `else` — it silently no-ops while the HTTP handler still completes the
+   cooldown check, DB write, and activity log, reporting success with
+   nothing ever sent. This is a full regression from Round 5's live
+   verification. Fixed by setting `MQTT_RUNTIME_ENABLED=true` in
+   `/root/secrets/iot-one/api-server.env` and restarting `jenix-one-api`.
+   See `DEVICE_PACKAGE_RUNTIME.md`'s new "Migrating to a new VPS" section
+   and the new `VPS/apps/api-server/.env.example` — both added this round
+   specifically so a future VPS migration (secrets live outside git) can't
+   silently reintroduce this.
+2. **The bench unit was still bound to the vendor-pool HOME.** Confirmed
+   with hard evidence (temporarily set the broker's `log_type all` and
+   watched the live PUBLISH): the API server correctly published to
+   `jnx/home-user-yugrika21-gmail-com/JNX-QRU-C3-001/JNX-QRU-C3-C0DCCB/cmd`
+   (the real account testing the app), but the device was still subscribed
+   to `jnx/home-user-qrunlock-vendor-jenix-internal/...` — left over from
+   Round 4/5's vendor-pool bench binding. Two different topics, so even
+   with the bridge enabled the device never heard the command. This is
+   exactly the gap already flagged in "Next recommended steps" item 5
+   below. Fixed for this bench unit by re-POSTing to the device's own
+   local `/api/cloud` endpoint (`WebServerService.cpp`) with the correct
+   `homeId`, using the bench-only local admin token the firmware prints to
+   serial at boot (`[SECURITY] Local API token ... value=...`). The
+   underlying gap — no real provisioning-intent bind flow — is unchanged;
+   this only fixed today's specific device/home pairing.
+
+**Live-verified after both fixes**: three consecutive real relay pulses
+from the app (`Relay pulse started: app -> ...`, `Relay pulse finished` on
+serial), confirming the full chain — app tap → HTTP → MQTT publish →
+device receive → physical relay — works end to end through the mobile app,
+not just the PWA or the vendor API path (both already verified in earlier
+rounds).
+
+**Third bug, same session**: the relay fired correctly every time, but the
+firmware's two-quick-flash LED confirmation (`AppController::Unlock()` →
+`StatusLedService::RequestRelayTriggerFlash()`) never actually lit up —
+100% reproducible for app/MQTT-triggered unlocks specifically, while the
+bench-only local `/api/relay/pulse` endpoint's flash worked every time.
+Root cause: `AppController::Tick()` captures one `nowMs` at the top of the
+loop and only reaches `led_.Tick(nowMs)` after `cloud_.Tick()` (MQTT
+handling) may already have run — and `Unlock()` stamps the flash's start
+time with its *own* fresh `millis()` read taken from inside that MQTT
+handling. Parsing the incoming command costs a little real time, so that
+fresh timestamp can end up later than the `nowMs` this `Tick()` call was
+given. `StatusLedService::Tick()`'s window-close check
+(`nowMs - relayFlashStartedAtMs_ >= kRelayFlashTotalMs`) is unsigned
+arithmetic, so a "nowMs earlier than start" case underflows to ~2^32 and
+reads as "long expired," cancelling the flash before it renders a single
+frame. The local HTTP path never hit this because `web_.Tick()` runs
+*after* `led_.Tick()` in the same loop, so the ordering hazard never
+applied there. Fixed with a clamped `ElapsedSinceFlashStart()` helper
+(treats "hasn't happened yet from this Tick's view" as 0 elapsed instead of
+wrapping) used everywhere `StatusLedService` computed elapsed time.
+Live-verified: user confirmed the flash renders correctly on an
+app-triggered unlock after the fix.
+
+## Round 7 — RF-learn pairing wired over MQTT, same session, 2026-08-29
+
+The backend has always sent `rf_learn_start`/`rf_learn_cancel` as real MQTT
+commands (`rf-learning.service.ts`, unchanged) — the gap was entirely on
+the firmware side: `CloudBridgeLogic.h`'s `ParseCommandKind()` only ever
+recognized `"unlock"`, so every RF-learn command sent through the app was
+rejected with `MQTT unsupported command`, confirmed live on serial. The
+underlying pairing logic (`RfService::StartLearning()`/`CancelLearning()`)
+was already proven working — the user had bench-tested it through the
+local WebUI's `/api/rf/learn/start` before this round, calling the exact
+same `ControlApi` methods.
+
+- Firmware: `CloudBridgeLogic.h` gained `CommandKind::RfLearnStart`/
+  `RfLearnCancel`. `CloudBridgeService::HandleMessage()` now dispatches
+  both to the same `StartRfLearning()`/`CancelRfLearning()` the WebUI already
+  used. A new `.../events` topic (the same suffix `nurse-call-receiver`
+  already uses, part of the frozen suffix set) carries a genuinely new
+  capability: `AppController::HandleRfEvent()` now calls
+  `CloudBridgeService::PublishRfLearnResult("learned"|"timeout")` when
+  `RfService` actually resolves a learn attempt — the platform previously
+  had **no way at all** to know a pairing really succeeded (see
+  `rf-learning.service.ts`'s own long-standing doc comment on
+  `currentState()`, which could only ever guess "timeout" from elapsed
+  time).
+- Backend: added `applyRfLearnResult(deviceId, "learned"|"timeout")` to
+  `rf-learning.service.ts` — applies the real result only if a "learning"
+  session is still on record (no-ops on a late/duplicate event), records a
+  new, honestly-real `"rf_learn_success"` activity type (source `"device"`,
+  not `"app"`/`"system"` — see `activity.types.ts`'s updated doc comment).
+  Wired in via a new `infrastructure/mqtt/device-event-capabilities.ts`
+  registry, deliberately mirroring `public-device-capabilities.ts`'s
+  existing pattern so `runtime.handlers.ts` (platform-core) never imports
+  `@jenix/qrunlock-backend` directly — `app.ts` (the one place already
+  allowed to know about every mounted plugin) registers the handler after
+  mounting the plugin, same as the vendor-API capability registration right
+  above it.
+- **Verified**: `pnpm --filter @jenix/qrunlock-backend typecheck`/`test` —
+  24/24 (3 new tests covering the learned/timeout/no-session-on-record
+  cases). `pnpm --filter @jenix/api-server typecheck`/`test` — 140/140,
+  zero regressions. Firmware: `pio run -e esp32-c3-supermini` clean build,
+  flashed to the bench unit.
+- **Not yet independently live-verified against a real physical remote** —
+  the command-acceptance half (no more "unsupported command") is confirmed
+  live via this round's own firmware changes reusing the already-proven
+  `StartRfLearning()` call; the full "press a real remote, see `learned`
+  land in the platform's activity log" round-trip should be exercised
+  before considering this fully closed out.
+
 ## Next recommended steps
 
 1. **QRunlock video-call project**: actually run the app and click

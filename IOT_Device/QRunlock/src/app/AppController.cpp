@@ -552,6 +552,10 @@ void AppController::HandleRfEvent(const rf::RfEvent& event) {
   if (event.type == rf::RfEventType::Triggered) Unlock("rf_vt");
   if (event.type == rf::RfEventType::LearningSuccess) {
     led_.RequestRfLearnQuietHold(millis());
+    cloud_.PublishRfLearnResult("learned");
+  }
+  if (event.type == rf::RfEventType::LearningTimeout) {
+    cloud_.PublishRfLearnResult("timeout");
   }
 }
 

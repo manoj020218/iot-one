@@ -2,10 +2,16 @@ import type { DeviceRecord } from "@jenix/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetActivityStore } from "../activity/activity.model";
+import { listActivity } from "../activity/activity.service";
 import { QRUNLOCK_PID } from "../constants";
 import type { QrunlockPlatformDeps } from "../platform-deps";
 import { resetRfLearningStore } from "./rf-learning.model";
-import { cancelRfLearning, getRfLearnState, startRfLearning } from "./rf-learning.service";
+import {
+  applyRfLearnResult,
+  cancelRfLearning,
+  getRfLearnState,
+  startRfLearning
+} from "./rf-learning.service";
 import { QrunlockRfLearnError } from "./rf-learning.types";
 
 function makeDevice(overrides: Partial<DeviceRecord> = {}): DeviceRecord {
@@ -84,5 +90,33 @@ describe("rf-learning module", () => {
     await expect(cancelRfLearning(deps, "JNX-QRU-C3-0001", {})).rejects.toBeInstanceOf(
       QrunlockRfLearnError
     );
+  });
+
+  it("applies a real learned result from the device's own MQTT event", async () => {
+    const { deps } = makeDeps([makeDevice()]);
+    await startRfLearning(deps, "JNX-QRU-C3-0001", {});
+
+    await applyRfLearnResult("JNX-QRU-C3-0001", "learned");
+
+    expect((await getRfLearnState(deps, "JNX-QRU-C3-0001", {})).status).toBe("learned");
+    const events = await listActivity(deps, "JNX-QRU-C3-0001", {});
+    expect(events[0]).toMatchObject({ type: "rf_learn_success", source: "device" });
+  });
+
+  it("applies a real timeout result from the device's own MQTT event", async () => {
+    const { deps } = makeDeps([makeDevice()]);
+    await startRfLearning(deps, "JNX-QRU-C3-0001", {});
+
+    await applyRfLearnResult("JNX-QRU-C3-0001", "timeout");
+
+    expect((await getRfLearnState(deps, "JNX-QRU-C3-0001", {})).status).toBe("timeout");
+  });
+
+  it("ignores a device event when no learning session is on record", async () => {
+    const { deps } = makeDeps([makeDevice()]);
+
+    await applyRfLearnResult("JNX-QRU-C3-0001", "learned");
+
+    expect((await getRfLearnState(deps, "JNX-QRU-C3-0001", {})).status).toBe("idle");
   });
 });

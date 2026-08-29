@@ -13,6 +13,7 @@ export { QRUNLOCK_PID } from "./constants";
 export { unlockDevice } from "./lock/lock.service";
 export { listActivity } from "./activity/activity.service";
 export { getSettings, updateSettings } from "./settings/settings.service";
+export { applyRfLearnResult } from "./rf-learning/rf-learning.service";
 export type { UpdateSettingsInput } from "./settings/settings.types";
 
 /**

@@ -8,6 +8,7 @@ import {
 import { sceneActionDispatchRepository } from "../../modules/scenes/scene.model";
 import type { SceneRuntimeQueueResponse } from "../../modules/scenes/scene.types";
 import { raiseCall } from "../../modules/nurse-call-receiver/nurse-call-receiver.service";
+import { getDeviceEventHandler } from "./device-event-capabilities";
 import {
   defaultSmartRfTopicRoot,
   ingestAck as ingestSmartRfAck,
@@ -250,6 +251,12 @@ export async function handleRuntimeOtaAckMessage(
 export async function handleRuntimeDeviceEventsMessage(
   message: RuntimeDeviceTopicMessage
 ): Promise<void> {
+  const pluginHandler = getDeviceEventHandler(message.pid);
+  if (pluginHandler) {
+    await pluginHandler(message.deviceId, message.payload);
+    return;
+  }
+
   if (message.pid !== nurseCallReceiverPid) {
     return;
   }

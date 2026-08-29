@@ -5,6 +5,7 @@ import {
 } from "@jenix/ip-speaker-backend";
 import {
   QRUNLOCK_PID,
+  applyRfLearnResult as applyQrunlockRfLearnResult,
   createQrunlockDeviceActionRouter,
   createQrunlockRouter,
   getSettings as getQrunlockSettings,
@@ -27,6 +28,7 @@ import {
   publicApiRouter
 } from "./modules/api-access/api-access.routes";
 import { registerPublicDeviceCapabilities } from "./modules/api-access/public-device-capabilities";
+import { registerDeviceEventHandler } from "./infrastructure/mqtt/device-event-capabilities";
 import { authRouter } from "./modules/auth/auth.routes";
 import { billingDispenserRouter } from "./modules/billing-dispenser/billing-dispenser.routes";
 import { deviceRouter } from "./modules/devices/device.routes";
@@ -196,6 +198,21 @@ export function createApp(): Express {
     async getLogs(deviceId, homeId, limit) {
       const events = await listQrunlockActivity(platformApi, deviceId, { homeId });
       return events.slice(0, limit);
+    }
+  });
+
+  // Device-originated .../events MQTT messages (see
+  // infrastructure/mqtt/device-event-capabilities.ts and
+  // CloudBridgeService::PublishRfLearnResult on the firmware side) — the
+  // only way the platform learns an RF-learn attempt actually succeeded or
+  // timed out, since that resolves later and asynchronously from whenever
+  // the command was sent.
+  registerDeviceEventHandler(QRUNLOCK_PID, async (deviceId, payload) => {
+    const eventType = typeof payload.eventType === "string" ? payload.eventType : undefined;
+    if (eventType === "rf_learned") {
+      await applyQrunlockRfLearnResult(deviceId, "learned");
+    } else if (eventType === "rf_learn_timeout") {
+      await applyQrunlockRfLearnResult(deviceId, "timeout");
     }
   });
 

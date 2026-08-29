@@ -34,11 +34,15 @@ inline int BuildTopic(char* out, size_t outSize, const char* tenantId, const cha
 enum class CommandKind : uint8_t {
   Unknown = 0,
   Unlock,
+  RfLearnStart,
+  RfLearnCancel,
 };
 
 inline CommandKind ParseCommandKind(const char* command) {
   if (command == nullptr || command[0] == '\0') return CommandKind::Unknown;
   if (std::strcmp(command, "unlock") == 0) return CommandKind::Unlock;
+  if (std::strcmp(command, "rf_learn_start") == 0) return CommandKind::RfLearnStart;
+  if (std::strcmp(command, "rf_learn_cancel") == 0) return CommandKind::RfLearnCancel;
   return CommandKind::Unknown;
 }
 
