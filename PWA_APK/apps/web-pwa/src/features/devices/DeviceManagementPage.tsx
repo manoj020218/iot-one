@@ -4,16 +4,20 @@ import { FiPlus } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
+import { QrunlockHomeTile } from "../home/components/QrunlockHomeTile";
+import { useToast } from "../home/hooks/useToast";
+import "../home/theme/home.css";
+import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
 import { DeviceCatalogGrid } from "./components/DeviceCatalogGrid";
 import {
   listManagedDevices,
   type ManagedDeviceSummary
 } from "./services/deviceManagementApi";
-import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
 
 export function DeviceManagementPage() {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const { toast, show } = useToast();
   const [devices, setDevices] = useState<ManagedDeviceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +57,13 @@ export function DeviceManagementPage() {
     };
   }, [session]);
 
+  function openDevice(deviceId: string, pid: string) {
+    navigate(pid === QRUNLOCK_PID ? `/qrunlock/${deviceId}` : `/devices/${deviceId}`);
+  }
+
+  const compactDevices = devices.filter((device) => device.pid === QRUNLOCK_PID);
+  const richDevices = devices.filter((device) => device.pid !== QRUNLOCK_PID);
+
   return (
     <AppShell
       eyebrow="Device Center"
@@ -70,9 +81,22 @@ export function DeviceManagementPage() {
     >
       {loading ? <section className="panel">Loading managed devices...</section> : null}
       {error ? <section className="panel">{error}</section> : null}
-      {!loading && devices.length ? (
+      {!loading && compactDevices.length ? (
+        <div className="jx-compact-grid" style={{ marginBottom: richDevices.length ? 14 : 0 }}>
+          {compactDevices.map((device) => (
+            <QrunlockHomeTile
+              device={device}
+              key={device.deviceId}
+              onOpen={() => openDevice(device.deviceId, device.pid)}
+              onToast={(message) => show(message)}
+              session={session}
+            />
+          ))}
+        </div>
+      ) : null}
+      {!loading && richDevices.length ? (
         <section className="content-grid">
-          {devices.map((device) => (
+          {richDevices.map((device) => (
             <article key={device.deviceId} className="device-card">
               <div className="device-card-head">
                 <div className="device-icon">{device.pidIconText}</div>
@@ -108,13 +132,7 @@ export function DeviceManagementPage() {
                 <button
                   className="text-button"
                   type="button"
-                  onClick={() =>
-                    navigate(
-                      device.pid === QRUNLOCK_PID
-                        ? `/qrunlock/${device.deviceId}`
-                        : `/devices/${device.deviceId}`
-                    )
-                  }
+                  onClick={() => openDevice(device.deviceId, device.pid)}
                 >
                   Open Details
                 </button>
@@ -127,6 +145,16 @@ export function DeviceManagementPage() {
         <DeviceCatalogGrid
           onSelect={(pid) => navigate(`/provisioning?pid=${encodeURIComponent(pid)}`)}
         />
+      ) : null}
+      {toast ? (
+        <div className="jx-toast">
+          <div>
+            <strong>{toast.title}</strong>
+            {toast.detail ? (
+              <div style={{ color: "var(--muted)", fontSize: 12 }}>{toast.detail}</div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
     </AppShell>
   );
