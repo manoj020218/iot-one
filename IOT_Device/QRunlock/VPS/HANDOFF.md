@@ -494,6 +494,61 @@ same `ControlApi` methods.
   land in the platform's activity log" round-trip should be exercised
   before considering this fully closed out.
 
+## Round 8 — the qrunlock-mobile package version is hardcoded into the APK, not a real fix delivery path
+
+Discovered while shipping the RfRemoteSetupScreen auto-close fix (Round 7):
+publishing a new `remoteEntry.js` build to the served `/ui-packages/...`
+path does **not** reach already-installed end users, for two compounding
+reasons:
+
+1. `nginx`'s `/ui-packages/` location serves every file with
+   `Cache-Control: public, max-age=31536000, immutable` (`one.jenix.in`'s
+   config) — correct behavior *if* every real change gets a new version
+   number/URL, but the exact same URL was reused for this fix, so any
+   client that had already fetched the old bundle keeps serving it from
+   its own HTTP cache for up to a year. Confirmed live: restarting the app
+   did not pick up the fix; only manually clearing the app's cache
+   (Android Settings, not a real end-user workflow) did.
+2. `QrunlockRoute.tsx` hardcodes `packageId`/`version`/`manifestPath`/
+   `entryPath` as a literal constant — already flagged in its own comment
+   as "TEMPORARY... until the VPS registers qrunlock-mobile through
+   `/api/v1/admin/ui-packages`... replace this with the matching entry
+   from the home-bootstrap response." Because this constant compiles into
+   the native Android app's own bundled assets, even bumping the version
+   number requires a full APK rebuild + reinstall to take effect for an
+   existing install — not something a live server-side deploy can fix.
+   **`StreamerRoute.tsx` has the identical documented shortcut** — this is
+   not QRunlock-specific, it affects every "full routed product package"
+   plugin on the platform (see `DEVICE_PACKAGE_RUNTIME.md`'s "Two ways to
+   build a package" section).
+
+**Real fix** (in progress this same round): wire QRunlock into the dynamic
+PID→package resolution the platform already designed for this (HOME
+bootstrap response carries `packages`/`pidBindings`; the client should read
+the package's `version`/paths from there instead of a hardcoded constant).
+Once in place, shipping a fix becomes: publish a new version folder, update
+the version pointer server-side, and every installed app picks it up on
+its next bootstrap fetch — no APK rebuild, no cache clearing, ever. Until
+this lands for Smart Streamer too, `StreamerRoute.tsx` has the same
+deliverability gap.
+
+**Resolved, same round**: `QrunlockRoute.tsx` now calls
+`getHomeUiBootstrap()` and resolves the package via a new
+`findUiPackageForPid()` helper (`uiBootstrapApi.ts`) instead of the
+hardcoded constant. Backend side: registered `qrunlock-mobile`@`1.0.0` via
+`POST /api/v1/admin/ui-packages` and flipped `JNX-QRU-C3-001`'s PID record
+to `ui.uiMode: "remote-package"` (`PATCH /api/v1/admin/pids/:pid`) — it was
+still `"builtin"` from initial provisioning. **Live-verified**: built a new
+debug APK (`pnpm --filter @jenix/web-pwa build:capacitor` →
+`npx cap sync android` → `gradlew assembleDebug`, needed Node 22 via
+`nvm4w` since Capacitor CLI 8.x requires it — the rest of this repo runs on
+Node 20), installed it over the existing app (`adb install -r`, preserving
+login), and confirmed the QRunlock device page still loads correctly
+through the new dynamic-resolution path. `StreamerRoute.tsx` still has the
+old hardcoded shortcut — same fix, not yet applied there, deliberately left
+alone this round since flipping it needs Smart Streamer's own PID/package
+registered the same way first, unverified as of this writing.
+
 ## Next recommended steps
 
 1. **QRunlock video-call project**: actually run the app and click

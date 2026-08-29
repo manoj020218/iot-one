@@ -73,6 +73,26 @@ export function findUiPackageForDevice(
   );
 }
 
+/**
+ * For a "full routed product package" route (QrunlockRoute, StreamerRoute)
+ * mounted for a whole PID family rather than one specific deviceId — same
+ * package/version regardless of which device of that PID the HOME owns.
+ * Resolves through pidBindings instead of a device binding.
+ */
+export function findUiPackageForPid(
+  bootstrap: HomeUiBootstrapResponse,
+  pid: string
+): HomeUiBootstrapPackageRecord | undefined {
+  const binding = bootstrap.pidBindings.find((entry) => entry.pid === pid);
+  if (!binding?.packageKey) {
+    return undefined;
+  }
+
+  return bootstrap.packages.find(
+    (pkg) => createUiPackageKey(pkg.packageId, pkg.version) === binding.packageKey
+  );
+}
+
 export const uiBootstrapApiTesting = {
   reset() {
     demoBootstrapStore.clear();
