@@ -132,6 +132,13 @@ Purpose:
 - live registry folder: `/root/projects/IOT_one/device-registry`
 - secrets: `/root/secrets/iot-one` (outside git — **not** carried over by a
   repo transfer; see the migration note below)
+- QRunlock factory flash records: `/root/secrets/iot-one/qrunlock-factory-records`
+  — per-device PoP + local API token pushed here by
+  `IOT_Device/QRunlock/FlashTool/flash_tool.py`'s `upload_to_vps()` over SCP
+  on every factory flash (root-only directory, deliberately not a public
+  endpoint — see that script's own docstring). Same migration exposure as
+  the rest of `/root/secrets/iot-one`: carry it over by hand, it will not
+  follow a `git clone`.
 
 ### Migrating to a new VPS
 

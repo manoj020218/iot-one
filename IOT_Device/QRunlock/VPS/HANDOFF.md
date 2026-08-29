@@ -568,3 +568,82 @@ registered the same way first, unverified as of this writing.
    provisioning-intent bind flow (`PROVISIONING.md` §9 item 8) once that
    exists — not urgent while there's a single bench unit, load-bearing
    before any second device or a real customer.
+
+## Round 9 — app-wide UI polish + factory flash tool relocated, 2026-08-29
+
+Continuation of the same session as Rounds 6-8, on the platform side of
+the repo rather than QRunlock's own backend/firmware:
+
+- **Home + Devices tabs no longer show fabricated Tank Guard data on
+  QRunlock.** `HomeDeviceSection`/`DeviceManagementPage` previously ran
+  every device through `DeviceTile`, hardcoded to Tank Guard's shape (tank
+  gauge, level/mm, flow L/m, a pump toggle) — a door lock was showing a
+  fake water level and a pump switch that did nothing. Added
+  `QrunlockHomeTile`: a compact icon card (product icon, real online/offline
+  `StatusChip`, the device's own display name, a green unlock button wired
+  to the exact same `unlockDevice()`/cooldown/10s-display-timer `LockHero.tsx`
+  already uses). Design went through two rounds of artifact-mockup review
+  before any code was written.
+- **Removed the dedicated "Lock" bottom-nav tab.** QRunlock is now reached
+  from its Home/Devices tile like every other PID, not a standing nav item
+  — this also fixed a real white-screen crash: tapping a QRunlock tile
+  used to go through `/devices/:deviceId` (`PidDynamicPageRenderer`, which
+  passes `device`/`pidProfile`/`runtime` props), but QRunlock's package
+  (registered as `uiMode: "remote-package"` for the deliverability fix
+  below) exports a `RemoteProductPackageComponent` expecting
+  `session`/`homeId` instead — wrong props in, blank render, no error.
+  Fixed by routing QRunlock devices to `/qrunlock/:deviceId` directly from
+  both tap sites.
+- **Device Management page dropped its redundant owned-device list.**
+  `listManagedDevices()` read the exact same home-scoped endpoint Home
+  already reads — this page showed the same devices twice for no reason.
+  It's now purely the "browse and add a new product" catalog
+  (`DeviceCatalogGrid`), which itself was fixed to actually stay visible
+  once a home has devices (it used to disappear after the first device was
+  added) and to actually use the tapped PID (`onSelect` previously
+  discarded it and always opened the generic BLE flow).
+- **Provisioning flow redesigned Tuya-style, generic across every
+  product.** The method picker was the same "engineering console" giant-
+  panel style the rest of the app had already moved away from. Replaced
+  with a primary "Smart Mode" card (BLE under the hood — the user is never
+  shown that word) and a demoted small "AP Mode" row. Added a real
+  permission preflight gate in front of Smart Mode (checks Bluetooth-
+  enabled + permission-granted — the only two real signals
+  `bleDiscoveryService.ts` reports, deliberately not a fabricated third
+  "Location Services" check) instead of the previous behavior of always
+  starting a scan and showing an inline warning next to what looked like
+  an empty "no devices found" list. Added an LED-meaning help sheet (fast
+  blink/slow blink/solid/rapid-triple-flash), translated from
+  `StatusLedService.cpp`'s real firmware blink-timing patterns, not
+  fabricated — this exact troubleshooting content didn't exist anywhere
+  before this round.
+- **Factory flash tool moved into this folder**: was
+  `IOT_Device/Flash Tool/`, now `IOT_Device/QRunlock/FlashTool/` — its
+  `hardware_models.json` only ever had one registered model (this
+  device's), and its own env var names (`QRUNLOCK_FACTORY_VPS_*`) were
+  already QRunlock-specific, so the old location was a mismatch with what
+  the tool actually is, not a real loss of generality.
+  `hardware_models.json`'s `project_dir` updated from `../QRunlock` to
+  `..` to match. `upload_to_vps()` was already stubbed out to POST to an
+  HTTP endpoint that never existed (`QRUNLOCK_FACTORY_VPS_URL` was never
+  set, uploads silently no-op'd every time) — rewritten to push the
+  record file over SCP into a root-only VPS directory
+  (`/root/secrets/iot-one/qrunlock-factory-records`, auto-created via
+  `plink mkdir -p` on first upload) instead, deliberately not a public API
+  endpoint, since these records carry each real device's own PoP and
+  local API token. All three env vars (`QRUNLOCK_FACTORY_VPS_HOST`/
+  `_PASSWORD`/`_DIR`) are optional — flashing still works and saves the
+  local record with none of them set. The local `records/` copy (gitignored)
+  is unchanged.
+
+**Verified**: `pnpm --filter @jenix/web-pwa typecheck`/`test` — clean,
+52/52, across every commit in this round, including the pre-existing BLE
+provisioning radar/empty-state test with no changes needed. Flash tool:
+`python -m py_compile` clean on all three modules; the SCP upload path
+itself has not yet been exercised against the live VPS (needs the env
+vars set locally first).
+
+**Not yet done**: the `/root/secrets/iot-one/qrunlock-factory-records`
+directory does not exist on the VPS yet — it will be created automatically
+on the first real upload once `QRUNLOCK_FACTORY_VPS_HOST` is set locally,
+but that first run itself hasn't happened.
