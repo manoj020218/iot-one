@@ -12,14 +12,20 @@
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
+        <!-- postSplashScreenTheme target (see AppTheme.NoActionBarLaunch below): the
+             Android 12+ SplashScreen API swaps to this theme the instant its own
+             icon-on-color phase ends, which previously nulled the window background
+             right before the WebView had painted anything - a flash of default white.
+             Keeping the same splash drawable here means the branded image stays up
+             continuously until the WebView's first real paint covers it. -->
+        <item name="android:background">@drawable/splash</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
         <item name="windowSplashScreenBackground">#16233F</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_icon</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
