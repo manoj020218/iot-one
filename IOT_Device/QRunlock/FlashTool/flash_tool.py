@@ -10,27 +10,37 @@ per-device Security Scheme 2 PoP and local API token to be generated -
 skipping this silently reuses whatever was already in NVS from a previous
 flash/test), then uploads, then captures the boot log directly over a raw
 serial connection to pull out the PoP, the local API token, and the BLE
-service name. The record is saved locally and, if VPS credentials are
-configured, uploaded there too.
+service name. The record is saved locally (this folder's own records/,
+gitignored - it contains real per-device secrets) and, if VPS credentials
+are configured, pushed there too over SCP into a root-only directory --
+deliberately not a public HTTP endpoint, since these records carry each
+device's own PoP and local API token.
 
 Usage:
     python flash_tool.py list-models
     python flash_tool.py register-model --model-id ID --display-name NAME \
         --chip esp32c3 --manufacturer NAME --board NAME \
-        --vid-pid 303A:1001 --project-dir ../QRunlock \
+        --vid-pid 303A:1001 --project-dir .. \
         --pio-env esp32-c3-supermini-prov2 [--notes TEXT]
     python flash_tool.py flash --model-id ID [--port COM25] [--skip-erase]
+
+VPS upload (all optional -- flashing still works and saves the local
+record with none of these set):
+    QRUNLOCK_FACTORY_VPS_HOST      e.g. root@154.61.69.200
+    QRUNLOCK_FACTORY_VPS_PASSWORD  password for the above (never committed --
+                                    set it in your own shell/profile, not here)
+    QRUNLOCK_FACTORY_VPS_DIR       remote directory (default below); created
+                                    on first upload if it doesn't exist yet
 """
 
 import argparse
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 
 import serial.tools.list_ports
 
@@ -40,8 +50,15 @@ TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
 REGISTRY_PATH = os.path.join(TOOL_DIR, "hardware_models.json")
 RECORDS_DIR = os.path.join(TOOL_DIR, "records")
 
-VPS_URL_ENV = "QRUNLOCK_FACTORY_VPS_URL"
-VPS_TOKEN_ENV = "QRUNLOCK_FACTORY_VPS_TOKEN"
+VPS_HOST_ENV = "QRUNLOCK_FACTORY_VPS_HOST"
+VPS_PASSWORD_ENV = "QRUNLOCK_FACTORY_VPS_PASSWORD"
+VPS_DIR_ENV = "QRUNLOCK_FACTORY_VPS_DIR"
+DEFAULT_VPS_DIR = "/root/secrets/iot-one/qrunlock-factory-records"
+# Same PuTTY suite the rest of this project's manual VPS access already
+# uses -- checked on PATH first so this also works if pscp is installed
+# some other way.
+DEFAULT_PSCP_PATH = r"C:\Program Files\PuTTY\pscp.exe"
+DEFAULT_PLINK_PATH = r"C:\Program Files\PuTTY\plink.exe"
 
 
 def find_esptool():
@@ -344,7 +361,7 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
     log(f"\nSaved local record: {record_path}")
     factory_record["record_path"] = record_path
 
-    upload_to_vps(factory_record, log)
+    upload_to_vps(record_path, log)
     return factory_record
 
 
@@ -357,25 +374,59 @@ def cmd_flash(args):
         sys.exit(1)
 
 
-def upload_to_vps(factory_record, log=print):
-    vps_url = os.environ.get(VPS_URL_ENV)
-    if not vps_url:
-        log(f"{VPS_URL_ENV} not set - skipping VPS upload "
+def find_putty_tool(name, default_path):
+    found = shutil.which(name)
+    if found:
+        return found
+    if os.path.isfile(default_path):
+        return default_path
+    return None
+
+
+def upload_to_vps(record_path, log=print):
+    """Push one factory record file to the VPS over SCP, into a root-only
+    directory -- never a public HTTP endpoint, since these records carry
+    each device's own PoP and local API token. All three env vars are
+    optional; flashing already succeeded and saved the local record
+    regardless of whether this step runs at all.
+    """
+    host = os.environ.get(VPS_HOST_ENV)
+    if not host:
+        log(f"{VPS_HOST_ENV} not set - skipping VPS upload "
             f"(local record is still saved).")
         return
 
-    body = json.dumps(factory_record).encode("utf-8")
-    req = urllib.request.Request(vps_url, data=body, method="POST")
-    req.add_header("Content-Type", "application/json")
-    token = os.environ.get(VPS_TOKEN_ENV)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
+    remote_dir = os.environ.get(VPS_DIR_ENV, DEFAULT_VPS_DIR)
+    password = os.environ.get(VPS_PASSWORD_ENV)
+    pw_args = ["-pw", password] if password else []
 
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            log(f"Uploaded to VPS: HTTP {resp.status}")
-    except (urllib.error.URLError, urllib.error.HTTPError) as exc:
-        log(f"VPS upload failed (local record is still saved): {exc}")
+    plink_path = find_putty_tool("plink", DEFAULT_PLINK_PATH)
+    pscp_path = find_putty_tool("pscp", DEFAULT_PSCP_PATH)
+    if pscp_path is None:
+        log("pscp not found (checked PATH and the default PuTTY install "
+            "dir) - skipping VPS upload. Install PuTTY or add pscp to "
+            "PATH to enable this.")
+        return
+
+    if plink_path is not None:
+        mkdir_result = subprocess.run(
+            [plink_path, "-batch", *pw_args, host, f"mkdir -p {remote_dir}"],
+            capture_output=True, text=True,
+        )
+        if mkdir_result.returncode != 0:
+            log(f"Could not confirm/create {remote_dir} on the VPS "
+                f"(continuing anyway - upload may still fail): "
+                f"{mkdir_result.stderr.strip() or mkdir_result.stdout.strip()}")
+
+    result = subprocess.run(
+        [pscp_path, "-batch", *pw_args, record_path, f"{host}:{remote_dir}/"],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        log(f"Uploaded to VPS: {host}:{remote_dir}/{os.path.basename(record_path)}")
+    else:
+        log(f"VPS upload failed (local record is still saved): "
+            f"{result.stderr.strip() or result.stdout.strip()}")
 
 
 def build_parser():

@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 # Factory records contain real per-device secrets (PoP, local API token) -
-# keep them out of git history. Upload to the VPS instead once that
-# endpoint exists.
+# keep them out of git history. Each flash also pushes a copy to the VPS
+# over SCP (see upload_to_vps() in flash_tool.py) when
+# QRUNLOCK_FACTORY_VPS_HOST is set.
 records/
