@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors the web app's real brand tokens (see PWA_APK/apps/web-pwa/src/styles.css)
+         so native chrome (permission dialogs, ripples) matches the launcher icon/splash
+         instead of falling back to AppCompat's default teal/purple. -->
+    <color name="colorPrimary">#16233F</color>
+    <color name="colorPrimaryDark">#0F1720</color>
+    <color name="colorAccent">#2FB87E</color>
+</resources>
