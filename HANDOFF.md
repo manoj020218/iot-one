@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-08-28
+> Last updated: 2026-08-30
 
 ---
 
@@ -172,10 +172,65 @@ when quoted. For anything beyond a single pipe-free one-liner, write a
 `.sh` file, `pscp` it over, then run it with one simple
 `plink ... "bash /root/thefile.sh"` call.
 
-## 5. Feature Status (as of 2026-08-09)
+## 5. Feature Status (as of 2026-08-30)
 
-All of the below are **live and deployed**, most recent first:
+All of the below are **live and deployed** unless noted otherwise, most recent first:
 
+- **Android app ready for its first Play Store release** (commits
+  `2956431`, `7d6a79f`, `02f38ac`, `6193d24` on `codex/smart-speaker-20260813`)
+  — **not yet uploaded, blocked on Play Console account verification**
+  (see §6). Everything on the app side is done and verified on real
+  hardware:
+  - Replaced the stock `cap add android` placeholder icon/splash with a
+    real identity (geometric "J" + accent-node mark, reusing the web
+    app's own `--ink`/`--success` tokens from `styles.css`) sized to
+    Play Store's adaptive-icon spec. `PWA_APK/apps/android/resources/`
+    holds the master art if it ever needs regenerating via
+    `npx @capacitor/assets generate --android` — but see the next bullet
+    before trusting that tool's output blindly.
+  - **Gotcha if you ever regenerate icons with `@capacitor/assets`:** it
+    emitted the adaptive-icon foreground/background layers at the
+    legacy 48dp-icon grid (max 192px) instead of the correct 108dp
+    adaptive grid (max 432px). The launcher icon looked fine at that
+    size; the Android 12+ splash renders the same drawable much larger
+    and it was visibly blurry. If you regenerate, verify
+    `mipmap-xxxhdpi/ic_launcher_foreground.png` is 432×432, not 192×192.
+  - Wired the real Android 12 Splash Screen API
+    (`windowSplashScreenBackground`/`windowSplashScreenAnimatedIcon` in
+    `styles.xml`, `SplashScreen.installSplashScreen(this)` in
+    `MainActivity.java`) instead of relying only on the old
+    window-background-drawable trick.
+  - Fixed a white flash between the splash and real content — two
+    separate causes, both needed fixing: (1) the SplashScreen API's
+    `postSplashScreenTheme` swapped to a theme with
+    `android:background="@null"`, and (2) independently of the theme,
+    Capacitor's WebView paints its own default-white surface the
+    instant it attaches, before the page/CSS has loaded, regardless of
+    the window background. Fixed by keeping `@drawable/splash` as the
+    post-splash theme's background too, **and** explicitly setting
+    `getBridge().getWebView().setBackgroundColor(...)` in
+    `MainActivity.onCreate()`.
+  - `values/colors.xml` didn't exist — `colorPrimary`/`colorPrimaryDark`/
+    `colorAccent` were referenced in `styles.xml` but silently resolved
+    through some dependency AAR's default. Added the file with the real
+    brand colors.
+  - **Release signing set up** (first-ever release, fresh keystore
+    generated): see `PWA_APK/apps/android/RELEASE_SIGNING.md` for the
+    keystore's real location (outside this repo, on the dev machine —
+    **not backed up anywhere else yet**, treat that as the actual
+    remaining risk here) and how to rebuild `assembleRelease
+    bundleRelease`.
+  - Native Google Sign-In's release SHA-1 is registered in the Google
+    Cloud OAuth client and confirmed working on the signed release
+    build. (If it ever throws Play Services status code `12502`
+    `SIGN_IN_CURRENTLY_IN_PROGRESS` during testing, that's stuck
+    client-side flow state from rapid reinstalls, not a config problem —
+    force-stop and relaunch.)
+  - Auth page's login card shrunk ~20% and given a more visible
+    border-radius (`PWA_APK/apps/web-pwa/src/styles.css`'s
+    `.auth-card`) — at its old `max-width: 380px` it filled the phone
+    viewport edge-to-edge and the existing 24px radius barely read as
+    rounded.
 - **Login security fix** (commit `958f8a5`) — `authApi.ts`'s
   login/signup/social-login used to swallow a real `401 Invalid
   credentials` and fabricate a fake local session instead, meaning any
@@ -211,6 +266,15 @@ All of the below are **live and deployed**, most recent first:
 
 ## 6. Known Open Items
 
+- **Play Store upload — waiting on account verification, not a code
+  blocker.** The signed `.aab`/`.apk` are built and verified (see §5
+  above and `RELEASE_SIGNING.md`); the Play Console developer account
+  itself is still going through Google's verification process. Once
+  that clears, rebuild fresh (`gradlew assembleRelease bundleRelease`
+  from `PWA_APK/apps/android/android`, keystore is already wired up)
+  rather than uploading a build that's been sitting around, then upload
+  `app/build/outputs/bundle/release/app-release.aab` — Play Console's
+  production track wants the App Bundle, not the APK.
 - **Uncommitted, not mine, unclear if finished:** the working tree has
   pre-existing uncommitted changes wiring a `@jenix/smart-streamer-backend`
   workspace package into `VPS/apps/api-server/src/app.ts` (new routes
