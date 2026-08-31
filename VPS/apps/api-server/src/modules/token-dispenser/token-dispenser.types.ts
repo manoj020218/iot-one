@@ -35,19 +35,18 @@ export interface TokenDispenserLogRecord {
 }
 
 /**
- * Per-device MQTT connection labels this firmware's own NVS config uses to
- * build its topic (jenix/{tenantId}/{siteId}/{deviceId}/{suffix}). These are
- * firmware-local strings, unrelated to the platform's own tenantId (=homeId)
- * concept — kept here purely so the platform can build/match the same topic
- * the device is actually configured with.
+ * Per-device MQTT connection labels the OLD jenix/{tenantId}/{siteId}/
+ * {deviceId}/{suffix} scheme used. Token Dispenser itself moved to the
+ * canonical jnx/{tenantId}/{pid}/{deviceId}/{suffix} scheme and no longer
+ * needs this — kept only because Billing Dispenser (same firmware family,
+ * relaunched as its own product, see billing-dispenser.service.ts) still
+ * dispatches commands over the old scheme and reuses this store.
  */
 export interface TokenDispenserConnectionConfig {
   deviceId: string;
   mqttTenantId: string;
   mqttSiteId: string;
 }
-
-export const defaultTokenDispenserConnectionLabel = "default";
 
 export class TokenDispenserModuleError extends Error {
   constructor(

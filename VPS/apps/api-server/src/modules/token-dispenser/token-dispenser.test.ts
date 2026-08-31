@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createApp } from "../../app";
 import { useRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
-import { handleRuntimeRawMessage } from "../../infrastructure/mqtt/runtime.handlers";
+import {
+  handleRuntimeDeviceEventsMessage,
+  handleRuntimeDeviceStatusMessage
+} from "../../infrastructure/mqtt/runtime.handlers";
 import { createAuthenticatedSession, createAuthHeaders } from "../../test-support/auth";
 import { authTesting } from "../auth/auth.service";
 import { deviceTesting } from "../devices/device.service";
@@ -13,7 +16,7 @@ import { homeTesting } from "../homes/home.service";
 import { pidTesting } from "../pid/pid.service";
 
 import { tokenDispenserLogRepository } from "./token-dispenser.model";
-import { buildTokenDispenserTopic, tokenDispenserTesting } from "./token-dispenser.service";
+import { tokenDispenserTesting } from "./token-dispenser.service";
 
 const developerHeaders = {
   "x-role": "JENIX_DEVELOPER",
@@ -35,6 +38,21 @@ async function createPid() {
     });
 }
 
+async function registerOwnerAndDevice(deviceId: string, ownerLabel: string) {
+  const owner = await createAuthenticatedSession({
+    name: ownerLabel,
+    email: `${ownerLabel.toLowerCase().replace(/\s+/g, "-")}@example.com`
+  });
+  const homeId = owner.activeHomeId!;
+  await request(createApp()).post("/api/v1/devices/register").send({
+    deviceId,
+    pid: "JNX-TD-C3-01",
+    homeId,
+    ownerUserId: owner.user.userId
+  });
+  return { owner, homeId };
+}
+
 describe("token dispenser routes", () => {
   beforeEach(async () => {
     useRuntimeMqttBridge(null);
@@ -46,47 +64,44 @@ describe("token dispenser routes", () => {
     await deviceUiRuntimeStore.reset();
   });
 
-  it("builds the device's real jenix/{tenant}/{site}/{device}/command topic on dispatch", async () => {
+  it("dispatches print/reset commands over the canonical MQTT command topic", async () => {
     await createPid();
-    const owner = await createAuthenticatedSession({
-      name: "Token Dispenser Owner",
-      email: "token-dispenser-owner@example.com"
-    });
-    const homeId = owner.activeHomeId!;
-    await request(createApp()).post("/api/v1/devices/register").send({
-      deviceId: "jnx-td-a001",
-      pid: "JNX-TD-C3-01",
-      homeId,
-      ownerUserId: owner.user.userId
-    });
+    const { owner } = await registerOwnerAndDevice("jnx-td-a001", "Token Dispenser Owner");
 
-    const publishedRaw: Array<{ topic: string; payload: unknown }> = [];
+    const publishedCommands: Array<{ command: string; pid: string; payload?: unknown }> = [];
     useRuntimeMqttBridge({
       async publishTelemetryIngress() {},
       async publishScheduleTick() {},
-      async publishDeviceCommand() {},
+      async publishDeviceCommand(message) {
+        publishedCommands.push({
+          command: message.command,
+          pid: message.pid,
+          ...(message.payload ? { payload: message.payload } : {})
+        });
+      },
       async publishNotification() {},
-      async publishOtaRequest() {},
-      async publishRaw(topic, payload) {
-        publishedRaw.push({ topic, payload });
-      }
+      async publishOtaRequest() {}
     });
 
-    const response = await request(createApp())
+    const printResponse = await request(createApp())
       .post("/api/v1/devices/JNX-TD-A001/token-dispenser/print-next")
       .set(createAuthHeaders(owner));
+    expect(printResponse.status).toBe(200);
 
-    expect(response.status).toBe(200);
-    expect(publishedRaw).toHaveLength(1);
-    expect(publishedRaw[0]?.topic).toBe(
-      buildTokenDispenserTopic("default", "default", "JNX-TD-A001", "command")
-    );
-    expect(publishedRaw[0]?.payload).toMatchObject({ command: "PRINT_NEXT_TOKEN" });
+    const resetResponse = await request(createApp())
+      .post("/api/v1/devices/JNX-TD-A001/token-dispenser/reset-roll")
+      .set(createAuthHeaders(owner));
+    expect(resetResponse.status).toBe(200);
+
+    expect(publishedCommands).toEqual([
+      { command: "PRINT_NEXT_TOKEN", pid: "JNX-TD-C3-01" },
+      { command: "RESET_ROLL_COUNTER", pid: "JNX-TD-C3-01" }
+    ]);
 
     const logsResponse = await request(createApp())
       .get("/api/v1/devices/JNX-TD-A001/token-dispenser/logs")
       .set(createAuthHeaders(owner));
-    expect(logsResponse.body.data[0].action).toBe("PRINT_NEXT_TOKEN");
+    expect(logsResponse.body.data[0].action).toBe("RESET_ROLL_COUNTER");
   });
 
   it("saves and returns a custom print template", async () => {
@@ -159,39 +174,52 @@ describe("token dispenser routes", () => {
     expect(response.status).toBe(403);
   });
 
-  it("routes a raw telemetry/state/event message for the device's real topic shape", async () => {
-    const topic = buildTokenDispenserTopic("acme", "site-1", "JNX-TD-D004", "telemetry");
-    await handleRuntimeRawMessage(
-      topic,
-      Buffer.from(
-        JSON.stringify({
-          currentToken: 42,
-          paperLow: false,
-          estimatedTokensLeft: 458
-        })
-      )
-    );
+  it("routes a canonical-topic status message into the device UI runtime snapshot", async () => {
+    await handleRuntimeDeviceStatusMessage({
+      tenantId: "home-1",
+      pid: "JNX-TD-C3-01",
+      deviceId: "JNX-TD-D004",
+      payload: {
+        currentToken: 42,
+        paperLow: false,
+        estimatedTokensLeft: 458
+      }
+    });
 
     const runtime = await deviceUiRuntimeStore.get("JNX-TD-D004");
     expect(runtime?.telemetrySnapshot.telemetry.currentToken).toBe(42);
     expect(runtime?.telemetrySnapshot.telemetry.estimatedTokensLeft).toBe(458);
-
-    const eventTopic = buildTokenDispenserTopic("acme", "site-1", "JNX-TD-D004", "event");
-    await handleRuntimeRawMessage(
-      eventTopic,
-      Buffer.from(JSON.stringify({ command_id: "cmd-1", success: true }))
-    );
-
-    const logs = await tokenDispenserLogRepository.listByDevice("JNX-TD-D004");
-    expect(logs).toHaveLength(1);
-    expect(logs[0]?.action).toBe("ACK");
   });
 
-  it("ignores raw messages that don't match the token dispenser topic shape", async () => {
-    await handleRuntimeRawMessage(
-      "some/unrelated/topic/state",
-      Buffer.from(JSON.stringify({ wifiConnected: true }))
-    );
+  it("logs a device-initiated events message (button/local web UI) but skips mqtt-sourced ones", async () => {
+    await createApp(); // populates the registerDeviceEventHandler registry
+
+    await handleRuntimeDeviceEventsMessage({
+      tenantId: "home-1",
+      pid: "JNX-TD-C3-01",
+      deviceId: "JNX-TD-E005",
+      payload: { eventType: "print_next_token", occurredAt: "2026-08-31T00:00:00Z", source: "button" }
+    });
+    await handleRuntimeDeviceEventsMessage({
+      tenantId: "home-1",
+      pid: "JNX-TD-C3-01",
+      deviceId: "JNX-TD-E005",
+      payload: { eventType: "print_next_token", occurredAt: "2026-08-31T00:00:01Z", source: "mqtt" }
+    });
+
+    const logs = await tokenDispenserLogRepository.listByDevice("JNX-TD-E005");
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.action).toBe("print_next_token");
+    expect(logs[0]?.source).toBe("BUTTON");
+  });
+
+  it("ignores status/events messages for other PIDs", async () => {
+    await handleRuntimeDeviceStatusMessage({
+      tenantId: "home-1",
+      pid: "JNX-TG-C3-001",
+      deviceId: "UNRELATED",
+      payload: { wifiConnected: true }
+    });
 
     const runtime = await deviceUiRuntimeStore.get("UNRELATED");
     expect(runtime).toBeUndefined();

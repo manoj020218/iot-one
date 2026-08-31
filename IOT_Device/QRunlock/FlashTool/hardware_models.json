@@ -10,6 +10,19 @@
       "project_dir": "..",
       "pio_env": "esp32-c3-supermini-prov2",
       "notes": "Security Scheme 2 provisioning pilot build. Uses mixed arduino+espidf framework."
+    },
+    {
+      "model_id": "JNX-TD-C3-01",
+      "display_name": "Jenix Smart Token Dispenser (ESP32-C3)",
+      "chip": "esp32c3",
+      "manufacturer": "Espressif",
+      "board": "ESP32-C3 SuperMini",
+      "vid_pid": "303A:1001",
+      "project_dir": "../../Smat Token Dispensor/firmware",
+      "pio_env": "jenix-td-c3-prov2",
+      "notes": "Security Scheme 2 provisioning pilot, same pattern as QRunlock's prov2 env.",
+      "vps_env_prefix": "TOKEN_DISPENSER",
+      "vps_dir_default": "/root/secrets/iot-one/token-dispenser-factory-records"
     }
   ]
 }

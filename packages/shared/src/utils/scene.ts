@@ -9,7 +9,9 @@ const restrictedSceneCommands = new Set<SceneActionCommand>([
   "ota_force",
   "matter_commission",
   "matter_bridge_sync",
-  "unlock"
+  "unlock",
+  "FACTORY_RESET",
+  "OTA_UPDATE"
 ]);
 
 export function isRestrictedSceneCommand(command: SceneActionCommand): boolean {
@@ -45,7 +47,16 @@ export const allSceneActionCommands: SceneActionCommand[] = [
   "stop_alarm",
   "start_stream",
   "stop_stream",
-  "unlock"
+  "unlock",
+  "PRINT_NEXT_TOKEN",
+  "TEST_PRINT",
+  "RESET_ROLL_COUNTER",
+  "SET_TOKEN_COUNTER",
+  "SET_TOKEN_PREFIX",
+  "SET_TEMPLATE",
+  "REBOOT",
+  "OTA_UPDATE",
+  "FACTORY_RESET"
 ];
 
 const sceneActionCommandLabels: Partial<Record<SceneActionCommand, string>> = {
@@ -70,7 +81,16 @@ const sceneActionCommandLabels: Partial<Record<SceneActionCommand, string>> = {
   stop_alarm: "Stop alarm",
   start_stream: "Start stream",
   stop_stream: "Stop stream",
-  unlock: "Unlock"
+  unlock: "Unlock",
+  PRINT_NEXT_TOKEN: "Print next token",
+  TEST_PRINT: "Test print",
+  RESET_ROLL_COUNTER: "Reset paper roll counter",
+  SET_TOKEN_COUNTER: "Set token counter",
+  SET_TOKEN_PREFIX: "Set token prefix",
+  SET_TEMPLATE: "Set print template",
+  REBOOT: "Restart device",
+  OTA_UPDATE: "Force OTA update",
+  FACTORY_RESET: "Factory reset"
 };
 
 export function describeSceneActionCommand(command: SceneActionCommand): string {

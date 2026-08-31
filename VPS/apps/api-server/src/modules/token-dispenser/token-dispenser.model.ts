@@ -16,6 +16,10 @@ export interface TokenDispenserTemplateRepository {
   reset(): Promise<void>;
 }
 
+/** Kept for Billing Dispenser (same firmware family, still on the old
+ *  per-device connection-config topic scheme) — see its own dispatchCommand
+ *  in billing-dispenser.service.ts. Token Dispenser itself no longer uses
+ *  this; it's on the canonical scheme now. */
 export interface TokenDispenserConnectionRepository {
   get(deviceId: string): Promise<TokenDispenserConnectionConfig | undefined>;
   save(record: TokenDispenserConnectionConfig): Promise<void>;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { DeviceRecord } from "@jenix/shared";
+import type { DeviceRecord, SceneActionCommand } from "@jenix/shared";
 
 import { getRuntimeMqttBridge } from "../../infrastructure/mqtt/runtime.binding";
 import { deviceRepository } from "../devices/device.model";
@@ -15,13 +15,11 @@ import {
   tokenDispenserTemplateRepository
 } from "./token-dispenser.model";
 import type {
-  TokenDispenserConnectionConfig,
   TokenDispenserLogRecord,
   TokenDispenserLogSource,
   TokenDispenserPrintTemplate
 } from "./token-dispenser.types";
 import {
-  defaultTokenDispenserConnectionLabel,
   defaultTokenDispenserPrintTemplate,
   TokenDispenserModuleError
 } from "./token-dispenser.types";
@@ -31,22 +29,16 @@ import {
   parseSetPrefixPayload
 } from "./token-dispenser.validation";
 
+export const TOKEN_DISPENSER_PID = "JNX-TD-C3-01";
+
+/**
+ * The OLD per-device topic scheme. Token Dispenser's own dispatch below no
+ * longer uses this (it's on the canonical jnx/{tenantId}/{pid}/{deviceId}/
+ * {suffix} scheme via publishDeviceCommand) — kept only because Billing
+ * Dispenser (same firmware family, relaunched as its own product, still on
+ * the old scheme) imports this builder in billing-dispenser.service.ts.
+ */
 export const tokenDispenserTopicPrefix = "jenix";
-/** Wildcard subscriptions for the bridge's raw passthrough (tenantId/siteId vary
- *  per device, so this can't be a fixed legacyTopicRoots-style family root). */
-export const tokenDispenserRawSubscriptions = ["telemetry", "state", "event"].map(
-  (suffix) => [tokenDispenserTopicPrefix, "+", "+", "+", suffix].join("/")
-);
-const restrictedActions = new Set(["factory_reset"]);
-
-function normalizeDeviceId(deviceId: string): string {
-  return deviceId.trim().toUpperCase();
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 export function buildTokenDispenserTopic(
   mqttTenantId: string,
   mqttSiteId: string,
@@ -56,19 +48,14 @@ export function buildTokenDispenserTopic(
   return [tokenDispenserTopicPrefix, mqttTenantId, mqttSiteId, deviceId, suffix].join("/");
 }
 
-/** Firmware-local NVS labels used to build the device's real topic — see
- *  ConfigStore::net() in mqtt_client.cpp. Unrelated to the platform tenantId. */
-async function resolveConnectionConfig(
-  deviceId: string
-): Promise<TokenDispenserConnectionConfig> {
-  const existing = await tokenDispenserConnectionRepository.get(deviceId);
-  return (
-    existing ?? {
-      deviceId,
-      mqttTenantId: defaultTokenDispenserConnectionLabel,
-      mqttSiteId: defaultTokenDispenserConnectionLabel
-    }
-  );
+const restrictedActions = new Set(["factory_reset"]);
+
+function normalizeDeviceId(deviceId: string): string {
+  return deviceId.trim().toUpperCase();
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
 async function resolveDeviceContext(
@@ -138,24 +125,28 @@ function appendLog(
 
 async function dispatchCommand(
   device: DeviceRecord,
-  command: string,
+  command: SceneActionCommand,
   extra: Record<string, unknown>,
   action: string,
   userId: string | undefined
 ): Promise<{ commandId: string; dispatched: boolean }> {
-  const connection = await resolveConnectionConfig(device.deviceId);
-  const topic = buildTokenDispenserTopic(
-    connection.mqttTenantId,
-    connection.mqttSiteId,
-    device.deviceId,
-    "command"
-  );
   const commandId = randomUUID();
   const bridge = getRuntimeMqttBridge();
   let dispatched = false;
 
-  if (bridge?.publishRaw) {
-    await bridge.publishRaw(topic, { command, command_id: commandId, ...extra });
+  if (bridge) {
+    await bridge.publishDeviceCommand({
+      deliveryId: commandId,
+      runId: `token-dispenser:${action}`,
+      sceneId: `manual:${action}`,
+      homeId: device.homeId,
+      source: "manual",
+      requestedAt: nowIso(),
+      deviceId: device.deviceId,
+      pid: device.pid,
+      command,
+      ...(Object.keys(extra).length > 0 ? { payload: extra } : {})
+    });
     dispatched = true;
   }
 
@@ -360,31 +351,41 @@ export async function ingestState(
   await ingestTelemetry(deviceId, state);
 }
 
-export async function ingestEvent(
+const deviceInitiatedLogSources: Partial<Record<string, TokenDispenserLogSource>> = {
+  local_webui: "Local",
+  button: "BUTTON",
+  espnow: "ESP-NOW"
+};
+
+/**
+ * Raw MQTT `.../events` ingestion — called from runtime.handlers.ts via
+ * registerDeviceEventHandler, not a REST path. Matches the
+ * {deviceId, eventType, occurredAt, source} shape publishActionEventJson()
+ * publishes in mqtt_client.cpp. "mqtt"-sourced actions are skipped here since
+ * dispatchCommand() already logged them when the command was issued —
+ * logging again would double the activity feed entry for the same action.
+ */
+export async function applyDeviceEvent(
   deviceId: string,
   event: Record<string, unknown>
 ): Promise<void> {
-  const normalizedDeviceId = normalizeDeviceId(deviceId);
-
-  if (typeof event.command_id === "string") {
-    await appendLog(normalizedDeviceId, {
-      level: event.success === false ? "error" : "info",
-      action: "ACK",
-      source: "MQTT",
-      requestId: event.command_id,
-      ...(typeof event.reason === "string" ? { detail: event.reason } : {})
-    });
+  if (typeof event.source !== "string" || event.source === "mqtt") {
     return;
   }
 
-  if (typeof event.type === "string") {
-    await appendLog(normalizedDeviceId, {
-      level: "warn",
-      action: event.type,
-      source: "MQTT",
-      detail: JSON.stringify(event)
-    });
+  const source = deviceInitiatedLogSources[event.source];
+
+  if (!source) {
+    return;
   }
+
+  const eventType = typeof event.eventType === "string" ? event.eventType : "unknown_event";
+
+  await appendLog(normalizeDeviceId(deviceId), {
+    level: "info",
+    action: eventType,
+    source
+  });
 }
 
 export const tokenDispenserTesting = {

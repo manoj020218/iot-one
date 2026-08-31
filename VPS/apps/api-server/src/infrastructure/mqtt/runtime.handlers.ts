@@ -16,10 +16,8 @@ import {
   ingestStatus as ingestSmartRfStatus
 } from "../../modules/smart-rf-transmitter/smart-rf-transmitter.service";
 import {
-  ingestEvent as ingestTokenDispenserEvent,
   ingestState as ingestTokenDispenserState,
-  ingestTelemetry as ingestTokenDispenserTelemetry,
-  tokenDispenserTopicPrefix
+  TOKEN_DISPENSER_PID
 } from "../../modules/token-dispenser/token-dispenser.service";
 import {
   ingestCommandAck as ingestP10DisplayCommandAck,
@@ -135,23 +133,14 @@ const legacyTopicRootHandlers: Record<
 };
 
 /**
- * Token Dispenser's real firmware uses a per-device topic shape
- * (jenix/{tenantId}/{siteId}/{deviceId}/{suffix}) where tenantId/siteId vary
- * per device rather than being a fixed family root, so it can't be matched by
- * legacyTopicRootHandlers above — it's routed through the bridge's generic raw
- * passthrough instead and parsed here.
- */
-const tokenDispenserTopicPattern = new RegExp(
-  `^${tokenDispenserTopicPrefix}\\/[^/]+\\/[^/]+\\/([^/]+)\\/(telemetry|state|event)$`
-);
-
-/**
  * P10 Token Display's real firmware uses jenix/v1/{homeId}/{deviceId}/{suffix}
- * (see BuildTopics() in mqtt_client.cpp) — homeId varies per device just like
- * Token Dispenser's tenantId/siteId, so this also goes through the generic
- * raw passthrough rather than legacyTopicRootHandlers. Unlike Token
- * Dispenser's firmware-local labels, this homeId is literally the platform
- * homeId, so no separate connection-config lookup is needed.
+ * (see BuildTopics() in mqtt_client.cpp) — homeId varies per device rather
+ * than being a fixed family root, so it goes through the bridge's generic raw
+ * passthrough instead of legacyTopicRootHandlers, and is parsed here. Unlike
+ * Token Dispenser (now on the canonical jnx/{tenantId}/{pid}/{deviceId}/
+ * {suffix} scheme, routed through handleRuntimeDeviceStatusMessage/
+ * handleRuntimeDeviceEventsMessage instead), this homeId is literally the
+ * platform homeId, so no separate connection-config lookup was ever needed.
  */
 const p10DisplayTopicPrefixEscaped = p10DisplayTopicPrefix.replace(/\//g, "\\/");
 const p10DisplayTopicPattern = new RegExp(
@@ -314,6 +303,9 @@ const canonicalStatusHandlersByPid: Record<
   [nurseCallReceiverPid]: handleNurseCallReceiverStatus,
   [sosSirenPid]: async (message) => {
     await ingestSosSirenStatus(message.deviceId, message.payload);
+  },
+  [TOKEN_DISPENSER_PID]: async (message) => {
+    await ingestTokenDispenserState(message.deviceId, message.payload);
   }
 };
 
@@ -345,12 +337,6 @@ export async function handleRuntimeRawMessage(
   topic: string,
   payload: Buffer
 ): Promise<void> {
-  // P10 Display's pattern requires a literal "v1" second segment, so it's
-  // strictly more specific than Token Dispenser's wildcard-tenant shape —
-  // it must be tried first, or a Token Dispenser mqttTenantId that happens
-  // to equal "v1" would collide with this device family (and vice versa,
-  // any other Token Dispenser topic falls through safely since it won't
-  // match the literal "v1" segment).
   const p10DisplayMatch = p10DisplayTopicPattern.exec(topic);
 
   if (p10DisplayMatch) {
@@ -373,33 +359,6 @@ export async function handleRuntimeRawMessage(
 
     if (suffix === "command/ack") {
       await ingestP10DisplayCommandAck(deviceId, parsedPayload);
-    }
-
-    return;
-  }
-
-  const tokenDispenserMatch = tokenDispenserTopicPattern.exec(topic);
-
-  if (tokenDispenserMatch) {
-    const [, deviceId, suffix] = tokenDispenserMatch;
-    const parsedPayload = parseJsonRecord(payload);
-
-    if (!parsedPayload || !deviceId) {
-      return;
-    }
-
-    if (suffix === "telemetry") {
-      await ingestTokenDispenserTelemetry(deviceId, parsedPayload);
-      return;
-    }
-
-    if (suffix === "state") {
-      await ingestTokenDispenserState(deviceId, parsedPayload);
-      return;
-    }
-
-    if (suffix === "event") {
-      await ingestTokenDispenserEvent(deviceId, parsedPayload);
     }
   }
 }

@@ -33,6 +33,11 @@ export interface SceneCondition {
 export type SceneActionType = "device_command" | "notification";
 
 export type SceneActionCommand =
+  // Token Dispenser's own commands are UPPER_SNAKE_CASE (not lower_snake_case
+  // like the rest of this union) because they're published verbatim onto the
+  // device's MQTT `cmd` topic and matched by literal strcmp() in the
+  // firmware's handleCommand() — changing the case here would break wire
+  // compatibility with already-flashed units.
   | "refresh"
   | "sync"
   | "set_relay"
@@ -54,7 +59,16 @@ export type SceneActionCommand =
   | "stop_alarm"
   | "start_stream"
   | "stop_stream"
-  | "unlock";
+  | "unlock"
+  | "PRINT_NEXT_TOKEN"
+  | "TEST_PRINT"
+  | "RESET_ROLL_COUNTER"
+  | "SET_TOKEN_COUNTER"
+  | "SET_TOKEN_PREFIX"
+  | "SET_TEMPLATE"
+  | "REBOOT"
+  | "OTA_UPDATE"
+  | "FACTORY_RESET";
 
 export interface SceneAction {
   actionId: string;

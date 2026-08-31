@@ -46,7 +46,6 @@ import { createMongoSmartRfTransmitterPersistenceStore } from "./modules/smart-r
 import { defaultSmartRfTopicRoot } from "./modules/smart-rf-transmitter/smart-rf-transmitter.service";
 import { useTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.model";
 import { createMongoTokenDispenserPersistenceStore } from "./modules/token-dispenser/token-dispenser.mongo-store";
-import { tokenDispenserRawSubscriptions } from "./modules/token-dispenser/token-dispenser.service";
 import { useP10DisplayPersistenceStore } from "./modules/p10-display/p10-display.model";
 import { createMongoP10DisplayPersistenceStore } from "./modules/p10-display/p10-display.mongo-store";
 import { p10DisplayRawSubscriptions } from "./modules/p10-display/p10-display.service";
@@ -286,7 +285,7 @@ async function bootstrap() {
           commandAck: "jenix/runtime/commands/ack",
           otaAck: "jenix/runtime/ota/ack"
         },
-        rawSubscriptions: [...tokenDispenserRawSubscriptions, ...p10DisplayRawSubscriptions],
+        rawSubscriptions: [...p10DisplayRawSubscriptions],
         onRawMessage: async (topic, payload) => {
           await handleRuntimeRawMessage(topic, payload);
         }

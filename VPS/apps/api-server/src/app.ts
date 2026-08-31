@@ -40,6 +40,10 @@ import { nurseCallReceiverRouter } from "./modules/nurse-call-receiver/nurse-cal
 import { p10DisplayRouter } from "./modules/p10-display/p10-display.routes";
 import { smartRfTransmitterRouter } from "./modules/smart-rf-transmitter/smart-rf-transmitter.routes";
 import { sosSirenRouter } from "./modules/sos-siren/sos-siren.routes";
+import {
+  applyDeviceEvent as applyTokenDispenserDeviceEvent,
+  TOKEN_DISPENSER_PID
+} from "./modules/token-dispenser/token-dispenser.service";
 import { tokenDispenserRouter } from "./modules/token-dispenser/token-dispenser.routes";
 import { publicPidRouter } from "./modules/pid/pid.public.routes";
 import { pidRouter } from "./modules/pid/pid.routes";
@@ -214,6 +218,14 @@ export function createApp(): Express {
     } else if (eventType === "rf_learn_timeout") {
       await applyQrunlockRfLearnResult(deviceId, "timeout");
     }
+  });
+
+  // Token Dispenser's own device-initiated .../events (print/reset actions
+  // triggered locally, off the physical button or its local web UI — see
+  // publishActionEvent() in mqtt_client.cpp) — mirrors it into the device's
+  // activity log the same way QRunlock's RF-learn events do above.
+  registerDeviceEventHandler(TOKEN_DISPENSER_PID, async (deviceId, payload) => {
+    await applyTokenDispenserDeviceEvent(deviceId, payload);
   });
 
   return app;
