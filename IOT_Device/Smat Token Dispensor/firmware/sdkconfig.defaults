@@ -1,0 +1,46 @@
+# ESP-IDF sdkconfig defaults for the jenix-td-c3-prov2 pilot env only.
+# Only read when a PlatformIO env uses framework=espidf (mixed arduino+espidf
+# here) — the pure-Arduino jenix-td-c3/jenix-td-c3-ota envs never touch this.
+#
+# Required by arduino-esp32 when used as an ESP-IDF component (enforced by
+# framework-arduinoespressif32's CMakeLists.txt) — IDF defaults to 100Hz.
+CONFIG_FREERTOS_HZ=1000
+#
+# NimBLE (BLE-only host) instead of Bluedroid to save flash — this device
+# only ever needs BLE, never classic Bluetooth. protocomm's BLE transport
+# supports both hosts; WIFI_PROV_BLE_SEC_CONN specifically depends on NimBLE.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+
+# Security Scheme 2 (SRP6a + AES-256-GCM) is the Jenix One standard
+# (PROVISIONING.md). Security 0 (no security) is explicitly "never used on
+# any Jenix device" per the standard — drop it to save a bit of flash too.
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
+CONFIG_WIFI_PROV_BLE_SEC_CONN=y
+
+# PlatformIO's ESP-IDF builder reparses compiler fragments and breaks on this
+# workspace's space-containing path when the default macro-hiding flag emits
+# -fmacro-prefix-map=<project>=..
+# CONFIG_COMPILER_HIDE_PATHS_MACROS is not set
+
+# Match the esp32-c3-devkitm-1 board definition used by the pilot env.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+# CONFIG_ESPTOOLPY_FLASHSIZE_DETECT is not set
+
+# Arduino is linked as an ESP-IDF component in the prov2 env; this enables the
+# core's app_main() wrapper that initializes Arduino and calls setup()/loop().
+CONFIG_AUTOSTART_ARDUINO=y
+
+# WiFiClientSecure's ssl_client.cpp compiles its implementation only when PSK
+# cipher support is enabled in the underlying mbedTLS config. QRunlock's
+# working prov2 env enables these and the generated mbedTLS header then emits
+# the expected MBEDTLS_KEY_EXCHANGE_*_PSK macros.
+CONFIG_MBEDTLS_PSK_MODES=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+
+# The pilot currently uses setInsecure() for OTA and does not rely on the
+# global ESP-IDF certificate bundle.
+# CONFIG_MBEDTLS_CERTIFICATE_BUNDLE is not set

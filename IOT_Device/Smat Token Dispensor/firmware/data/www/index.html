@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jenix Token Dispenser</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #f1f5f9; --muted: #94a3b8; --accent: #3b82f6;
+    --green: #22c55e; --red: #ef4444; --yellow: #eab308; --orange: #f97316;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
+         font-size: 14px; padding: 16px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px; }
+  .card h2 { font-size: 13px; color: var(--muted); text-transform: uppercase;
+             letter-spacing: .05em; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: center;
+         padding: 4px 0; border-bottom: 1px solid #1e293b; }
+  .row:last-child { border-bottom: none; }
+  .label { color: var(--muted); }
+  .val { font-weight: 600; }
+  .badge { padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+  .ok    { background: #166534; color: #86efac; }
+  .warn  { background: #713f12; color: #fde68a; }
+  .err   { background: #7f1d1d; color: #fca5a5; }
+  .token-big { font-size: 48px; font-weight: 900; text-align: center;
+               color: var(--accent); letter-spacing: 4px; padding: 8px 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+           font-size: 13px; font-weight: 600; transition: opacity .15s; }
+  button:hover { opacity: .8; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost   { background: var(--surface); color: var(--text);
+                 border: 1px solid var(--border); }
+  .btn-danger  { background: var(--red); color: #fff; }
+  .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 18px;
+           border-radius: 8px; font-weight: 600; font-size: 13px;
+           opacity: 0; transition: opacity .3s; pointer-events: none;
+           background: var(--green); color: #fff; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--red); }
+  .login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8);
+                   display: flex; align-items: center; justify-content: center;
+                   z-index: 100; }
+  .login-box { background: var(--surface); border: 1px solid var(--border);
+               border-radius: 12px; padding: 28px; width: 320px; }
+  .login-box h2 { margin-bottom: 16px; }
+  .login-box input { width: 100%; padding: 8px 12px; background: var(--bg);
+                     border: 1px solid var(--border); border-radius: 6px;
+                     color: var(--text); margin-bottom: 10px; font-size: 13px; }
+  a.config-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--green);
+                   transition: width .5s; }
+  .progress-fill.low  { background: var(--yellow); }
+  .progress-fill.out  { background: var(--red); }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay" class="login-overlay" style="display:none">
+  <div class="login-box">
+    <h2>Jenix Admin Login</h2>
+    <input id="lusr" type="text" placeholder="Username" value="admin">
+    <input id="lpwd" type="password" placeholder="Password">
+    <div class="actions">
+      <button class="btn-primary" style="width:100%" onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<h1>Jenix Token Dispenser</h1>
+<div class="sub" id="subTitle">Loading...</div>
+
+<div class="grid">
+  <!-- Token card -->
+  <div class="card">
+    <h2>Current Token</h2>
+    <div class="token-big" id="tokenDisplay">----</div>
+    <div class="row"><span class="label">Last Printed</span><span class="val" id="lastPrinted">—</span></div>
+    <div class="row"><span class="label">Prefix</span><span class="val" id="prefix">—</span></div>
+    <div class="row"><span class="label">Printer</span><span class="val" id="printerState">—</span></div>
+    <div class="actions">
+      <button class="btn-primary" onclick="authed(printNext)">Print Next</button>
+      <button class="btn-ghost"   onclick="authed(testPrint)">Test Print</button>
+    </div>
+  </div>
+
+  <!-- Paper card -->
+  <div class="card">
+    <h2>Paper Roll</h2>
+    <div class="row"><span class="label">Estimated Left</span><span class="val" id="paperLeft">—</span></div>
+    <div class="row"><span class="label">Used This Roll</span><span class="val" id="paperUsed">—</span></div>
+    <div class="row"><span class="label">Per Roll</span><span class="val" id="perRoll">—</span></div>
+    <div class="row"><span class="label">Status</span><span class="badge" id="paperBadge">—</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="paperBar" style="width:100%"></div></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="authed(resetRoll)">Reset Roll Counter</button>
+    </div>
+  </div>
+
+  <!-- Network card -->
+  <div class="card">
+    <h2>Network</h2>
+    <div class="row"><span class="label">WiFi</span><span class="badge" id="wifiBadge">—</span></div>
+    <div class="row"><span class="label">IP</span><span class="val" id="wifiIp">—</span></div>
+    <div class="row"><span class="label">RSSI</span><span class="val" id="wifiRssi">—</span></div>
+    <div class="row"><span class="label">MQTT</span><span class="badge" id="mqttBadge">—</span></div>
+    <div class="row"><span class="label">ESP-NOW</span><span class="badge" id="espnowBadge">—</span></div>
+  </div>
+
+  <!-- Device info card -->
+  <div class="card">
+    <h2>Device</h2>
+    <div class="row"><span class="label">Device ID</span><span class="val" id="deviceId">—</span></div>
+    <div class="row"><span class="label">MAC</span><span class="val" id="mac">—</span></div>
+    <div class="row"><span class="label">Firmware</span><span class="val" id="fwVer">—</span></div>
+    <div class="row"><span class="label">PID</span><span class="val" id="pid">—</span></div>
+    <div class="row"><span class="label">Uptime</span><span class="val" id="uptime">—</span></div>
+    <div class="row"><span class="label">Time</span><span class="val" id="devTime">—</span></div>
+    <div class="actions">
+      <a class="config-link" href="/config.html">&#9881; Configuration</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let authedSession = false;
+
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+function authed(fn) {
+  if (authedSession) { fn(); return; }
+  document.getElementById('loginOverlay').style.display = 'flex';
+  window._pendingFn = fn;
+}
+
+async function doLogin() {
+  const u = document.getElementById('lusr').value;
+  const p = document.getElementById('lpwd').value;
+  const fd = new FormData();
+  fd.append('user', u); fd.append('pass', p);
+  const r = await fetch('/api/login', { method: 'POST', body: fd });
+  const d = await r.json();
+  if (d.ok) {
+    authedSession = true;
+    document.getElementById('loginOverlay').style.display = 'none';
+    if (window._pendingFn) { window._pendingFn(); window._pendingFn = null; }
+  } else {
+    toast('Invalid credentials', true);
+  }
+}
+
+async function printNext() {
+  const r = await fetch('/api/print/next', { method: 'POST' });
+  const d = await r.json();
+  toast(d.ok ? 'Print queued!' : ('Error: ' + d.error), !d.ok);
+}
+
+async function testPrint() {
+  await fetch('/api/print/test', { method: 'POST' });
+  toast('Test print queued');
+}
+
+async function resetRoll() {
+  if (!confirm('Reset paper roll counter?')) return;
+  await fetch('/api/roll/reset', { method: 'POST' });
+  toast('Roll counter reset');
+}
+
+function fmtUptime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
+function badge(txt, cls) {
+  return `<span class="badge ${cls}">${txt}</span>`;
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+
+    document.getElementById('subTitle').textContent =
+      `${d.pid} | ${d.firmware_version} | ${d.date_time}`;
+
+    // Token
+    document.getElementById('tokenDisplay').textContent = d.token.current || '0';
+    document.getElementById('lastPrinted').textContent  = d.token.last_printed || '0';
+    document.getElementById('prefix').textContent       = d.token.prefix || '(none)';
+
+    const psMap = {idle:'ok',printing:'warn',print_success:'ok',
+                   print_failed:'err',paper_low:'warn',paper_out:'err',
+                   offline:'err',error:'err'};
+    const ps = d.printer.state || 'idle';
+    document.getElementById('printerState').innerHTML =
+      badge(ps.replace('_',' ').toUpperCase(), psMap[ps] || 'warn');
+
+    // Paper
+    const left   = d.paper.estimated_left;
+    const perRoll= d.paper.tokens_per_roll;
+    const pct    = perRoll > 0 ? Math.round(left * 100 / perRoll) : 100;
+    document.getElementById('paperLeft').textContent = left;
+    document.getElementById('paperUsed').textContent = d.paper.tokens_since_reset;
+    document.getElementById('perRoll').textContent   = perRoll;
+    const barEl = document.getElementById('paperBar');
+    barEl.style.width = pct + '%';
+    barEl.className = 'progress-fill' + (d.printer.paper_out ? ' out' : (d.paper.paper_low ? ' low' : ''));
+    document.getElementById('paperBadge').innerHTML =
+      d.printer.paper_out ? badge('PAPER OUT', 'err') :
+      d.paper.paper_low   ? badge('LOW', 'warn') :
+                            badge('OK', 'ok');
+
+    // Network
+    document.getElementById('wifiBadge').innerHTML =
+      d.wifi.status === 'connected' ? badge('Connected', 'ok') : badge('Disconnected', 'err');
+    document.getElementById('wifiIp').textContent   = d.wifi.ip || '—';
+    document.getElementById('wifiRssi').textContent = d.wifi.rssi + ' dBm';
+    document.getElementById('mqttBadge').innerHTML  =
+      d.mqtt.connected ? badge('Connected', 'ok') : badge('Disconnected', 'err');
+    document.getElementById('espnowBadge').innerHTML =
+      d.espnow.active  ? badge('Active', 'ok') : badge('Off', 'warn');
+
+    // Device
+    document.getElementById('deviceId').textContent = d.device_id;
+    document.getElementById('mac').textContent       = d.mac;
+    document.getElementById('fwVer').textContent     = d.firmware_version + ' (' + d.firmware_build_date + ')';
+    document.getElementById('pid').textContent       = d.pid;
+    document.getElementById('uptime').textContent    = fmtUptime(d.uptime_sec);
+    document.getElementById('devTime').textContent   = d.date_time;
+
+  } catch(e) {
+    document.getElementById('subTitle').textContent = 'Connection error — retrying...';
+  }
+}
+
+// Poll every 5 seconds
+refresh();
+setInterval(refresh, 5000);
+
+// Enter key in login form
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('loginOverlay').style.display !== 'none') doLogin();
+  }
+});
+</script>
+</body>
+</html>

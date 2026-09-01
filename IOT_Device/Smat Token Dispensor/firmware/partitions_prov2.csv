@@ -1,0 +1,9 @@
+# Jenix Token Dispenser — 4MB flash, provisioning-v2 pilot env (jenix-td-c3-prov2)
+# Single "factory" app slot (no A/B OTA rollback) to make room for the
+# Espressif wifi_provisioning/protocomm/mbedtls-SRP6a stack. Pilot env only —
+# the production partitions.csv (dual OTA slots) is untouched.
+# Name,     Type, SubType,  Offset,   Size,    Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+app0,       app,  factory,  0x10000,  0x300000,
+spiffs,     data, spiffs,   0x310000, 0xE0000,
+coredump,   data, coredump, 0x3F0000, 0x10000,

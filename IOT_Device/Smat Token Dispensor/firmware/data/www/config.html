@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jenix — Configuration</title>
+<style>
+  :root {
+    --bg:#0f172a;--surface:#1e293b;--border:#334155;
+    --text:#f1f5f9;--muted:#94a3b8;--accent:#3b82f6;
+    --green:#22c55e;--red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;
+       font-size:14px;padding:16px;}
+  h1{font-size:18px;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:20px;}
+  .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:6px;cursor:pointer;border:1px solid var(--border);
+       background:var(--surface);color:var(--muted);font-size:13px;}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .pane{display:none;}.pane.active{display:block;}
+  .card{background:var(--surface);border:1px solid var(--border);
+        border-radius:8px;padding:20px;margin-bottom:12px;max-width:560px;}
+  .card h2{font-size:13px;color:var(--muted);text-transform:uppercase;
+           letter-spacing:.05em;margin-bottom:16px;}
+  .field{margin-bottom:12px;}
+  label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px;}
+  input,select{width:100%;padding:8px 12px;background:var(--bg);
+               border:1px solid var(--border);border-radius:6px;
+               color:var(--text);font-size:13px;}
+  input[type=checkbox]{width:auto;}
+  .row-check{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+  button{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;
+         font-size:13px;font-weight:600;transition:opacity .15s;}
+  button:hover{opacity:.8;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:var(--red);color:#fff;}
+  .toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;
+         border-radius:8px;font-weight:600;font-size:13px;
+         opacity:0;transition:opacity .3s;pointer-events:none;
+         background:var(--green);color:#fff;}
+  .toast.show{opacity:1;}
+  .toast.error{background:var(--red);}
+  textarea{width:100%;background:var(--bg);border:1px solid var(--border);
+           border-radius:6px;color:var(--text);font-size:12px;
+           font-family:monospace;padding:8px;min-height:200px;}
+  a.back{color:var(--accent);text-decoration:none;font-size:13px;display:inline-block;margin-bottom:12px;}
+  .login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);
+                 display:flex;align-items:center;justify-content:center;z-index:100;}
+  .login-box{background:var(--surface);border:1px solid var(--border);
+             border-radius:12px;padding:28px;width:320px;}
+  .login-box h2{margin-bottom:16px;}
+  .login-box input{width:100%;padding:8px 12px;background:var(--bg);
+                   border:1px solid var(--border);border-radius:6px;
+                   color:var(--text);margin-bottom:10px;font-size:13px;}
+</style>
+</head>
+<body>
+
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <input id="lusr" type="text" placeholder="Username" value="admin">
+    <input id="lpwd" type="password" placeholder="Password">
+    <button class="btn-primary" style="width:100%" onclick="doLogin()">Login</button>
+  </div>
+</div>
+
+<a class="back" href="/">&larr; Back to Dashboard</a>
+<h1>Configuration</h1>
+<div class="sub">Changes require reboot unless noted otherwise.</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('network')">Network</div>
+  <div class="tab" onclick="showTab('device')">Device</div>
+  <div class="tab" onclick="showTab('template')">Print Template</div>
+  <div class="tab" onclick="showTab('token')">Token</div>
+  <div class="tab" onclick="showTab('ota')">OTA</div>
+  <div class="tab" onclick="showTab('logs')">Logs</div>
+  <div class="tab" onclick="showTab('danger')">Danger Zone</div>
+</div>
+
+<!-- Network -->
+<div class="pane active" id="tab-network">
+  <div class="card">
+    <h2>WiFi</h2>
+    <div class="field"><label>SSID</label><input id="wifiSsid" placeholder="WiFi network name"></div>
+    <div class="field"><label>Password</label><input id="wifiPass" type="password" placeholder="(unchanged if blank)"></div>
+  </div>
+  <div class="card">
+    <h2>MQTT Broker</h2>
+    <div class="field"><label>Host</label><input id="mqttHost" placeholder="mqtt.example.com"></div>
+    <div class="field"><label>Port</label><input id="mqttPort" type="number" value="1883" min="1" max="65535"></div>
+    <div class="field"><label>Username</label><input id="mqttUser" placeholder="(optional)"></div>
+    <div class="field"><label>Password</label><input id="mqttPass" type="password" placeholder="(optional)"></div>
+  </div>
+  <div class="card">
+    <h2>Platform Binding</h2>
+    <div class="field"><label>Home ID</label><input id="homeId" placeholder="your-home-id"></div>
+    <div class="field"><label>Site Name</label><input id="siteName" placeholder="clinic-main"></div>
+    <div class="field"><label>HTTP Fallback URL</label><input id="httpFallback" placeholder="https://api.yourvps.com/v1"></div>
+  </div>
+  <div class="card">
+    <h2>Web UI Access</h2>
+    <div class="field"><label>Admin Username</label><input id="webUser"></div>
+    <div class="field"><label>Admin Password</label><input id="webPass" type="password" placeholder="(unchanged if blank)"></div>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" onclick="saveNet()">Save Network Config</button>
+  </div>
+</div>
+
+<!-- Device -->
+<div class="pane" id="tab-device">
+  <div class="card">
+    <h2>Token Settings</h2>
+    <div class="field"><label>Token Prefix (e.g. A, OPD, "")</label><input id="tokenPrefix" maxlength="15"></div>
+    <div class="field"><label>Daily Reset Hour (0-23, 255 = disabled)</label><input id="dailyResetHour" type="number" min="0" max="255"></div>
+  </div>
+  <div class="card">
+    <h2>Paper Roll</h2>
+    <div class="field"><label>Tokens Per Roll</label><input id="tokensPerRoll" type="number" min="1"></div>
+    <div class="field"><label>Low Paper Threshold (tokens remaining)</label><input id="lowPaperThreshold" type="number" min="1"></div>
+  </div>
+  <div class="card">
+    <h2>Behaviour</h2>
+    <div class="row-check"><input type="checkbox" id="queueOneBusy"><label for="queueOneBusy" style="margin:0">Queue one extra print while busy</label></div>
+    <div class="row-check"><input type="checkbox" id="longPressRollReset"><label for="longPressRollReset" style="margin:0">Enable 10-sec long press to reset roll</label></div>
+    <div class="row-check"><input type="checkbox" id="buzzerEnabled"><label for="buzzerEnabled" style="margin:0">Enable buzzer</label></div>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" onclick="saveDev()">Save Device Config</button>
+  </div>
+</div>
+
+<!-- Template -->
+<div class="pane" id="tab-template">
+  <div class="card">
+    <h2>Print Template (JSON)</h2>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:8px;">
+      Edit and upload the ESC/POS print template. Supported variables:
+      {{token_number}}, {{date_time}}, {{queue_name}}, {{site_name}},
+      {{custom_header}}, {{custom_footer}}, {{qr_payload}}
+    </p>
+    <textarea id="templateJson"></textarea>
+    <div class="actions">
+      <button class="btn-ghost" onclick="loadTemplate()">Reload from Device</button>
+      <button class="btn-primary" onclick="uploadTemplate()">Upload Template</button>
+    </div>
+  </div>
+</div>
+
+<!-- Token -->
+<div class="pane" id="tab-token">
+  <div class="card">
+    <h2>Set Token Counter</h2>
+    <div class="field"><label>New Counter Value</label><input id="tokenValue" type="number" min="0" value="0"></div>
+    <div class="actions">
+      <button class="btn-primary" onclick="setToken()">Set Counter</button>
+    </div>
+  </div>
+</div>
+
+<!-- OTA -->
+<div class="pane" id="tab-ota">
+  <div class="card">
+    <h2>HTTP OTA Update</h2>
+    <div class="field"><label>Firmware URL (.bin)</label><input id="otaUrl" placeholder="https://updates.yourserver.com/jnx-td-c3-v1.1.0.bin"></div>
+    <div class="actions">
+      <button class="btn-primary" onclick="startOta()">Start OTA Update</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:12px;">
+      Device will reboot automatically after successful update.
+      Local OTA also available via PlatformIO (port 3232).
+    </p>
+  </div>
+</div>
+
+<!-- Logs -->
+<div class="pane" id="tab-logs">
+  <div class="card">
+    <h2>Event Log</h2>
+    <div class="actions" style="margin-bottom:12px;">
+      <button class="btn-ghost" onclick="downloadLogs()">Download Logs</button>
+      <button class="btn-danger" onclick="clearLogs()">Clear Logs</button>
+    </div>
+    <textarea id="logArea" style="min-height:320px;font-size:11px;" readonly></textarea>
+  </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="pane" id="tab-danger">
+  <div class="card">
+    <h2>Danger Zone</h2>
+    <div class="actions" style="flex-direction:column;align-items:flex-start;">
+      <button class="btn-ghost" onclick="reboot()">Reboot Device</button>
+      <button class="btn-danger" style="margin-top:8px" onclick="factoryReset()">Factory Reset</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:12px;">
+      Factory reset will erase all WiFi, MQTT, and token configuration.
+    </p>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 3500);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', t.textContent.trim().toLowerCase().replace(/\s/g,'') === name ||
+      (name === 'network' && i === 0) ||
+      (name === 'device' && i === 1) ||
+      (name === 'template' && i === 2) ||
+      (name === 'token' && i === 3) ||
+      (name === 'ota' && i === 4) ||
+      (name === 'logs' && i === 5) ||
+      (name === 'danger' && i === 6)
+    );
+  });
+  document.querySelectorAll('.pane').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + name);
+  });
+  if (name === 'logs') loadLogs();
+  if (name === 'template') loadTemplate();
+}
+
+// Fix tab click: just use index
+document.querySelectorAll('.tab').forEach((t, i) => {
+  const names = ['network','device','template','token','ota','logs','danger'];
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + names[i]).classList.add('active');
+    if (names[i] === 'logs') loadLogs();
+    if (names[i] === 'template') loadTemplate();
+  };
+});
+
+// ---- Auth ----
+async function doLogin() {
+  const fd = new FormData();
+  fd.append('user', document.getElementById('lusr').value);
+  fd.append('pass', document.getElementById('lpwd').value);
+  const r = await fetch('/api/login', { method: 'POST', body: fd });
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    loadStatus();
+  } else {
+    toast('Invalid credentials', true);
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: body && typeof body === 'object' && !(body instanceof FormData)
+      ? {'Content-Type': 'application/json'} : {},
+    body: body ? (typeof body === 'object' && !(body instanceof FormData)
+      ? JSON.stringify(body) : body) : undefined,
+  });
+  return r.json();
+}
+
+// ---- Status load (populate form fields) ----
+async function loadStatus() {
+  try {
+    const d = await (await fetch('/api/status')).json();
+    // Network
+    document.getElementById('wifiSsid').value   = d.wifi?.ssid || '';
+    document.getElementById('mqttHost').value    = d.mqtt?.host || '';
+    document.getElementById('mqttPort').value    = d.mqtt?.port || 1883;
+    document.getElementById('homeId').value      = d.platform?.home_id || '';
+    document.getElementById('siteName').value    = d.platform?.site_name || '';
+    // Device
+    document.getElementById('tokenPrefix').value = d.token?.prefix || '';
+    document.getElementById('tokensPerRoll').value      = d.paper?.tokens_per_roll || 500;
+    document.getElementById('lowPaperThreshold').value  = 50;
+    document.getElementById('dailyResetHour').value     = 255;
+  } catch(e) {}
+}
+
+// ---- Network ----
+async function saveNet() {
+  const body = {
+    wifiSsid: document.getElementById('wifiSsid').value,
+    wifiPass: document.getElementById('wifiPass').value,
+    mqttHost: document.getElementById('mqttHost').value,
+    mqttPort: parseInt(document.getElementById('mqttPort').value),
+    mqttUser: document.getElementById('mqttUser').value,
+    mqttPass: document.getElementById('mqttPass').value,
+    homeId:   document.getElementById('homeId').value,
+    siteName: document.getElementById('siteName').value,
+    httpFallbackUrl: document.getElementById('httpFallback').value,
+    webUser:  document.getElementById('webUser').value,
+    webPass:  document.getElementById('webPass').value,
+  };
+  // Remove empty optional fields
+  Object.keys(body).forEach(k => { if (!body[k]) delete body[k]; });
+  const d = await post('/api/config/net', body);
+  toast(d.ok ? 'Network config saved — reboot to apply' : ('Error: ' + d.error), !d.ok);
+}
+
+// ---- Device ----
+async function saveDev() {
+  const body = {
+    tokenPrefix:       document.getElementById('tokenPrefix').value,
+    dailyResetHour:    parseInt(document.getElementById('dailyResetHour').value),
+    tokensPerRoll:     parseInt(document.getElementById('tokensPerRoll').value),
+    lowPaperThreshold: parseInt(document.getElementById('lowPaperThreshold').value),
+    queueOneBusy:      document.getElementById('queueOneBusy').checked,
+    longPressRollReset:document.getElementById('longPressRollReset').checked,
+    buzzerEnabled:     document.getElementById('buzzerEnabled').checked,
+  };
+  const d = await post('/api/config/dev', body);
+  toast(d.ok ? 'Device config saved' : ('Error: ' + d.error), !d.ok);
+}
+
+// ---- Template ----
+async function loadTemplate() {
+  try {
+    const r = await fetch('/api/template');
+    const t = await r.text();
+    document.getElementById('templateJson').value =
+      JSON.stringify(JSON.parse(t), null, 2);
+  } catch(e) {
+    document.getElementById('templateJson').value = '// Could not load template';
+  }
+}
+
+async function uploadTemplate() {
+  const json = document.getElementById('templateJson').value;
+  try { JSON.parse(json); } catch(e) { toast('Invalid JSON', true); return; }
+  const r = await fetch('/api/template/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: json,
+  });
+  const d = await r.json();
+  toast(d.ok ? 'Template uploaded' : ('Error: ' + d.error), !d.ok);
+}
+
+// ---- Token ----
+async function setToken() {
+  const val = parseInt(document.getElementById('tokenValue').value);
+  if (isNaN(val)) { toast('Invalid value', true); return; }
+  const d = await post('/api/token/set', { value: val });
+  toast(d.ok ? 'Counter set to ' + val : 'Error', !d.ok);
+}
+
+// ---- OTA ----
+async function startOta() {
+  const url = document.getElementById('otaUrl').value.trim();
+  if (!url) { toast('URL is required', true); return; }
+  if (!confirm('Start OTA update from: ' + url + '?')) return;
+  const d = await post('/api/ota/start', { url });
+  toast(d.ok ? 'OTA started — device will reboot' : ('Error: ' + d.error), !d.ok);
+}
+
+// ---- Logs ----
+async function loadLogs() {
+  try {
+    const r = await fetch('/api/logs');
+    const d = await r.json();
+    document.getElementById('logArea').value =
+      d.map(e => `[${e.t}][${e.l}][${e.c}] ${e.m}`).join('\n');
+  } catch(e) {
+    document.getElementById('logArea').value = 'Failed to load logs';
+  }
+}
+
+function downloadLogs() {
+  window.open('/api/logs', '_blank');
+}
+
+async function clearLogs() {
+  if (!confirm('Clear all logs?')) return;
+  await post('/api/logs/clear');
+  toast('Logs cleared');
+  loadLogs();
+}
+
+// ---- Danger ----
+async function reboot() {
+  if (!confirm('Reboot the device?')) return;
+  await post('/api/reboot');
+  toast('Rebooting...');
+}
+
+async function factoryReset() {
+  if (!confirm('FACTORY RESET — all config will be erased! Continue?')) return;
+  if (!confirm('Are you absolutely sure?')) return;
+  await post('/api/factory-reset');
+  toast('Factory reset — device rebooting');
+}
+
+// Boot: check if already logged in
+fetch('/api/status').then(r => {
+  if (r.ok) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    loadStatus();
+  }
+});
+</script>
+</body>
+</html>

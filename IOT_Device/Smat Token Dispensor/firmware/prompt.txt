@@ -1,0 +1,226 @@
+PID: JNX-TD-C3-01
+Device Name: Jenix Smart Token Dispenser
+BLE/AP SSID: JNX-TD-XXXX where XXXX = last 4 chars of MAC
+Firmware Profile: TOKEN_DISPENSER_C3_V1
+
+You are developing production-grade firmware for “Jenix Smart Token Dispenser”.
+
+Device:
+- Product Name: Jenix Smart Token Dispenser
+- PID: JNX-TD-C3-01
+- MCU: ESP32-C3
+- Printer: CSN-A1X thermal panel printer over TTL UART / ESC-POS
+- Input: 1 touch/button input for “Generate Token”
+- Connectivity: WiFi, BLE provisioning, AP fallback, MQTT telemetry, HTTP fallback, ESP-NOW local status broadcast
+- Target product life: 10 years, field-grade, low maintenance
+
+Core Requirement:
+When user presses/touches the button, the device must generate next token number, print token, feed/cut/dispense paper as supported by printer, store state safely, and publish/broadcast status.
+
+Main Features:
+1. Independent offline working
+- Token dispenser must work without internet.
+- Token counter must continue locally.
+- Store token counter in NVS/Preferences with wear-level strategy.
+- Use safe commit: do not lose token number after power failure.
+- Maintain daily token counter reset option configurable.
+- Support token prefix like A001, B001, OPD001, etc.
+
+2. Printer control
+- Use UART hardware serial.
+- Support ESC/POS printing.
+- Print template should be separate from main firmware logic.
+- Create print_template.json or equivalent embedded configurable template.
+- Template should support:
+  - token_number
+  - date_time
+  - queue_name
+  - site_name
+  - custom_header
+  - custom_footer
+  - qr_payload
+  - linked_device_message
+  - action_reason
+- Future PID should be able to print custom text from JSON without rewriting core printer driver.
+- Support text alignment, bold, double size, feed lines, QR code if supported.
+- Printer status query should detect:
+  - online/offline
+  - paper out
+  - overheat if available
+  - error state
+- If printer status query is not reliable, add software fallback using print success timeout and button lockout.
+
+3. Paper roll estimation
+- Since CSN-A1X may not give exact paper length left, implement token-count-based paper estimation.
+- Config:
+  - tokens_per_roll_default = 500
+  - low_paper_threshold_tokens = 50
+  - roll_reset_button/API after new roll installed
+- Track:
+  - tokens_printed_since_roll_reset
+  - estimated_tokens_left
+  - paper_low = true if estimated_tokens_left <= 50
+- Publish alert when paper low.
+- Block printing only on confirmed paper-out, not only low estimate.
+
+4. Button/touch input
+- One GPIO input.
+- Debounce 100–300 ms.
+- Long press optional:
+  - 5 sec = local test print
+  - 10 sec = reset paper roll counter only if enabled
+- Prevent double token printing with lockout while printer is busy.
+- If button pressed during printing, ignore or queue only one pending request based on config.
+
+5. ESP-NOW
+- Broadcast current status locally:
+  - PID
+  - device_id
+  - current_token
+  - last_printed_token
+  - print_status
+  - paper_low
+  - estimated_tokens_left
+  - printer_error
+  - battery/power status if available
+  - timestamp
+- Allow other Jenix devices to read current/last token.
+- Allow trusted paired ESP-NOW command to trigger token dispense.
+- Include simple pairing key / device allowlist to avoid fake triggers.
+
+6. MQTT + HTTP fallback
+- MQTT primary telemetry to VPS.
+- HTTP fallback if MQTT unavailable.
+- Topics:
+  - jenix/{tenantId}/{siteId}/{deviceId}/telemetry
+  - jenix/{tenantId}/{siteId}/{deviceId}/state
+  - jenix/{tenantId}/{siteId}/{deviceId}/command
+  - jenix/{tenantId}/{siteId}/{deviceId}/event
+- Commands:
+  - PRINT_NEXT_TOKEN
+  - PRINT_CUSTOM_JSON
+  - RESET_ROLL_COUNTER
+  - SET_TOKEN_COUNTER
+  - SET_TEMPLATE
+  - TEST_PRINT
+  - REBOOT
+  - OTA_UPDATE
+  - FACTORY_RESET
+- Every command must return ack with command_id, success/failure, reason.
+
+7. Local Web UI
+Create local web UI available in AP mode and STA mode:
+- SSID: JNX-TD-XXXX
+- Local page must show:
+  - firmware version and build date
+  - PID
+  - MAC/device ID
+  - WiFi status
+  - MQTT status
+  - HTTP fallback status
+  - printer status
+  - current token
+  - last printed token
+  - paper roll estimate
+  - paper low alert
+  - button status
+  - ESP-NOW status
+- Local actions:
+  - test print
+  - print next token
+  - reset roll counter
+  - set token prefix
+  - set current token number
+  - upload/update print template JSON
+  - configure WiFi
+  - configure MQTT
+  - OTA firmware update
+  - download logs
+- Use login protection for configuration page.
+
+8. BLE provisioning + AP fallback
+- BLE device name: JNX-TD-XXXX
+- BLE provisioning should send WiFi SSID/password and tenant/site binding token.
+- If WiFi not configured or failed, start AP mode.
+- AP SSID: JNX-TD-XXXX
+- AP page should allow setup.
+
+9. OTA
+- Support secure OTA from VPS.
+- Show current firmware version and release date.
+- Firmware version format:
+  - v1.0.0
+  - build date
+  - PID
+- OTA must support rollback if boot fails.
+
+10. Logging
+- Keep circular logs in flash:
+  - boot
+  - WiFi connect/disconnect
+  - MQTT connect/disconnect
+  - print success/failure
+  - paper low
+  - paper out
+  - commands received
+  - OTA events
+- Limit writes to protect flash life.
+
+11. Professional reliability
+- Watchdog enabled.
+- Brownout handling.
+- Non-blocking printer task.
+- State machine:
+  - IDLE
+  - PRINT_REQUESTED
+  - PRINTING
+  - PRINT_SUCCESS
+  - PRINT_FAILED
+  - PAPER_LOW
+  - PAPER_OUT
+  - ERROR
+- Use FreeRTOS tasks carefully:
+  - button task
+  - printer task
+  - network task
+  - telemetry task
+  - local web server task
+- No blocking delay in main loop.
+- Code must be modular:
+  - main.cpp
+  - printer_driver.*
+  - token_manager.*
+  - print_template.*
+  - paper_estimator.*
+  - mqtt_client.*
+  - http_fallback.*
+  - espnow_service.*
+  - ble_provisioning.*
+  - local_webui.*
+  - ota_service.*
+  - config_store.*
+  - event_log.*
+
+Suggested Hardware Pins:
+- Printer UART TX from ESP32-C3 to Printer RX
+- Printer UART RX from ESP32-C3 to Printer TX
+- Button input GPIO with pull-up/pull-down as per circuit
+- status LED
+- Optional buzzer
+
+
+Important:
+- ESP32-C3 is 3.3V logic. If printer TX is 5V TTL, use level shifting or voltage divider into ESP32-C3 RX.
+- Common GND is required.
+- Printer power supply must be separate strong 5V/9V/12V as per selected CSN-A1X model.
+- Add large capacitor near printer supply.
+- Do not power printer from ESP32 board regulator.
+
+Deliverables:
+- Complete PlatformIO project.
+- README with wiring.
+- Local web UI files.
+- Example print_template.json.
+- Example MQTT payloads.
+- Unit-testable modules where possible.
+- Version: v1.0.0 for PID JNX-TD-C3-01.

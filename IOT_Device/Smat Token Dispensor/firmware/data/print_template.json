@@ -1,0 +1,106 @@
+{
+  "_comment": "Jenix Token Dispenser — ESC/POS print template v1.0",
+  "_doc": "Supported element types: text, feed, cut, qr, divider",
+  "_variables": [
+    "{{token_number}}", "{{date_time}}", "{{queue_name}}", "{{site_name}}",
+    "{{custom_header}}", "{{custom_footer}}", "{{qr_payload}}",
+    "{{linked_device_message}}", "{{action_reason}}",
+    "{{firmware_version}}", "{{pid}}"
+  ],
+  "elements": [
+    {
+      "type": "feed",
+      "lines": 1
+    },
+    {
+      "type": "text",
+      "content": "{{custom_header}}",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "text",
+      "content": "{{site_name}}",
+      "align": 1,
+      "bold": true,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "text",
+      "content": "YOUR TOKEN NUMBER",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "text",
+      "content": "{{token_number}}",
+      "align": 1,
+      "bold": true,
+      "double_height": true,
+      "double_width": true
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "text",
+      "content": "Queue: {{queue_name}}",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "text",
+      "content": "{{date_time}}",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "text",
+      "content": "{{linked_device_message}}",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "qr",
+      "content": "{{qr_payload}}",
+      "size": 6
+    },
+    {
+      "type": "text",
+      "content": "{{custom_footer}}",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "text",
+      "content": "Powered by Jenix One",
+      "align": 1,
+      "bold": false,
+      "double_height": false,
+      "double_width": false
+    },
+    {
+      "type": "feed",
+      "lines": 4
+    },
+    {
+      "type": "cut"
+    }
+  ]
+}
