@@ -17,6 +17,7 @@ import type {
   ProvisioningProgressModel,
   WifiCredentialPayload
 } from "../provisioning.types";
+import { fetchFactoryProofOfPossession } from "../services/provisioningApi";
 import {
   getInitialProvisioningStatus,
   getProvisioningSequence
@@ -63,6 +64,8 @@ export function BleProvisioningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentWifi = useCurrentWifiSsid();
+  const [factoryPop, setFactoryPop] = useState<string | null>(null);
+  const [factoryPopLoading, setFactoryPopLoading] = useState(false);
 
   if (!session) {
     throw new Error("BleProvisioningPage requires an authenticated session");
@@ -110,6 +113,13 @@ export function BleProvisioningPage() {
     setSelectedDevice(device);
     setError(null);
     setScreen("wifi");
+
+    setFactoryPop(null);
+    setFactoryPopLoading(true);
+    void fetchFactoryProofOfPossession(activeSession, device.deviceId).then((pop) => {
+      setFactoryPop(pop ?? null);
+      setFactoryPopLoading(false);
+    });
   }
 
   async function handleSubmitWifi(payload: WifiCredentialPayload) {

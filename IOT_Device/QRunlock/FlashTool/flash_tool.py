@@ -14,7 +14,9 @@ service name. The record is saved locally (this folder's own records/,
 gitignored - it contains real per-device secrets) and, if VPS credentials
 are configured, pushed there too over SCP into a root-only directory --
 deliberately not a public HTTP endpoint, since these records carry each
-device's own PoP and local API token.
+device's own PoP and local API token. Separately, and also optionally, just
+the PoP (not the local API token) is registered with the platform API so
+the app can auto-fill it during BLE provisioning.
 
 Usage:
     python flash_tool.py list-models
@@ -37,16 +39,27 @@ without sharing credentials:
                                     model's own vps_dir_default, then to
                                     DEFAULT_VPS_DIR); created on first upload
                                     if it doesn't exist yet
+
+Factory-record registration (also optional): POSTs just the deviceId/pid/PoP
+(not the local API token) to the platform API so the app can auto-fill the
+PoP during BLE provisioning instead of asking the installer to type it in.
+    <PREFIX>_ADMIN_API_URL / JENIX_ADMIN_API_URL    e.g. https://api.iotsoft.in
+    <PREFIX>_ADMIN_API_KEY / JENIX_ADMIN_API_KEY    only needed once the
+                                    platform's ADMIN_API_KEY enforcement is
+                                    turned on (see require-admin.ts)
 """
 
 import argparse
 import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 import serial.tools.list_ports
 
@@ -368,6 +381,7 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
     factory_record["record_path"] = record_path
 
     upload_to_vps(record_path, model, log)
+    register_factory_record_with_api(factory_record, model, log)
     return factory_record
 
 
@@ -443,6 +457,64 @@ def upload_to_vps(record_path, model, log=print):
     else:
         log(f"VPS upload failed (local record is still saved): "
             f"{result.stderr.strip() or result.stdout.strip()}")
+
+
+def device_id_from_factory_record(factory_record):
+    """Mirrors the app's own derivation exactly (bleDiscoveryService.ts's
+    deriveDeviceIdFromPid): the PID with its trailing "-NN" instance number
+    stripped, "-", then the last 6 hex chars of the BLE name (same bytes the
+    firmware's own ensureDeviceId() uses). Must never drift from that -- a
+    mismatch here means the app looks up a PoP for a deviceId the backend
+    never sees traffic from, same failure mode as the deviceId bug this
+    whole factory-record feature was built alongside.
+    """
+    pid_prefix = re.sub(r"-\d+$", "", factory_record["pid"])
+    mac_suffix = factory_record["ble_name"][-6:]
+    return f"{pid_prefix}-{mac_suffix}"
+
+
+def register_factory_record_with_api(factory_record, model, log=print):
+    """POST the captured PoP to the platform so the app can auto-fill it
+    during BLE provisioning instead of asking the installer to type it in
+    (see VPS/apps/api-server/src/modules/factory-records). Optional, same
+    as the SCP upload above -- flashing already succeeded regardless.
+    """
+    prefix = model.get("vps_env_prefix") or DEFAULT_VPS_ENV_PREFIX
+    base_url = os.environ.get(f"{prefix}_ADMIN_API_URL") or os.environ.get(
+        "JENIX_ADMIN_API_URL"
+    )
+    if not base_url:
+        log(f"{prefix}_ADMIN_API_URL / JENIX_ADMIN_API_URL not set - "
+            f"skipping factory-record registration (app will fall back to "
+            f"asking the installer for this device's PoP).")
+        return
+
+    admin_key = os.environ.get(f"{prefix}_ADMIN_API_KEY") or os.environ.get(
+        "JENIX_ADMIN_API_KEY"
+    )
+    device_id = device_id_from_factory_record(factory_record)
+    body = json.dumps({
+        "deviceId": device_id,
+        "pid": factory_record["pid"],
+        "proofOfPossession": factory_record["pop"],
+    }).encode("utf-8")
+
+    request = urllib.request.Request(
+        base_url.rstrip("/") + "/api/v1/admin/factory-records",
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            **({"x-admin-key": admin_key} if admin_key else {}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+        log(f"Registered factory record with platform for deviceId={device_id}")
+    except urllib.error.URLError as exc:
+        log(f"Factory-record registration failed (local record is still "
+            f"saved, app will fall back to manual PoP entry): {exc}")
 
 
 def build_parser():

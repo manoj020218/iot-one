@@ -257,6 +257,38 @@ export async function registerProvisionedDevice(
   }
 }
 
+/**
+ * Looks up the device's real Security Scheme 2 Proof-of-Possession, captured
+ * by the Flash Tool at factory-flash time and stored server-side -- lets the
+ * installer skip typing it in by hand (see WifiCredentialForm's
+ * requireProofOfPossession). Returns undefined for both "no factory record"
+ * and "request failed" -- either way the caller falls back to asking the
+ * installer to enter it manually.
+ */
+export async function fetchFactoryProofOfPossession(
+  session: AuthSession,
+  deviceId: string
+): Promise<string | undefined> {
+  try {
+    const response = await fetch(
+      `${provisioningEndpoint}/factory-records/${encodeURIComponent(deviceId)}/pop`,
+      {
+        method: "GET",
+        headers: createAuthenticatedHeaders(session, {})
+      }
+    );
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const payload = (await response.json()) as { data: { proofOfPossession: string } };
+    return payload.data.proofOfPossession;
+  } catch {
+    return undefined;
+  }
+}
+
 export const provisioningApiTesting = {
   reset() {
     localIntentStore.clear();

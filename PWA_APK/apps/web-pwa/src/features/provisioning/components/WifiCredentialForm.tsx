@@ -25,6 +25,15 @@ export interface WifiCredentialFormProps {
    * this (Security Scheme 2 pairing) -- the AP flow doesn't use it.
    */
   requireProofOfPossession?: boolean;
+  /**
+   * The device's real PoP, looked up from its factory record (captured by
+   * the Flash Tool at flash time) -- same auto-fill-unless-touched pattern
+   * as detectedSsid. undefined means "still looking it up", null means
+   * "no factory record for this device", either of which leaves the field
+   * as a manual fallback for the installer.
+   */
+  autoProofOfPossession?: string | null | undefined;
+  autoProofOfPossessionLoading?: boolean | undefined;
   onSubmit: (payload: WifiCredentialPayload) => Promise<void> | void;
 }
 
@@ -38,13 +47,16 @@ export function WifiCredentialForm({
   detectingSsid = false,
   onRefreshDetectedSsid,
   requireProofOfPossession = false,
+  autoProofOfPossession,
+  autoProofOfPossessionLoading = false,
   onSubmit
 }: WifiCredentialFormProps) {
   const [ssid, setSsid] = useState(detectedSsid || initialSsid);
   const [ssidTouched, setSsidTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [proofOfPossession, setProofOfPossession] = useState("");
+  const [proofOfPossession, setProofOfPossession] = useState(autoProofOfPossession || "");
+  const [popTouched, setPopTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Only auto-fill from a fresh detection if the user hasn't typed their
@@ -56,6 +68,13 @@ export function WifiCredentialForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectedSsid]);
+
+  useEffect(() => {
+    if (autoProofOfPossession && !popTouched) {
+      setProofOfPossession(autoProofOfPossession);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoProofOfPossession]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,10 +176,28 @@ export function WifiCredentialForm({
           <input
             autoComplete="off"
             name="proofOfPossession"
-            onChange={(event) => setProofOfPossession(event.target.value)}
-            placeholder="Printed on the device label / factory record"
+            onChange={(event) => {
+              setPopTouched(true);
+              setProofOfPossession(event.target.value);
+            }}
+            placeholder={
+              autoProofOfPossessionLoading
+                ? "Looking up this device's pairing code..."
+                : "Printed on the device label / factory record"
+            }
             value={proofOfPossession}
           />
+          {autoProofOfPossession ? (
+            <span className="wifi-cred-hint">
+              Verified automatically from this device's factory record.
+            </span>
+          ) : autoProofOfPossessionLoading ? (
+            <span className="wifi-cred-hint">Checking the factory record...</span>
+          ) : (
+            <span className="wifi-cred-hint">
+              No factory record found -- enter the code printed on the device label.
+            </span>
+          )}
         </label>
       ) : null}
       {error ? <p className="inline-error">{error}</p> : null}
