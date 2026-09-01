@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-08-30
+> Last updated: 2026-09-01
 
 ---
 
@@ -172,10 +172,58 @@ when quoted. For anything beyond a single pipe-free one-liner, write a
 `.sh` file, `pscp` it over, then run it with one simple
 `plink ... "bash /root/thefile.sh"` call.
 
-## 5. Feature Status (as of 2026-08-30)
+## 5. Feature Status (as of 2026-09-01)
 
 All of the below are **live and deployed** unless noted otherwise, most recent first:
 
+- **Token Dispenser (`JNX-TD-C3-01`) brought to QRunlock parity, real
+  hardware onboarded end-to-end** (commits `9402dda`, `7e5a0c6`, `6851ad4`
+  on `codex/smart-speaker-20260813`) — VPS now speaks the canonical
+  `jnx/{tenantId}/{pid}/{deviceId}/{suffix}` scheme for this device
+  (previously the firmware side was done but the VPS half never was);
+  periodic snapshot moved from `.../telemetry` (reserved internally for
+  cross-instance scene-job relay) to `.../status`; real local API token
+  added matching QRunlock's pattern; the PWA-tool React files were built
+  into a proper `token-dispenser-mobile` dynamic remote package (see
+  `DEVICE_PACKAGE_RUNTIME.md`) instead of a webui fallback. Home-page
+  compact tiles are now a PID-keyed component registry
+  (`HomeDeviceSection.tsx`'s `COMPACT_TILE_COMPONENTS`) so every device's
+  tile is added the same way at the same size.
+  - **Root-caused and fixed a real "device shows online forever" bug,
+    confirmed to also explain why QRunlock devices weren't flipping
+    offline either:** `ensureDeviceId()` in the firmware's
+    `config_store.cpp` built its internal deviceId as
+    `JNX-{full 6-byte MAC}`, but the app derives
+    `JNX-TD-C3-{last-3-MAC-bytes}` from the BLE-advertised name
+    (`bleDiscoveryService.ts`'s `deriveDeviceIdFromPid`) and registers
+    *that* string in Mongo. Every topic the firmware published to
+    (`status`/`lwt`/`events`/`cmd`) therefore targeted a deviceId the
+    backend never saw — confirmed live by finding retained
+    `{"status":"offline"}` LWT messages on the broker for QRunlock
+    deviceIds (proving the LWT subscription/handler mechanism itself
+    works) but zero retained message at all under Token Dispenser's old
+    deviceId. Fixed to match QRunlock's own `DeviceIdentity.cpp` pattern.
+    **If you ever see a device stuck at one MQTT status forever, check
+    this class of bug first** — compare what the firmware actually
+    publishes on the wire against what deviceId string the app
+    registered, don't assume the LWT/backend plumbing is broken.
+    **Existing flashed units need a full erase before reflashing** — the
+    wrong deviceId is already burned into NVS, so a normal upload alone
+    won't regenerate it.
+  - **New: BLE provisioning auto-fills the Security Scheme 2 pairing
+    code (PoP) instead of asking the installer to type it in.** The
+    Flash Tool already captures each device's real PoP at factory-flash
+    time; it's now also POSTed to a new
+    `VPS/apps/api-server/src/modules/factory-records` module (Mongo-backed,
+    admin-key-gated ingest, session-authenticated read by deviceId) and
+    the app looks it up when a device is selected in
+    `BleProvisioningPage.tsx`, same auto-fill-unless-touched pattern as
+    Wi-Fi SSID detection. Falls back to manual entry when there's no
+    factory record (e.g. units flashed before this feature) — nothing
+    regresses. Wire-up for a new/re-flashed unit needs
+    `<PREFIX>_ADMIN_API_URL` set wherever `flash_tool.py` runs (see its
+    own `--help`); without it, flashing still works, the app just falls
+    back to the manual field.
 - **Android app ready for its first Play Store release** (commits
   `2956431`, `7d6a79f`, `02f38ac`, `6193d24` on `codex/smart-speaker-20260813`)
   — **not yet uploaded, blocked on Play Console account verification**
