@@ -170,7 +170,14 @@ export function WifiCredentialForm({
         </div>
       </label>
 
-      {requireProofOfPossession ? (
+      {requireProofOfPossession && autoProofOfPossession ? (
+        <div className="field">
+          <span>Device pairing code</span>
+          <span className="wifi-cred-hint">
+            Verified automatically from this device's factory record -- no need to enter it.
+          </span>
+        </div>
+      ) : requireProofOfPossession ? (
         <label className="field">
           <span>Device pairing code</span>
           <input
@@ -187,11 +194,7 @@ export function WifiCredentialForm({
             }
             value={proofOfPossession}
           />
-          {autoProofOfPossession ? (
-            <span className="wifi-cred-hint">
-              Verified automatically from this device's factory record.
-            </span>
-          ) : autoProofOfPossessionLoading ? (
+          {autoProofOfPossessionLoading ? (
             <span className="wifi-cred-hint">Checking the factory record...</span>
           ) : (
             <span className="wifi-cred-hint">
