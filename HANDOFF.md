@@ -71,6 +71,50 @@ only touch `jenix-one-api`'s PM2 process and the paths below; never
 `pm2 restart`/`delete` anything else, and always check what a
 port/service actually is before assuming it's yours.
 
+### Three separate git repos are involved here, not one
+
+This has caused real confusion (2026-09-01) and is worth internalizing
+before touching deploy at all:
+
+1. **`manoj020218/iot-one`** — this monorepo. Local dev clones this;
+   the VPS keeps its own clone at `/root/repos/iot-one` purely as a
+   fetch/reset staging area, never edited in place.
+2. **`manoj020218/IOT_Devices`** — a *completely separate* repo holding
+   per-device release artifacts: firmware binaries, PID capability
+   manifests, and **built UI-package bundles** (the actual
+   `remoteEntry.js` a dynamic device page runs — see
+   `DEVICE_PACKAGE_RUNTIME.md`). Cloned on the VPS at
+   `/root/repos/IOT_Devices`. **A device's dynamic-remote-package
+   source lives in `iot-one` (`PWA_APK/apps/web-pwa/src/features/
+   <device>/remotePackage/`), but the *built* bundle that production
+   actually serves has to be separately committed and pushed to
+   *this* repo — building it in `iot-one` alone changes nothing live.**
+   Confirmed 2026-09-01: `token-dispenser-mobile`'s deployed bundle had
+   sat as a stale placeholder (wrong `exportName`, wrong `templateId`,
+   missing its CSS entirely — compare a working manifest like
+   `qrunlock-mobile`'s to sanity-check a new one) since whenever it was
+   first drafted, silently never able to mount, because nobody pushed
+   a real build here after `iot-one`'s source was finished.
+3. **`/root/projects/IOT_one`** — **not a git repo.** Pure `rsync`
+   target (step 2 below), gitignored `.git` excluded. This is what
+   `pm2` actually runs `jenix-one-api` from. `device-registry/` inside
+   it is excluded from that rsync and instead populated straight from
+   repo #2 by `sync-device-registry.sh` (called automatically as the
+   last step of `deploy-iot-one.sh`).
+
+**The recurring gotcha:** `deploy-iot-one.sh`'s `BRANCH` defaults to
+`main` and every step below resets hard to `origin/$BRANCH` —
+regardless of what branch you've actually been pushing feature work to
+(e.g. `codex/smart-speaker-20260813`). Active development can sit on a
+feature branch for an entire session, get pushed and typechecked
+repeatedly, and still never reach production until that branch is
+fast-forwarded into `main` and pushed there too. **Before assuming a
+deploy will pick up recent work, confirm
+`git rev-list --count origin/main..origin/<your-branch>` is `0`** — if
+it isn't, fast-forward first: `git push origin <your-branch>:main`
+(direct pushes to `main` are typically blocked for the assistant by
+Claude Code's auto-mode classifier; the user runs this one via `!`).
+
 ```bash
 # 1. Sync the git mirror
 cd /root/repos/iot-one && git fetch --prune origin && git checkout main && git reset --hard origin/main
@@ -100,6 +144,24 @@ directory holds the live PWA on the same domain root).
 `deploy-iot-one.sh` automates steps 1–4 (and the device-registry sync,
 §5) but **not** step 5 above — the frontend rsync to `/var/www/` is
 still a separate manual command after it finishes.
+
+**Publishing a new/updated dynamic-remote-package build** (see the
+three-repos note above) is a separate push entirely, into
+`manoj020218/IOT_Devices`, not `iot-one`:
+
+```bash
+# From wherever you built it, e.g. PWA_APK/apps/web-pwa/public/ui-packages/<pkg>/<ver>/
+git clone https://github.com/manoj020218/IOT_Devices.git   # or reuse an existing clone
+cp <built files> IOT_Devices/devices/<PID>/ui-packages/<pkg>/<ver>/
+cd IOT_Devices && git add -A && git commit -m "..." && git push origin main
+# Then, on the VPS:
+bash /root/bin/sync-device-registry.sh main
+```
+Sanity-check a new manifest.json against an already-working device's
+(e.g. `qrunlock-mobile`'s) before pushing — `exportName` must match
+what the package's own `register.ts` actually exports, and
+`templateId`/`capabilities` should follow the same shape other working
+packages use, not be invented fresh.
 
 ## 5. Adding a New Device — Minimum Code Edits
 
