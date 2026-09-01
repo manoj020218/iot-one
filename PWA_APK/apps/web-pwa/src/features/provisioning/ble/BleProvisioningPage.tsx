@@ -10,6 +10,7 @@ import {
 } from "../components/ProvisioningProgress";
 import { ProvisioningSuccess } from "../components/ProvisioningSuccess";
 import { WifiCredentialForm } from "../components/WifiCredentialForm";
+import { useCurrentWifiSsid } from "../hooks/useCurrentWifiSsid";
 import type {
   BleScanDevice,
   ProvisionedDeviceSummary,
@@ -61,6 +62,7 @@ export function BleProvisioningPage() {
   const [summary, setSummary] = useState<ProvisionedDeviceSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentWifi = useCurrentWifiSsid();
 
   if (!session) {
     throw new Error("BleProvisioningPage requires an authenticated session");
@@ -235,8 +237,10 @@ export function BleProvisioningPage() {
           </section>
           <WifiCredentialForm
             description="Send the Wi-Fi credentials so the device can join the cloud and register its telemetry stream."
-            initialSsid="Factory 2.4 GHz"
+            detectedSsid={currentWifi.ssid}
+            detectingSsid={currentWifi.detecting}
             loading={submitting}
+            onRefreshDetectedSsid={currentWifi.refresh}
             onSubmit={handleSubmitWifi}
             requireProofOfPossession
             submitLabel="Send Wi-Fi"

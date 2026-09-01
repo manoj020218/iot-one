@@ -413,6 +413,46 @@ button, input, select, textarea { font: inherit; }
 .form-card { display: grid; gap: 14px; }
 .meta-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 
+/* ── Wi-Fi credential form ── */
+.wifi-cred-notice {
+  align-items: flex-start;
+  background: var(--warning-tint);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  border-radius: var(--radius-control);
+  color: #8a5a00;
+  display: flex;
+  font-size: 0.85rem;
+  gap: 10px;
+  line-height: 1.5;
+  padding: 12px 14px;
+}
+.wifi-cred-notice svg { color: var(--warning); flex-shrink: 0; margin-top: 2px; width: 18px; height: 18px; }
+
+.wifi-cred-input-row { align-items: center; display: flex; gap: 8px; }
+.wifi-cred-input-row input { flex: 1; min-width: 0; }
+.wifi-cred-input-icon { color: var(--faint); flex-shrink: 0; width: 18px; height: 18px; }
+
+.wifi-cred-detect-btn {
+  align-items: center;
+  background: var(--card2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  flex-shrink: 0;
+  height: 40px;
+  width: 40px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.wifi-cred-detect-btn:hover { background: var(--card); color: var(--text); }
+.wifi-cred-detect-btn svg { width: 17px; height: 17px; margin: auto; }
+.wifi-cred-detect-btn.spinning svg { animation: wifi-cred-spin 0.9s linear infinite; }
+@keyframes wifi-cred-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wifi-cred-detect-btn.spinning svg { animation: none; } }
+
+.wifi-cred-hint { color: var(--faint); font-size: 0.78rem; font-weight: 500; }
+
 .top-bar {
   align-items: center;
   display: flex;

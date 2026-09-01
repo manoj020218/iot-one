@@ -48,4 +48,11 @@
          every API level. -->
     <uses-permission android:name="android.permission.BLUETOOTH" tools:node="replace" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" tools:node="replace" />
+
+    <!-- WifiInfoPlugin: reading the phone's currently-connected SSID (to
+         prefill the Wi-Fi provisioning form) requires location permission
+         on every Android version. Unlike BLE scanning above, there is no
+         neverForLocation-style opt-out for this specific API. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

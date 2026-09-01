@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     SplashScreen.installSplashScreen(this);
     registerPlugin(EspProvisioningPlugin.class);
     registerPlugin(GoogleSignInPlugin.class);
+    registerPlugin(WifiInfoPlugin.class);
     super.onCreate(savedInstanceState);
     // The WebView paints its own default-white surface the instant it attaches,
     // before the page or its CSS has loaded, regardless of the window's own
