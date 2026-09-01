@@ -123,11 +123,19 @@ void saveDev() {
 
 void ensureDeviceId() {
     if (strlen(s_net.deviceId) == 0) {
+        // Must match the app's own derivation exactly (bleDiscoveryService.ts
+        // deriveDeviceIdFromPid: FIRMWARE_PID with its trailing "-NN" instance
+        // number stripped, "-", then the same last-3-MAC-bytes hex suffix the
+        // BLE advertised name already carries via buildServiceName() in
+        // provisioning2.cpp). Any mismatch means every topic this firmware
+        // publishes to (status/lwt/events/cmd) targets a deviceId the backend
+        // never registered, so nothing -- including the offline LWT -- ever
+        // reaches the real device record.
         uint8_t mac[6];
         WiFi.macAddress(mac);
         snprintf(s_net.deviceId, sizeof(s_net.deviceId),
-                 "JNX-%02X%02X%02X%02X%02X%02X",
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                 "JNX-TD-C3-%02X%02X%02X",
+                 mac[3], mac[4], mac[5]);
         saveNet();
     }
     if (strlen(s_net.mqttClientId) == 0) {
