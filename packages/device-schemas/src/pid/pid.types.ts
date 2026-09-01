@@ -308,11 +308,16 @@ export const qrunlockPidBlueprint: CreatePidInput = {
     allowedScopes: ["devices:read", "devices:write"]
   },
   ui: {
-    // Real state, not aspirational: features/qrunlock/ is bundled into the
-    // app itself, not a dynamically loaded remote package (see
-    // QRunlock/PROVISIONING.md's Workstream B architecture note before
-    // changing this to "remote-package").
-    uiMode: "builtin"
+    // QRunlock migrated from "builtin" to a real remote package
+    // (qrunlock-mobile, see PWA_APK/apps/web-pwa/src/features/qrunlock/
+    // remotePackage/) so a fix ships by replacing one file on the VPS
+    // instead of a full app rebuild + reinstall — see
+    // DEVICE_PACKAGE_RUNTIME.md's "every device UI is a dynamic remote
+    // package" rule. Confirmed against the live product_pids record
+    // 2026-09-01 — this blueprint had drifted stale after that migration.
+    uiMode: "remote-package",
+    uiPackageId: "qrunlock-mobile",
+    uiPackageVersion: "1.0.0"
   },
   dashboard: {
     templateId: "qrunlock-default",
@@ -329,6 +334,87 @@ export const qrunlockPidBlueprint: CreatePidInput = {
   }
 };
 
+export const tokenDispenserPidRecord: PidIdentity = {
+  pid: "JNX-TD-C3-01",
+  productName: "Smart Token Dispenser",
+  productCategory: "Queue Management",
+  productLine: "Token Dispenser",
+  status: "beta",
+  matterMode: "NONE"
+};
+
+export const tokenDispenserPidBlueprint: CreatePidInput = {
+  ...tokenDispenserPidRecord,
+  brand: "JENIX",
+  description:
+    "ESP32-C3 smart token dispenser — thermal printer, BLE, MQTT, ESP-NOW, mDNS web UI.",
+  hardware: {
+    mcu: "ESP32-C3",
+    hardwareRevision: "HW-466AB",
+    hasBle: true,
+    hasWifi: true,
+    hasMatter: false,
+    hasThread: false,
+    hasEthernet: false,
+    hasRs485: false,
+    notes: "USB-C, PCB antenna @ 8.5 dBm, UART1 to CSN-A1X thermal printer"
+  },
+  firmware: {
+    firmwareFamily: "token-dispenser",
+    otaChannel: "beta",
+    stableVersion: "v1.0.0",
+    betaVersion: "v1.0.0",
+    rollbackAllowed: true
+  },
+  matter: {
+    enabled: false,
+    mode: "NONE",
+    certificationStatus: "not_required",
+    bridgeSupported: false
+  },
+  api: {
+    enabled: true,
+    sellable: false,
+    allowedScopes: [
+      "token:read",
+      "token:write",
+      "printer:read",
+      "printer:write",
+      "template:read",
+      "template:write",
+      "logs:read"
+    ],
+    webhookSupport: false,
+    mqttBridgeSupport: true
+  },
+  ui: {
+    // Full routed product package (token-dispenser-mobile, same pattern as
+    // qrunlock-mobile), not the older per-device dynamic-page style — see
+    // PWA_APK/apps/web-pwa/src/features/token-dispenser/remotePackage/ and
+    // DEVICE_PACKAGE_RUNTIME.md's "every device UI is a dynamic remote
+    // package" rule.
+    uiMode: "remote-package",
+    uiPackageId: "token-dispenser-mobile",
+    uiPackageVersion: "1.0.0"
+  },
+  dashboard: {
+    templateId: "token-dispenser-default",
+    dynamicPages: ["token-dispenser"],
+    icon: "receipt",
+    cardLayout: "token-dispenser"
+  },
+  automation: {
+    commands: [
+      { command: "PRINT_NEXT_TOKEN", label: "Print next token" },
+      { command: "TEST_PRINT", label: "Test print" },
+      { command: "RESET_ROLL_COUNTER", label: "Reset paper roll counter" },
+      { command: "SET_TOKEN_COUNTER", label: "Set token counter" },
+      { command: "SET_TOKEN_PREFIX", label: "Set token prefix" },
+      { command: "FACTORY_RESET", label: "Factory reset", restricted: true }
+    ]
+  }
+};
+
 /**
  * Every locally-known PID blueprint in one place. Consumers that need to go
  * from "a product code segment" (e.g. the advertised BLE name's `QRU` in
@@ -341,5 +427,6 @@ export const qrunlockPidBlueprint: CreatePidInput = {
 export const allPidBlueprints: CreatePidInput[] = [
   foundationPidBlueprint,
   smartStreamerPidBlueprint,
-  qrunlockPidBlueprint
+  qrunlockPidBlueprint,
+  tokenDispenserPidBlueprint
 ];

@@ -15,6 +15,7 @@ import { SceneBuilderPage } from "../features/scenes/SceneBuilderPage";
 import { SceneListPage } from "../features/scenes/SceneListPage";
 import { QrunlockRoute } from "../features/qrunlock/QrunlockRoute";
 import { StreamerRoute } from "../features/streamer/StreamerRoute";
+import { TokenDispenserRoute } from "../features/token-dispenser/TokenDispenserRoute";
 import { AppUpdatePage } from "../features/settings/AppUpdatePage";
 import { HomeDetailPage } from "../features/settings/HomeDetailPage";
 import { HomeManagementPage } from "../features/settings/HomeManagementPage";
@@ -53,6 +54,7 @@ export function AppRouter() {
         <Route path="/scenes/:sceneId" element={<SceneBuilderPage />} />
         <Route path="/streamer/*" element={<StreamerRoute />} />
         <Route path="/qrunlock/*" element={<QrunlockRoute />} />
+        <Route path="/token-dispenser/*" element={<TokenDispenserRoute />} />
         <Route path="/settings" element={<SettingsHomePage />} />
         <Route path="/settings/profile" element={<UserProfilePage />} />
         <Route path="/settings/homes" element={<HomeManagementPage />} />

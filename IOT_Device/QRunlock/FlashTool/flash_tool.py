@@ -315,7 +315,7 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
     log("\n== Capturing boot log ==")
     record = {}
     raw_lines = []
-    max_attempts = 5
+    max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         got, lines = capture_boot_record(port)
         record.update(got)

@@ -57,6 +57,10 @@ export interface MqttRuntimeBridgeOptions {
   /** Event-driven devices only (e.g. nurse call receiver) — optional, no-op if omitted. */
   onDeviceEventsMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
   onDeviceStatusMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
+  /** Broker-published LWT ("{"status":"offline"}", retained) fired on an
+   *  ungraceful disconnect — the only way the platform learns a device
+   *  dropped off without a clean shutdown. Optional, no-op if omitted. */
+  onDeviceLwtMessage?: (message: RuntimeDeviceTopicMessage) => Promise<void>;
   /**
    * Legacy device families to bridge, each with its own topic root and suffix
    * vocabulary — see JENIXONE_MQTT_HANDOFF.md. Empty/omitted means no legacy
@@ -149,6 +153,9 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
   private readonly onDeviceStatusMessage:
     | ((message: RuntimeDeviceTopicMessage) => Promise<void>)
     | undefined;
+  private readonly onDeviceLwtMessage:
+    | ((message: RuntimeDeviceTopicMessage) => Promise<void>)
+    | undefined;
   private readonly legacyTopicRoots: LegacyTopicFamily[];
   private readonly onLegacyDeviceMessage:
     | ((message: RuntimeLegacyDeviceMessage) => Promise<void>)
@@ -180,6 +187,7 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
     this.onOtaAckMessage = options.onOtaAckMessage;
     this.onDeviceEventsMessage = options.onDeviceEventsMessage;
     this.onDeviceStatusMessage = options.onDeviceStatusMessage;
+    this.onDeviceLwtMessage = options.onDeviceLwtMessage;
     this.legacyTopicRoots = options.legacyTopicRoots ?? [];
     this.onLegacyDeviceMessage = options.onLegacyDeviceMessage;
     this.legacyGlobalAckTopics = options.legacyGlobalAckTopics;
@@ -299,6 +307,16 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
         deviceId: parsedTopic.deviceId,
         payload: parseJsonMessage<Record<string, unknown>>(payload)
       });
+      return;
+    }
+
+    if (parsedTopic.suffix === "lwt" && this.onDeviceLwtMessage) {
+      await this.onDeviceLwtMessage({
+        tenantId: parsedTopic.tenantId,
+        pid: parsedTopic.pid,
+        deviceId: parsedTopic.deviceId,
+        payload: parseJsonMessage<Record<string, unknown>>(payload)
+      });
     }
   }
 
@@ -324,7 +342,8 @@ export class MqttRuntimeBridge implements RuntimeMqttBridge {
           buildDeviceTopicWildcard("cmd/ack"),
           buildDeviceTopicWildcard("ota/ack"),
           buildDeviceTopicWildcard("events"),
-          buildDeviceTopicWildcard("status")
+          buildDeviceTopicWildcard("status"),
+          buildDeviceTopicWildcard("lwt")
         ];
         const legacyTopicSubscriptions = this.legacyTopicRoots.flatMap((family) =>
           family.suffixes.map((suffix) => buildLegacyDeviceTopicWildcard(family.topicRoot, suffix))

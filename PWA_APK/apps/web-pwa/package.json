@@ -17,6 +17,7 @@
     "build": "vite build",
     "build:capacitor": "vite build --mode capacitor --base=/ --outDir dist-capacitor",
     "build:qrunlock-package": "vite build --config src/features/qrunlock/remotePackage/vite.config.ts",
+    "build:token-dispenser-package": "vite build --config src/features/token-dispenser/remotePackage/vite.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --environment jsdom",
     "test:unit": "vitest run --environment jsdom",

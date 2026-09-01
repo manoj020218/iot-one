@@ -2,6 +2,33 @@
 
 This document explains why the dynamic device-package runtime was added, how it currently works, and what a new developer should touch next.
 
+## Rule: every device UI is a dynamic remote package — never bundled into the app
+
+Decided 2026-09-01, during Token Dispenser onboarding. Applies to every device
+type, no exceptions: a device's screens are always fetched at runtime via
+`devicePackageRegistry.ts` (either shape under "Two ways to build a package"
+below), never compiled directly into the base `web-pwa`/Android bundle the
+way QRunlock originally was.
+
+**Why:** a bundled feature can only ship a fix by rebuilding the whole app and
+getting every install onto the new version — for the native Android app that
+means a full APK rebuild + reinstall per device, which is exactly the
+friction QRunlock's own later migration to `qrunlock-mobile` (a real remote
+package) was done to eliminate. A remote package ships a fix by replacing one
+file on the VPS (`device-registry/ui-packages/...`) — every home gets it on
+its next page load, no app-store update, no reinstall.
+
+**How to apply:** when adding a new device type's UI, pick one of the two
+package shapes below (a single embedded card → per-device dynamic page; a
+whole mounted sub-app with its own navigation → full routed product package,
+following `qrunlock-mobile`'s pattern) and register it the same way Tank
+Guard/QRunlock are registered (`ui.uiMode: "remote-package"` on the PID,
+package record in the catalog). The only platform-repo touch a new device
+should ever need is the PID's own route registration line (e.g. QRunlock's
+`/qrunlock/*` in `AppRouter.tsx`) plus the catalog/bootstrap wiring described
+below — never a new `features/<device>/` folder that ships inside the base
+bundle.
+
 ## Goal
 
 Jenix One should stay a thin platform shell while device-specific pages are loaded only when a HOME actually owns that device type.

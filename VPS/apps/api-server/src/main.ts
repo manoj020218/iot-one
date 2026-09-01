@@ -10,6 +10,7 @@ import { createMqttRuntimeBridge } from "./infrastructure/mqtt/mqtt-runtime-brid
 import {
   handleRuntimeDeviceCommandAckMessage,
   handleRuntimeDeviceEventsMessage,
+  handleRuntimeDeviceLwtMessage,
   handleRuntimeDeviceStatusMessage,
   handleRuntimeLegacyDeviceMessage,
   handleRuntimeOtaAckMessage,
@@ -270,6 +271,9 @@ async function bootstrap() {
         },
         onDeviceStatusMessage: async (message) => {
           await handleRuntimeDeviceStatusMessage(message);
+        },
+        onDeviceLwtMessage: async (message) => {
+          await handleRuntimeDeviceLwtMessage(message);
         },
         legacyTopicRoots: [
           { topicRoot: defaultSmartRfTopicRoot, suffixes: legacyDeviceTopicSuffixes },

@@ -1,0 +1,161 @@
+/* Token pair layout */
+.td-token-pair {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.td-token-card {
+  text-align: center;
+}
+
+/* Large animated token number */
+.td-token-number {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1;
+  padding: 12px 0;
+}
+
+.td-token-number.td-token-printing {
+  animation: td-pulse 0.8s ease-in-out infinite;
+  color: #0f766e;
+}
+
+.td-token-number.td-token-last {
+  font-size: 2.5rem;
+  color: #64748b;
+}
+
+@keyframes td-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.td-printing-badge {
+  display: inline-block;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Receipt stub visual */
+.td-receipt-stub {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  font-family: monospace;
+}
+
+/* Paper roll progress bar */
+.td-paper-bar-bg {
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.td-paper-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+
+/* Printer status display */
+.td-status-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.td-status-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* Modal — bottom sheet on mobile, centered on desktop */
+.td-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+}
+
+@media (min-width: 600px) {
+  .td-modal-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+}
+
+.td-modal {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 600px) {
+  .td-modal {
+    border-radius: 24px;
+  }
+}
+
+/* Audit log list */
+.td-log-list {
+  display: grid;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.td-log-entry {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.td-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Scene capability list */
+.td-cap-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.td-cap-item {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-family: monospace;
+  color: #0f766e;
+}

@@ -379,6 +379,27 @@ export async function applyDeviceTelemetryState(
   return savedDevice;
 }
 
+/**
+ * Updates only the device's own connectivity fields — unlike
+ * applyDeviceTelemetryState, deliberately does NOT touch
+ * deviceUiRuntimeStore, so a pure connectivity signal (the MQTT broker's
+ * LWT, for instance) doesn't wipe the last-known telemetry snapshot the UI
+ * is still showing.
+ */
+export async function applyDeviceConnectivityStatus(
+  deviceId: string,
+  status: { mqttStatus?: DeviceRecord["mqttStatus"]; cloudStatus?: DeviceRecord["cloudStatus"] }
+): Promise<DeviceRecord> {
+  const existing = await requireDevice(deviceId);
+  const updatedDevice: DeviceRecord = {
+    ...existing,
+    updatedAt: new Date().toISOString(),
+    ...(status.mqttStatus ? { mqttStatus: status.mqttStatus } : {}),
+    ...(status.cloudStatus ? { cloudStatus: status.cloudStatus } : {})
+  };
+  return deviceRepository.save(updatedDevice);
+}
+
 function createRuntimeTelemetryIngressMessage(
   job: Awaited<ReturnType<typeof prepareTelemetrySceneEvaluationJob>>,
   pid: string,

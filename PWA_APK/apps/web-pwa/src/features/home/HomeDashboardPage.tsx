@@ -17,6 +17,7 @@ import { HomeSelectorSheet } from "../homes/components/HomeSelectorSheet";
 import { HomeFormSheet } from "../homes/components/HomeFormSheet";
 import { createHome, listHomes, type HomeUpsertInput } from "../homes/services/homeApi";
 import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
+import { TOKEN_DISPENSER_PID } from "../token-dispenser/tokenDispenserPid";
 import "./theme/home.css";
 
 export function HomeDashboardPage() {
@@ -48,6 +49,10 @@ export function HomeDashboardPage() {
     const device = devices.find((entry) => entry.deviceId === deviceId);
     if (device?.pid === QRUNLOCK_PID) {
       navigate(`/qrunlock/${encodeURIComponent(deviceId)}`);
+      return;
+    }
+    if (device?.pid === TOKEN_DISPENSER_PID) {
+      navigate(`/token-dispenser/${encodeURIComponent(deviceId)}`);
       return;
     }
     navigate(`/devices/${encodeURIComponent(deviceId)}`);

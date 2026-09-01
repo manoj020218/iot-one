@@ -49,11 +49,19 @@ def _parse_line(line, record):
         return
 
 
-def capture_boot_record(port, baud=115200, timeout_s=8):
+def capture_boot_record(port, baud=115200, timeout_s=60):
     """Read boot output from `port` for up to `timeout_s` seconds.
 
     Returns (record, raw_lines). `record` has whatever of REQUIRED_FIELDS
     was found; missing keys mean that line never appeared in the window.
+
+    60s (not 8s) because on a genuinely fresh/erased chip, Token Dispenser's
+    real reset-to-BLE-advertising time measured ~42.5s on real hardware:
+    two Preferences::begin() calls on not-yet-existent namespaces each
+    block ~5s before failing (~11s total), then wifi_prov_mgr's BLE/NimBLE
+    stack bring-up itself takes another ~20-30s wall-clock. QRunlock's own
+    boot has none of this, so a longer window only makes its capture more
+    generous, not slower in practice.
     """
     record = {}
     raw_lines = []

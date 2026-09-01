@@ -1,4 +1,7 @@
-import { applyDeviceTelemetryState } from "../../modules/devices/device.service";
+import {
+  applyDeviceConnectivityStatus,
+  applyDeviceTelemetryState
+} from "../../modules/devices/device.service";
 import { deviceUiRuntimeStore } from "../../modules/devices/device-ui-runtime.model";
 import { acknowledgeOtaDeliveryFailure, acknowledgeOtaDeliverySuccess } from "../../modules/ota/ota.service";
 import {
@@ -319,6 +322,26 @@ export async function handleRuntimeDeviceStatusMessage(
   }
 
   await handler(message);
+}
+
+/**
+ * The broker-published LWT ("{"status":"offline"}", retained) fired on an
+ * ungraceful MQTT disconnect — the only signal telling the platform a
+ * device dropped off without a clean shutdown. Was never wired up at all
+ * before this (see mqtt-runtime-bridge.ts's subscription list) — every
+ * canonical-scheme device's mqttStatus just stuck at whatever it last was.
+ */
+export async function handleRuntimeDeviceLwtMessage(
+  message: RuntimeDeviceTopicMessage
+): Promise<void> {
+  const status = readStringField(message.payload, "status");
+  const mqttStatus = status === "offline" ? "offline" : "online";
+
+  try {
+    await applyDeviceConnectivityStatus(message.deviceId, { mqttStatus });
+  } catch {
+    // Device not registered yet — nothing to update.
+  }
 }
 
 export async function handleRuntimeLegacyDeviceMessage(
