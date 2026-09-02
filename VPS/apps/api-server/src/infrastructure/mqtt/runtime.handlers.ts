@@ -338,7 +338,20 @@ export async function handleRuntimeDeviceLwtMessage(
   const mqttStatus = status === "offline" ? "offline" : "online";
 
   try {
-    await applyDeviceConnectivityStatus(message.deviceId, { mqttStatus });
+    // Every "is this device online" read across the platform (dashboard
+    // tiles, home.service.ts's online/offline counts) treats mqttStatus
+    // and cloudStatus as an OR -- correct for a device with a genuinely
+    // separate HTTP-fallback channel, but cloudStatus is otherwise only
+    // ever set once at registration and never again. For a canonical-
+    // scheme device reaching this handler at all, MQTT IS its cloud
+    // channel, so leaving cloudStatus frozen at "online" made the LWT fix
+    // pointless -- the OR always resolved true regardless of mqttStatus.
+    // Confirmed live: mqttStatus correctly flipped to offline, tiles kept
+    // showing online anyway.
+    await applyDeviceConnectivityStatus(message.deviceId, {
+      mqttStatus,
+      cloudStatus: mqttStatus
+    });
   } catch {
     // Device not registered yet — nothing to update.
   }
