@@ -286,6 +286,33 @@ All of the below are **live and deployed** unless noted otherwise, most recent f
     `<PREFIX>_ADMIN_API_URL` set wherever `flash_tool.py` runs (see its
     own `--help`); without it, flashing still works, the app just falls
     back to the manual field.
+  - **Follow-up fix (commit `d6c5c5e`):** the first version of this only
+    *prefilled* the pairing-code field, it never stopped rendering it —
+    so the installer still saw (and could still edit) a field that was
+    supposed to be invisible on a successful auto-fill. Fixed to
+    replace the field with a confirmation line once a factory-record
+    PoP is found; the input only ever appears as the genuine fallback
+    (no record / lookup still in flight).
+  - **Separately found while testing this: `token-dispenser-mobile`'s
+    deployed UI-package bundle (in the separate `IOT_Devices` repo, see
+    §4) was a stale placeholder** — wrong `exportName`
+    (`TokenDispenserDynamicPage` vs. the real `TokenDispenserApp`),
+    wrong `templateId`/`capabilities` shape, and missing its built CSS
+    entirely. It could never have mounted correctly in production,
+    independent of anything else in this session. Rebuilt and pushed
+    the real bundle to `IOT_Devices` (commit `d05ffb7` there).
+  - **Also found and fixed a genuine deploy-topology gap**, not specific
+    to this device: `deploy-iot-one.sh` only ever deploys `iot-one`'s
+    `main` branch, so this entire session's work (43 commits, including
+    everything above) sat unshipped on `codex/smart-speaker-20260813`
+    the whole time — restarting `jenix-one-api` after building from the
+    feature branch's own checkout looked like a successful deploy but
+    changed nothing live, since `pm2` runs from a separate rsync target
+    (`/root/projects/IOT_one`) that only ever gets refreshed from
+    `main`. Fixed for now by fast-forwarding `main` to the branch tip;
+    see §4's new "three separate git repos" note for the permanent fix
+    (always check `git rev-list --count origin/main..origin/<branch>`
+    before assuming a deploy did anything).
 - **Android app ready for its first Play Store release** (commits
   `2956431`, `7d6a79f`, `02f38ac`, `6193d24` on `codex/smart-speaker-20260813`)
   — **not yet uploaded, blocked on Play Console account verification**
