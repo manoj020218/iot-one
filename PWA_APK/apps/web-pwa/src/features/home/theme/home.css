@@ -100,7 +100,15 @@
 .jx-btn.primary { background: var(--grad); color: #fff; height: 48px; box-shadow: 0 10px 20px -12px rgba(22,35,63,0.45); }
 .jx-btn.primary:active { transform: scale(0.98); }
 .jx-btn.ghost { background: var(--panel); border: 1px solid var(--line); color: var(--txt); height: 44px; padding: 0 14px; }
+.jx-btn.danger { background: var(--red); color: #fff; height: 48px; box-shadow: 0 10px 20px -12px rgba(220,38,38,0.45); }
+.jx-btn.danger:active { transform: scale(0.98); }
+.jx-btn:disabled { opacity: 0.6; cursor: default; }
 .jx-btn.block { width: 100%; }
+
+/* Offline devices: the whole card reads as inert at a glance -- grayscale
+   + dimmed, not just a status chip color someone can miss, so nobody
+   mistakes a disconnected device for one that'll actually respond. */
+.is-offline { filter: grayscale(1); opacity: 0.55; }
 
 /* add-device scan */
 .jx-scan { text-align: center; padding: 26px 20px; }

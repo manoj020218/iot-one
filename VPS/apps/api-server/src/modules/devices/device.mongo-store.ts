@@ -37,6 +37,9 @@ export async function createMongoDeviceRepository(
 
       return record;
     },
+    async delete(deviceId) {
+      await deviceCollection.deleteOne({ deviceId });
+    },
     async reset() {
       await deviceCollection.deleteMany({});
     }

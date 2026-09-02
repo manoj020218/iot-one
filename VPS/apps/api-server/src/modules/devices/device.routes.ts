@@ -15,6 +15,7 @@ import {
   replayDeviceFirmwareRolloutController,
   requestDeviceFirmwareUpdateController,
   registerDeviceController,
+  removeDeviceController,
   renameDeviceController
 } from "./device.controller";
 
@@ -44,3 +45,4 @@ deviceRouter.post("/:deviceId/commands", dispatchDeviceUiCommandController);
 deviceRouter.patch("/:deviceId", patchDeviceController);
 deviceRouter.post("/:deviceId/firmware/request", requestDeviceFirmwareUpdateController);
 deviceRouter.post("/:deviceId/rename", renameDeviceController);
+deviceRouter.delete("/:deviceId", removeDeviceController);

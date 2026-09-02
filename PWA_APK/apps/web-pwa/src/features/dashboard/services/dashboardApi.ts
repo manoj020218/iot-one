@@ -164,6 +164,41 @@ export async function renameDashboardDevice(
   }
 }
 
+/**
+ * "Remove device" (Tuya-style unpair) -- disconnects it from this
+ * home/account and best-effort tells the physical unit to factory-reset
+ * so it's ready to be added fresh again (see device.service.ts's
+ * removeDevice). The app side just needs to stop showing it.
+ */
+export async function removeDashboardDevice(
+  session: AuthSession,
+  deviceId: string
+): Promise<void> {
+  const currentHome = getCurrentHome(session);
+
+  try {
+    await fetchAuthenticatedJson(
+      `${deviceEndpoint}/${encodeURIComponent(deviceId)}`,
+      session,
+      {
+        method: "DELETE",
+        headers: createAuthenticatedHeaders(session, {
+          homeId: currentHome.homeId
+        })
+      }
+    );
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+  }
+
+  const remaining = listDemoDevices(session.user.userId, currentHome.homeId).filter(
+    (device) => device.deviceId !== deviceId
+  );
+  setDemoDevices(session.user.userId, currentHome.homeId, remaining);
+}
+
 export const dashboardApiTesting = {
   resetDemoStore() {
     resetDemoDevices();

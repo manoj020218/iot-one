@@ -355,6 +355,49 @@ export async function renameDevice(
   return deviceRepository.save(renameDeviceRecord(existing, payload.displayName));
 }
 
+/**
+ * "Remove device" (Tuya-style unpair): disconnects the device from this
+ * home/account AND best-effort tells the physical unit to factory-reset so
+ * it re-enters provisioning mode, ready to be added fresh again. The
+ * factory-reset send is fire-and-forget on purpose -- the device is
+ * usually already offline when someone wants to remove it (broken, given
+ * away, or mid-troubleshooting), and unpairing must never get stuck behind
+ * an unreachable device.
+ */
+export async function removeDevice(
+  deviceId: string,
+  context: DeviceRequestContext
+): Promise<void> {
+  const resolvedContext = await resolveContext(context);
+
+  if (resolvedContext.homeRole === "viewer") {
+    throw new DeviceModuleError(403, "Viewer access cannot remove devices");
+  }
+
+  const existing = ensureAccess(await requireDevice(deviceId), resolvedContext);
+  const bridge = getRuntimeMqttBridge();
+
+  if (bridge) {
+    try {
+      await bridge.publishDeviceCommand({
+        deliveryId: createCommandId(),
+        runId: `unpair:${existing.deviceId}`,
+        sceneId: "unpair:factory_reset",
+        homeId: existing.homeId,
+        source: "manual",
+        requestedAt: new Date().toISOString(),
+        deviceId: existing.deviceId,
+        pid: existing.pid,
+        command: "FACTORY_RESET"
+      });
+    } catch {
+      // Device offline/unreachable -- proceed with removal regardless.
+    }
+  }
+
+  await deviceRepository.delete(existing.deviceId);
+}
+
 export async function applyDeviceTelemetryState(
   deviceId: string,
   payload: DeviceTelemetryIngestPayload

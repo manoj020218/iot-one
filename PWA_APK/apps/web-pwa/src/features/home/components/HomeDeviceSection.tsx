@@ -1,14 +1,40 @@
 import type { AuthSession } from "@jenix/shared";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 import type { DashboardDevice } from "../../dashboard/services/dashboardApi";
 import { QRUNLOCK_PID } from "../../qrunlock/qrunlockPid";
 import { TOKEN_DISPENSER_PID } from "../../token-dispenser/tokenDispenserPid";
+import { useLongPressGuard } from "../hooks/useLongPressGuard";
 import type { MetricsMap } from "../hooks/useLiveMetrics";
 import { DeviceTile } from "./DeviceTile";
 import { HomeFilterTabs, type HomeFilter } from "./HomeFilterTabs";
 import { QrunlockHomeTile } from "./QrunlockHomeTile";
 import { TokenDispenserHomeTile } from "./TokenDispenserHomeTile";
+
+/**
+ * Wraps one tile with the shared offline gray-shade + Tuya-style long-press
+ * gesture -- a real component (not an inline .map() callback) because
+ * useLongPressGuard is a hook and hook rules forbid calling one inside a
+ * loop/callback whose iteration count can change between renders (filtering
+ * the device list does exactly that).
+ */
+function HomeTileSlot({
+  device,
+  onRequestRemove,
+  children
+}: {
+  device: DashboardDevice;
+  onRequestRemove: (device: DashboardDevice) => void;
+  children: ReactNode;
+}) {
+  const longPress = useLongPressGuard(() => onRequestRemove(device));
+
+  return (
+    <div className={device.online ? undefined : "is-offline"} {...longPress}>
+      {children}
+    </div>
+  );
+}
 
 interface CompactTileProps {
   session: AuthSession;
@@ -44,6 +70,7 @@ export interface HomeDeviceSectionProps {
   metrics: MetricsMap;
   onChangeFilter: (filter: HomeFilter) => void;
   onOpenDevice: (deviceId: string) => void;
+  onRequestRemove: (device: DashboardDevice) => void;
   onTogglePump: (deviceId: string) => void;
   onToast: (message: string) => void;
 }
@@ -56,9 +83,22 @@ export function HomeDeviceSection({
   metrics,
   onChangeFilter,
   onOpenDevice,
+  onRequestRemove,
   onTogglePump,
   onToast
 }: HomeDeviceSectionProps) {
+  // Offline devices can't hear anything sent to them -- opening the
+  // device-specific UI would just let someone press buttons that silently
+  // do nothing, which reads as the app being broken rather than the device
+  // being unreachable. Gate it here, once, instead of in every product's
+  // own detail page.
+  function tryOpen(device: DashboardDevice) {
+    if (!device.online) {
+      onToast(`${device.displayName} is offline — nothing will happen right now.`);
+      return;
+    }
+    onOpenDevice(device.deviceId);
+  }
   const visible = devices.filter((device) => {
     if (filter === "online") {
       return device.online;
@@ -93,13 +133,14 @@ export function HomeDeviceSection({
               {compactDevices.map((device) => {
                 const Tile = COMPACT_TILE_COMPONENTS[device.pid]!;
                 return (
-                  <Tile
-                    device={device}
-                    key={device.deviceId}
-                    onOpen={() => onOpenDevice(device.deviceId)}
-                    onToast={onToast}
-                    session={session}
-                  />
+                  <HomeTileSlot device={device} key={device.deviceId} onRequestRemove={onRequestRemove}>
+                    <Tile
+                      device={device}
+                      onOpen={() => tryOpen(device)}
+                      onToast={onToast}
+                      session={session}
+                    />
+                  </HomeTileSlot>
                 );
               })}
             </div>
@@ -113,13 +154,14 @@ export function HomeDeviceSection({
                 }
 
                 return (
-                  <DeviceTile
-                    device={device}
-                    key={device.deviceId}
-                    metrics={deviceMetrics}
-                    onOpen={() => onOpenDevice(device.deviceId)}
-                    onTogglePump={() => onTogglePump(device.deviceId)}
-                  />
+                  <HomeTileSlot device={device} key={device.deviceId} onRequestRemove={onRequestRemove}>
+                    <DeviceTile
+                      device={device}
+                      metrics={deviceMetrics}
+                      onOpen={() => tryOpen(device)}
+                      onTogglePump={() => onTogglePump(device.deviceId)}
+                    />
+                  </HomeTileSlot>
                 );
               })}
             </div>

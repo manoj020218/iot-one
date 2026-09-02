@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import {
   getDashboardDevices,
+  removeDashboardDevice,
   renameDashboardDevice,
   type DashboardDevice
 } from "../services/dashboardApi";
@@ -36,6 +37,11 @@ export function useDashboardDevices(session: AuthSession) {
     );
   }
 
+  async function remove(deviceId: string) {
+    await removeDashboardDevice(session, deviceId);
+    setDevices((current) => current.filter((device) => device.deviceId !== deviceId));
+  }
+
   useEffect(() => {
     void load();
   }, [session.user.userId, session.activeHomeId]);
@@ -44,6 +50,7 @@ export function useDashboardDevices(session: AuthSession) {
     devices,
     loading,
     error,
-    rename
+    rename,
+    remove
   };
 }

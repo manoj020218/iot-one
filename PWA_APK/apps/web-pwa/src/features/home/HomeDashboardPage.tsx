@@ -4,9 +4,10 @@ import { FiBell, FiChevronDown } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/hooks/useAuth";
-import { getCurrentHome } from "../dashboard/services/dashboardApi";
+import { getCurrentHome, type DashboardDevice } from "../dashboard/services/dashboardApi";
 import { useNotifications } from "../notifications/hooks/useNotifications";
 import { HomeDeviceSection } from "./components/HomeDeviceSection";
+import { RemoveDeviceSheet } from "./components/RemoveDeviceSheet";
 import { StatStrip } from "./components/StatStrip";
 import { useDashboardDevices } from "../dashboard/hooks/useDashboardDevices";
 import { useHomeDashboard } from "./hooks/useHomeDashboard";
@@ -26,7 +27,8 @@ export function HomeDashboardPage() {
   if (!session) throw new Error("HomeDashboardPage requires a session");
   const activeSession = session;
   const currentHome = getCurrentHome(activeSession);
-  const { devices } = useDashboardDevices(activeSession);
+  const { devices, remove } = useDashboardDevices(activeSession);
+  const [removeCandidate, setRemoveCandidate] = useState<DashboardDevice | null>(null);
   const { error } = useHomeDashboard(activeSession);
   const { metrics, togglePump } = useLiveMetrics(devices);
   const { unreadCount } = useNotifications(activeSession);
@@ -99,10 +101,21 @@ export function HomeDashboardPage() {
     >
       <StatStrip online={online} total={devices.length} alerts={alerts} />
       {error ? <section className="panel">{error}</section> : null}
-      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection session={activeSession} devices={devices} filter={filter} homeName={currentHome.name} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={openDevice} onToast={(message) => show(message)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
+      {currentHome.allowed === false ? <section className="panel">This home is linked to your account, but access is currently not allowed by the admin.</section> : <HomeDeviceSection session={activeSession} devices={devices} filter={filter} homeName={currentHome.name} metrics={metrics} onChangeFilter={setFilter} onOpenDevice={openDevice} onRequestRemove={setRemoveCandidate} onToast={(message) => show(message)} onTogglePump={(deviceId) => { togglePump(deviceId); show("Command sent", `${deviceId} pump toggled`); }} />}
       {toast ? <div className="jx-toast"><div><strong>{toast.title}</strong>{toast.detail ? <div style={{ color: "var(--muted)", fontSize: 12 }}>{toast.detail}</div> : null}</div></div> : null}
       <HomeSelectorSheet currentHomeId={currentHome.homeId} homes={activeSession.homes} onClose={() => setSelectorOpen(false)} onCreate={() => { setSelectorOpen(false); setFormOpen(true); }} onSelect={setActiveHome} open={selectorOpen} />
       <HomeFormSheet open={formOpen} title="Create Home" subtitle="Create a new home with its own device list, timezone, and member access." submitting={saving} error={saveError} onClose={() => setFormOpen(false)} onSubmit={handleCreateHome} />
+      {removeCandidate ? (
+        <RemoveDeviceSheet
+          deviceName={removeCandidate.displayName}
+          onCancel={() => setRemoveCandidate(null)}
+          onConfirm={async () => {
+            await remove(removeCandidate.deviceId);
+            show("Device removed", `${removeCandidate.displayName} was removed from this home`);
+            setRemoveCandidate(null);
+          }}
+        />
+      ) : null}
     </AppShell>
   );
 }

@@ -8,6 +8,7 @@ export interface DeviceRepository {
   list(): Promise<DeviceRecord[]>;
   get(deviceId: string): Promise<DeviceRecord | undefined>;
   save(record: DeviceRecord): Promise<DeviceRecord>;
+  delete(deviceId: string): Promise<void>;
   reset(): Promise<void>;
 }
 
@@ -25,6 +26,9 @@ function createInMemoryDeviceRepository(): DeviceRepository {
     async save(record) {
       deviceStore.set(record.deviceId, clone(record));
       return clone(record);
+    },
+    async delete(deviceId) {
+      deviceStore.delete(deviceId);
     },
     async reset() {
       deviceStore.clear();
@@ -51,6 +55,9 @@ export const deviceRepository: DeviceRepository = {
   },
   save(record) {
     return activeDeviceRepository.save(record);
+  },
+  delete(deviceId) {
+    return activeDeviceRepository.delete(deviceId);
   },
   reset() {
     return activeDeviceRepository.reset();

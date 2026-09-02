@@ -16,6 +16,7 @@ import {
   replayDeviceFirmwareRollout,
   requestDeviceFirmwareUpdate,
   registerDevice,
+  removeDevice,
   renameDevice
 } from "./device.service";
 import { DeviceModuleError } from "./device.types";
@@ -156,6 +157,15 @@ export async function renameDeviceController(request: Request, response: Respons
         readContext(request)
       )
     });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function removeDeviceController(request: Request, response: Response) {
+  try {
+    await removeDevice(request.params.deviceId ?? "", readContext(request));
+    response.status(200).json({ data: { deviceId: request.params.deviceId } });
   } catch (error) {
     sendError(response, error);
   }
