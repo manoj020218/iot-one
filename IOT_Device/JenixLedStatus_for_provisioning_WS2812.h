@@ -305,10 +305,19 @@ private:
 
   void ensureRmtReady() {
     if (_rmtReady) return;
-    // kMaxPixels(8) * 24 bits = 192 symbols; RMT_MEM_256 comfortably covers
-    // that with headroom, still cheap (one channel + a fraction of another)
-    // on chips with only 4-8 total RMT channels like the ESP32-C3.
-    _rmt = rmtInit(_pin, RMT_TX_MODE, RMT_MEM_256);
+    // RMT_MEM_64 (one channel's worth) is enough regardless of pixel count:
+    // rmt_write_items() (what rmtWriteBlocking() calls under the hood)
+    // refills the hardware memory via interrupt as it drains, so total
+    // transmission length isn't capped by the reserved block size -- that's
+    // exactly how ESP32 NeoPixel drivers push far more data through tiny
+    // RMT buffers. Reserving more than this actively breaks chips with few
+    // channels: the ESP32-C3 has only 2 TX-capable channels x 48 words
+    // each (SOC_RMT_TX_CANDIDATES_PER_GROUP / SOC_RMT_MEM_WORDS_PER_CHANNEL
+    // in soc_caps.h), so RMT_MEM_128 is already this chip's ceiling and
+    // RMT_MEM_256 (needs 4 contiguous channels) silently fails rmtInit --
+    // confirmed live: the LED driver never initialized, so the strip just
+    // stayed frozen on whatever it last showed before reflashing.
+    _rmt = rmtInit(_pin, RMT_TX_MODE, RMT_MEM_64);
     if (_rmt == nullptr) {
       log_e("JenixLedStatus: RMT init failed on pin %d", _pin);
       return;
