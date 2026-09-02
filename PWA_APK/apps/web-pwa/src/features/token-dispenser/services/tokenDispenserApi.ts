@@ -162,6 +162,18 @@ export async function setPrefix(
   });
 }
 
+export async function setLedCount(
+  session: AuthSession,
+  deviceId: string,
+  value: number
+): Promise<void> {
+  await fetchJson(`${base(deviceId)}/set-led-count`, {
+    method: "POST",
+    headers: createAuthenticatedHeaders(session, { contentType: "application/json" }),
+    body: JSON.stringify({ value })
+  });
+}
+
 export async function getTemplate(
   session: AuthSession,
   deviceId: string

@@ -9,19 +9,20 @@
     ESP32-C3 / ESP32-S3 / ESP32-P4 (Arduino framework)
 
   Dependency:
-    None beyond the Arduino-ESP32 core itself -- drives the pixel via the
-    core's own built-in neopixelWrite() (esp32-hal-rgb-led.h), the same
-    helper the core uses for RGB_BUILTIN boards. Deliberately not the
-    Adafruit_NeoPixel library: its RMT-based esp.c backend assumes a
-    specific arduino-esp32 core RMT API shape that a pinned/patched core
+    None beyond the Arduino-ESP32 core itself -- drives the chain directly
+    via the core's own RMT wrapper (esp32-hal-rmt.h), the same primitives
+    the core's built-in neopixelWrite() uses internally, just parameterized
+    for N pixels instead of neopixelWrite()'s hardcoded one. Deliberately
+    not the Adafruit_NeoPixel library: its RMT-based esp.c backend assumes
+    a specific arduino-esp32 core RMT API shape that a pinned/patched core
     (e.g. a mixed arduino+espidf provisioning build pinned to a specific
-    ESP-IDF version) may not match, while neopixelWrite() is part of the
+    ESP-IDF version) may not match, while esp32-hal-rmt.h is part of the
     core itself and always matches whatever core it ships with.
 
   Usage:
     #include "JenixLedStatus.h"
 
-    JenixLedStatus led(8);   // WS2812 data GPIO
+    JenixLedStatus led(8, 51, 3);   // WS2812 data GPIO, brightness, pixel count
 
     void setup() {
       led.begin();
@@ -33,14 +34,17 @@
     }
 
   Notes:
-    - Designed for one WS2812 RGB LED.
+    - Drives a chain of 1-kMaxPixels WS2812s, all showing the same color --
+      this is a status indicator, not an addressable-pixel-art driver.
+      setPixelCount() can change the chain length at runtime (e.g. from a
+      persisted config value) without re-flashing.
     - All animations are non-blocking.
     - Call update() frequently from loop().
     - Normal LED brightness defaults to 20%.
 */
 
 #include <Arduino.h>
-#include <esp32-hal-rgb-led.h>
+#include <esp32-hal-rmt.h>
 
 enum class JenixLedState : uint8_t {
   OFF = 0,
@@ -81,14 +85,18 @@ enum class JenixLedState : uint8_t {
 
 class JenixLedStatus {
 public:
+  static constexpr uint8_t kMaxPixels = 8;
+
   explicit JenixLedStatus(
       uint8_t pin,
-      uint8_t brightness = 51)   // ~20%
+      uint8_t brightness = 51,   // ~20%
+      uint8_t pixelCount = 1)
       : _pin(pin),
-        _brightness(brightness) {}
+        _brightness(brightness),
+        _pixelCount(clampPixelCount(pixelCount)) {}
 
   void begin() {
-    neopixelWrite(_pin, 0, 0, 0);
+    writeScaled(0, 0, 0);
 
     _state = JenixLedState::OFF;
     _previousState = JenixLedState::OFF;
@@ -102,6 +110,17 @@ public:
 
   uint8_t getBrightness() const {
     return _brightness;
+  }
+
+  // Changes the chain length live (e.g. from a persisted config value the
+  // user can edit without re-flashing) -- takes effect on the next
+  // showColor()/update() write, no re-init needed.
+  void setPixelCount(uint8_t count) {
+    _pixelCount = clampPixelCount(count);
+  }
+
+  uint8_t getPixelCount() const {
+    return _pixelCount;
   }
 
   void setState(JenixLedState state) {
@@ -232,6 +251,10 @@ private:
   JenixLedState _previousState = JenixLedState::OFF;
 
   uint8_t _brightness = 51;
+  uint8_t _pixelCount = 1;
+
+  rmt_obj_t* _rmt = nullptr;
+  bool _rmtReady = false;
 
   uint32_t _lastTick = 0;
   uint16_t _step = 0;
@@ -274,16 +297,58 @@ private:
     }
   }
 
-  // Applies _brightness on top of the caller's already-scaled 0-255 value --
-  // neopixelWrite() has no separate brightness concept of its own, unlike
-  // Adafruit_NeoPixel's setBrightness()/show(), so every write goes through
-  // this one place instead.
+  static uint8_t clampPixelCount(uint8_t count) {
+    if (count < 1) return 1;
+    if (count > kMaxPixels) return kMaxPixels;
+    return count;
+  }
+
+  void ensureRmtReady() {
+    if (_rmtReady) return;
+    // kMaxPixels(8) * 24 bits = 192 symbols; RMT_MEM_256 comfortably covers
+    // that with headroom, still cheap (one channel + a fraction of another)
+    // on chips with only 4-8 total RMT channels like the ESP32-C3.
+    _rmt = rmtInit(_pin, RMT_TX_MODE, RMT_MEM_256);
+    if (_rmt == nullptr) {
+      log_e("JenixLedStatus: RMT init failed on pin %d", _pin);
+      return;
+    }
+    rmtSetTick(_rmt, 100);
+    _rmtReady = true;
+  }
+
+  // Applies _brightness on top of the caller's already-scaled 0-255 value,
+  // then writes the SAME color to every pixel in the chain (this is a
+  // status indicator, not an addressable strip) in one blocking RMT
+  // transaction. neopixelWrite() has no separate brightness concept of its
+  // own, unlike Adafruit_NeoPixel's setBrightness()/show(), so every write
+  // goes through this one place instead.
   void writeScaled(uint8_t r, uint8_t g, uint8_t b) {
-    neopixelWrite(
-        _pin,
-        static_cast<uint16_t>(r) * _brightness / 255,
-        static_cast<uint16_t>(g) * _brightness / 255,
-        static_cast<uint16_t>(b) * _brightness / 255);
+    ensureRmtReady();
+    if (!_rmtReady) return;
+
+    const uint8_t sr = static_cast<uint16_t>(r) * _brightness / 255;
+    const uint8_t sg = static_cast<uint16_t>(g) * _brightness / 255;
+    const uint8_t sb = static_cast<uint16_t>(b) * _brightness / 255;
+    const int colorOrder[3] = {sg, sr, sb}; // WS2812 wire order: GREEN, RED, BLUE
+
+    rmt_data_t ledData[kMaxPixels * 24];
+    int i = 0;
+    for (uint8_t pixel = 0; pixel < _pixelCount; pixel++) {
+      for (int col = 0; col < 3; col++) {
+        for (int bit = 0; bit < 8; bit++) {
+          if (colorOrder[col] & (1 << (7 - bit))) {
+            ledData[i].level0 = 1; ledData[i].duration0 = 8;  // T1H 0.8us
+            ledData[i].level1 = 0; ledData[i].duration1 = 4;  // T1L 0.4us
+          } else {
+            ledData[i].level0 = 1; ledData[i].duration0 = 4;  // T0H 0.4us
+            ledData[i].level1 = 0; ledData[i].duration1 = 8;  // T0L 0.8us
+          }
+          i++;
+        }
+      }
+    }
+    rmtWriteBlocking(_rmt, ledData, i);
   }
 
   void setColor(const RGB &color) {

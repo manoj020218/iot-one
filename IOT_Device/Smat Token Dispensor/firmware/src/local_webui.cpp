@@ -126,7 +126,8 @@ static void buildStatusJson(char* buf, size_t maxLen) {
             "\"paper_low\":%s,"
             "\"tokens_per_roll\":%lu"
           "},"
-          "\"espnow\":{\"active\":%s}"
+          "\"espnow\":{\"active\":%s},"
+          "\"led\":{\"count\":%lu,\"brightness\":%lu}"
         "}",
         FIRMWARE_VERSION, FIRMWARE_BUILD_DATE, FIRMWARE_PID,
         n.deviceId,
@@ -152,7 +153,9 @@ static void buildStatusJson(char* buf, size_t maxLen) {
         (unsigned long)PaperEstimator::estimatedTokensLeft(),
         PaperEstimator::isPaperLow() ? "true" : "false",
         (unsigned long)d.tokensPerRoll,
-        EspNowService::isInitialized() ? "true" : "false"
+        EspNowService::isInitialized() ? "true" : "false",
+        (unsigned long)d.ledCount,
+        (unsigned long)d.ledBrightness
     );
 }
 
@@ -385,6 +388,16 @@ void begin() {
             if (doc["tokensPerRoll"].is<uint32_t>())    d.tokensPerRoll     = doc["tokensPerRoll"];
             if (doc["lowPaperThreshold"].is<uint32_t>())d.lowPaperThreshold = doc["lowPaperThreshold"];
             if (doc["buzzerEnabled"].is<bool>())        d.buzzerEnabled     = doc["buzzerEnabled"];
+            if (doc["ledBrightness"].is<uint32_t>()) {
+                uint32_t v = doc["ledBrightness"];
+                d.ledBrightness = (v > 255) ? 255 : v;
+                StatusLed::setBrightness(static_cast<uint8_t>(d.ledBrightness));
+            }
+            if (doc["ledCount"].is<uint32_t>()) {
+                uint32_t v = doc["ledCount"];
+                d.ledCount = (v < 1) ? 1 : (v > 8 ? 8 : v);
+                StatusLed::setPixelCount(static_cast<uint8_t>(d.ledCount));
+            }
             ConfigStore::saveDev();
             req->send(200, "application/json", "{\"ok\":true}");
         });

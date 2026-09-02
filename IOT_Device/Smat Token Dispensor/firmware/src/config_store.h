@@ -37,6 +37,7 @@ struct DevConfig {
     uint8_t espNowKey[8];       // shared security key for ESP-NOW commands
     bool buzzerEnabled;
     uint32_t ledBrightness;     // 0-255 (future PWM)
+    uint32_t ledCount;          // WS2812 pixels behind the touch button (1-8)
 };
 
 namespace ConfigStore {

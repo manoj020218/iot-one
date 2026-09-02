@@ -26,6 +26,7 @@ import {
 import {
   parsePrintTemplatePayload,
   parseSetCounterPayload,
+  parseSetLedCountPayload,
   parseSetPrefixPayload
 } from "./token-dispenser.validation";
 
@@ -223,6 +224,28 @@ export async function setCounter(
     "SET_TOKEN_COUNTER",
     { value: parsed.data.value },
     "SET_TOKEN_COUNTER",
+    resolvedContext.userId
+  );
+  return { commandId };
+}
+
+export async function setLedCount(
+  deviceId: string,
+  input: unknown,
+  context: DeviceRequestContext
+): Promise<{ commandId: string }> {
+  const { device, context: resolvedContext } = await resolveDeviceContext(deviceId, context);
+  const parsed = parseSetLedCountPayload(input);
+
+  if (!parsed.ok) {
+    throw new TokenDispenserModuleError(400, parsed.errors.join("; "));
+  }
+
+  const { commandId } = await dispatchCommand(
+    device,
+    "SET_LED_COUNT",
+    { value: parsed.data.value },
+    "SET_LED_COUNT",
     resolvedContext.userId
   );
   return { commandId };

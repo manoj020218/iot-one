@@ -131,6 +131,11 @@
     <div class="row-check"><input type="checkbox" id="longPressRollReset"><label for="longPressRollReset" style="margin:0">Enable 10-sec long press to reset roll</label></div>
     <div class="row-check"><input type="checkbox" id="buzzerEnabled"><label for="buzzerEnabled" style="margin:0">Enable buzzer</label></div>
   </div>
+  <div class="card">
+    <h2>Touch Button LED</h2>
+    <div class="field"><label>LED Count (WS2812 pixels behind the button, 1-8)</label><input id="ledCount" type="number" min="1" max="8"></div>
+    <div class="field"><label>Full Brightness (0-255, applies when ready)</label><input id="ledBrightness" type="number" min="0" max="255"></div>
+  </div>
   <div class="actions">
     <button class="btn-primary" onclick="saveDev()">Save Device Config</button>
   </div>
@@ -291,6 +296,8 @@ async function loadStatus() {
     document.getElementById('tokensPerRoll').value      = d.paper?.tokens_per_roll || 500;
     document.getElementById('lowPaperThreshold').value  = 50;
     document.getElementById('dailyResetHour').value     = 255;
+    document.getElementById('ledCount').value           = d.led?.count || 3;
+    document.getElementById('ledBrightness').value      = d.led?.brightness ?? 255;
   } catch(e) {}
 }
 
@@ -325,6 +332,8 @@ async function saveDev() {
     queueOneBusy:      document.getElementById('queueOneBusy').checked,
     longPressRollReset:document.getElementById('longPressRollReset').checked,
     buzzerEnabled:     document.getElementById('buzzerEnabled').checked,
+    ledCount:          parseInt(document.getElementById('ledCount').value),
+    ledBrightness:     parseInt(document.getElementById('ledBrightness').value),
   };
   const d = await post('/api/config/dev', body);
   toast(d.ok ? 'Device config saved' : ('Error: ' + d.error), !d.ok);

@@ -28,6 +28,22 @@ export function parseSetCounterPayload(
   return { ok: true, data: { value: body.value } };
 }
 
+export function parseSetLedCountPayload(
+  body: unknown
+): TokenDispenserValidationResult<{ value: number }> {
+  if (
+    !isRecord(body) ||
+    typeof body.value !== "number" ||
+    !Number.isInteger(body.value) ||
+    body.value < 1 ||
+    body.value > 8
+  ) {
+    return { ok: false, errors: ["value must be an integer from 1 to 8"] };
+  }
+
+  return { ok: true, data: { value: body.value } };
+}
+
 export function parseSetPrefixPayload(
   body: unknown
 ): TokenDispenserValidationResult<{ prefix: string }> {

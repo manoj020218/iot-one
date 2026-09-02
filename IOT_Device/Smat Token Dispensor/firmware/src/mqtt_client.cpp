@@ -170,6 +170,18 @@ static void handleCommand(const char* payload, size_t len) {
             MqttClient::publishAck(deliveryId, true, "prefix_set");
         }
 
+    } else if (strcmp(cmd, "SET_LED_COUNT") == 0) {
+        uint32_t value = getPayloadUint(commandPayload, doc, "value");
+        if (value < 1 || value > 8) {
+            MqttClient::publishAck(deliveryId, false, "value_out_of_range_1_8");
+        } else {
+            ConfigStore::dev().ledCount = value;
+            ConfigStore::saveDev();
+            StatusLed::setPixelCount(static_cast<uint8_t>(value));
+            MqttClient::publishActionEvent("set_led_count", "mqtt");
+            MqttClient::publishAck(deliveryId, true, "led_count_set");
+        }
+
     } else if (strcmp(cmd, "SET_TEMPLATE") == 0) {
         char tmplJson[1024];
         JsonVariantConst templatePayload = commandPayload;

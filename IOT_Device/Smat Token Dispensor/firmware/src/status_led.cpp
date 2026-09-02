@@ -29,9 +29,26 @@ constexpr RGB CYAN_C   = {0, 255, 255};
 constexpr RGB ORANGE_C = {255, 70, 0};
 constexpr RGB RED_C    = {255, 0, 0};
 
+// While the printer is actively pulling current for its motor/heater, the
+// touch-button accent chain drops to this fraction of full brightness --
+// still visibly "working" (busy blink keeps running), but frees up current
+// budget on the shared 5V rail instead of also running N WS2812s at full
+// brightness at the same moment the printer needs it most.
+constexpr uint8_t PRINT_BRIGHTNESS_PERCENT = 25;
+
+RGB scalePercent(const RGB& color, uint8_t percent) {
+    return RGB{
+        static_cast<uint8_t>(static_cast<uint16_t>(color.r) * percent / 100),
+        static_cast<uint8_t>(static_cast<uint16_t>(color.g) * percent / 100),
+        static_cast<uint8_t>(static_cast<uint16_t>(color.b) * percent / 100)
+    };
+}
+
 // PIN_STATUS_LED is the one WS2812 data pin on this board -- PIN_LED (the
 // dev board's own built-in LED) is a plain single-color LED and stays
-// untouched, driven separately in main.cpp.
+// untouched, driven separately in main.cpp. Brightness and pixel count are
+// both re-applied in StatusLed::begin() from ConfigStore, since they're
+// user-configurable (local web UI / MQTT / app) without a reflash.
 JenixLedStatus s_led(PIN_STATUS_LED);
 
 SemaphoreHandle_t s_transientMtx = nullptr;
@@ -135,8 +152,11 @@ RGB basePatternColor(uint32_t nowMs) {
 
     if (printerState == PrinterState::PRINTING) {
         // Fast white blink -- same feel as JenixLedState::BUSY, so the user
-        // gets instant, unmistakable "the printer is working" feedback.
-        return ((nowMs % 160) < 80) ? WHITE_C : OFF_C;
+        // gets instant, unmistakable "the printer is working" feedback --
+        // but dimmed, so the printer's motor/heater gets first call on the
+        // shared 5V rail's current budget instead of competing with N
+        // WS2812s at full brightness during the exact moment it matters.
+        return ((nowMs % 160) < 80) ? scalePercent(WHITE_C, PRINT_BRIGHTNESS_PERCENT) : OFF_C;
     }
 
     if (paperOut) {
@@ -159,8 +179,11 @@ RGB basePatternColor(uint32_t nowMs) {
         return ((nowMs % 1000) < 500) ? BLUE_C : OFF_C;
     }
 
-    // Ready-to-print heartbeat, steady green.
-    return ((nowMs % 2200) < 80) ? GREEN_C : OFF_C;
+    // Ready to print: solid full-brightness accent glow, not a heartbeat --
+    // this is the resting state the acrylic diffuser sits in most of the
+    // time, so it's the one place a steady, always-visible light actually
+    // makes sense (the current cost is why PRINTING above dims instead).
+    return GREEN_C;
 }
 
 void task(void* pv) {
@@ -217,6 +240,8 @@ namespace StatusLed {
 void begin() {
     s_transientMtx = xSemaphoreCreateMutex();
     s_led.begin();
+    s_led.setBrightness(static_cast<uint8_t>(ConfigStore::dev().ledBrightness));
+    s_led.setPixelCount(static_cast<uint8_t>(ConfigStore::dev().ledCount));
 
     xTaskCreate(task, "status_led", STACK_STATUS_LED, nullptr, 2, nullptr);
 }
@@ -225,6 +250,14 @@ void signalTrigger(StatusLedTriggerSource source) {
     setTransient(source == StatusLedTriggerSource::BUTTON
                  ? TransientPattern::BUTTON_ACK
                  : TransientPattern::REMOTE_ACK);
+}
+
+void setPixelCount(uint8_t count) {
+    s_led.setPixelCount(count);
+}
+
+void setBrightness(uint8_t brightness) {
+    s_led.setBrightness(brightness);
 }
 
 } // namespace StatusLed

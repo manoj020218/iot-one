@@ -13,6 +13,7 @@ import {
   resetRoll,
   saveTemplate,
   setCounter,
+  setLedCount,
   setPrefix,
   testPrint
 } from "./token-dispenser.service";
@@ -81,6 +82,16 @@ export async function setPrefixController(request: Request, response: Response) 
   try {
     response.status(200).json({
       data: await setPrefix(request.params.deviceId ?? "", request.body, readContext(request))
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
+}
+
+export async function setLedCountController(request: Request, response: Response) {
+  try {
+    response.status(200).json({
+      data: await setLedCount(request.params.deviceId ?? "", request.body, readContext(request))
     });
   } catch (error) {
     sendError(response, error);

@@ -61,6 +61,7 @@ static void loadDev() {
     s_dev.longPressRollReset= s_devPrefs.getBool("lpRollReset",     false);
     s_dev.buzzerEnabled     = s_devPrefs.getBool("buzzerEnabled",   false);
     s_dev.ledBrightness     = s_devPrefs.getUInt("ledBrightness",   255);
+    s_dev.ledCount          = s_devPrefs.getUInt("ledCount",        3);
 
     size_t keyLen = s_devPrefs.getBytesLength("espNowKey");
     if (keyLen == 8) {
@@ -117,6 +118,7 @@ void saveDev() {
     s_devPrefs.putBool("lpRollReset",     s_dev.longPressRollReset);
     s_devPrefs.putBool("buzzerEnabled",   s_dev.buzzerEnabled);
     s_devPrefs.putUInt("ledBrightness",   s_dev.ledBrightness);
+    s_devPrefs.putUInt("ledCount",        s_dev.ledCount);
     s_devPrefs.putBytes("espNowKey",      s_dev.espNowKey, 8);
     s_devPrefs.end();
 }

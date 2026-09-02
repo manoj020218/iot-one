@@ -65,6 +65,7 @@ export type SceneActionCommand =
   | "RESET_ROLL_COUNTER"
   | "SET_TOKEN_COUNTER"
   | "SET_TOKEN_PREFIX"
+  | "SET_LED_COUNT"
   | "SET_TEMPLATE"
   | "REBOOT"
   | "OTA_UPDATE"

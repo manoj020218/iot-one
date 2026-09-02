@@ -10,6 +10,7 @@ import {
   resetRollController,
   saveTemplateController,
   setCounterController,
+  setLedCountController,
   setPrefixController,
   testPrintController
 } from "./token-dispenser.controller";
@@ -22,6 +23,7 @@ tokenDispenserRouter.post("/:deviceId/token-dispenser/test-print", testPrintCont
 tokenDispenserRouter.post("/:deviceId/token-dispenser/reset-roll", resetRollController);
 tokenDispenserRouter.post("/:deviceId/token-dispenser/set-counter", setCounterController);
 tokenDispenserRouter.post("/:deviceId/token-dispenser/set-prefix", setPrefixController);
+tokenDispenserRouter.post("/:deviceId/token-dispenser/set-led-count", setLedCountController);
 tokenDispenserRouter.post("/:deviceId/token-dispenser/factory-reset", factoryResetController);
 tokenDispenserRouter.get("/:deviceId/token-dispenser/template", getTemplateController);
 tokenDispenserRouter.put("/:deviceId/token-dispenser/template", saveTemplateController);

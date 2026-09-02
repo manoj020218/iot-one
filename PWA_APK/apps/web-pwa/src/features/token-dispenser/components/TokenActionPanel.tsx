@@ -15,6 +15,7 @@ export function TokenActionPanel({
 }: Props) {
   const [counterVal, setCounterVal] = useState("");
   const [prefixVal, setPrefixVal] = useState("");
+  const [ledCountVal, setLedCountVal] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +94,30 @@ export function TokenActionPanel({
             disabled={busy !== null || !prefixVal}
             onClick={() =>
               run("prefix", () => api.setPrefix(session, deviceId, prefixVal))
+            }
+          >
+            Set
+          </button>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Touch Button LED Count (1-8)</label>
+        <div className="button-row">
+          <input
+            type="number"
+            min={1}
+            max={8}
+            value={ledCountVal}
+            onChange={(e) => setLedCountVal(e.target.value)}
+            placeholder="e.g. 3"
+            style={{ flex: 1 }}
+          />
+          <button
+            className="secondary-button"
+            disabled={busy !== null || !ledCountVal}
+            onClick={() =>
+              run("ledCount", () => api.setLedCount(session, deviceId, Number(ledCountVal)))
             }
           >
             Set
