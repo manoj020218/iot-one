@@ -45,6 +45,8 @@ export interface AppConfig {
   sceneRuntimeWorkerIntervalMs: number;
   sceneRuntimeWorkerBatchSize: number;
   sceneRuntimeWorkerVisibilityTimeoutMs: number;
+  deviceOfflineSweepIntervalMs: number;
+  deviceOfflineStaleAfterMs: number;
 }
 
 function parseBooleanEnv(
@@ -246,6 +248,22 @@ export function readAppConfig(): AppConfig {
     5_000,
     "OTA_DELIVERY_WORKER_INTERVAL_MS"
   );
+  // Dead-man's-switch for device connectivity (device.service.ts's
+  // sweepStaleDevicesOffline) -- covers what LWT structurally can't: a
+  // device that never established an MQTT session under its current
+  // credentials at all, or one whose registered will was dropped by a
+  // broker restart. 60s poll, 5-minute staleness (~10x a typical 30s
+  // telemetry interval, generous enough to not false-positive on jitter).
+  const deviceOfflineSweepIntervalMs = parsePositiveIntegerEnv(
+    process.env.DEVICE_OFFLINE_SWEEP_INTERVAL_MS,
+    60_000,
+    "DEVICE_OFFLINE_SWEEP_INTERVAL_MS"
+  );
+  const deviceOfflineStaleAfterMs = parsePositiveIntegerEnv(
+    process.env.DEVICE_OFFLINE_STALE_AFTER_MS,
+    300_000,
+    "DEVICE_OFFLINE_STALE_AFTER_MS"
+  );
   const otaDeliveryWorkerBatchSize = parsePositiveIntegerEnv(
     process.env.OTA_DELIVERY_WORKER_BATCH_SIZE,
     25,
@@ -413,6 +431,8 @@ export function readAppConfig(): AppConfig {
     ),
     sceneRuntimeWorkerIntervalMs,
     sceneRuntimeWorkerBatchSize,
-    sceneRuntimeWorkerVisibilityTimeoutMs
+    sceneRuntimeWorkerVisibilityTimeoutMs,
+    deviceOfflineSweepIntervalMs,
+    deviceOfflineStaleAfterMs
   };
 }

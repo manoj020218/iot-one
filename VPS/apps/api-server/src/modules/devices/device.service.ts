@@ -434,13 +434,57 @@ export async function applyDeviceConnectivityStatus(
   status: { mqttStatus?: DeviceRecord["mqttStatus"]; cloudStatus?: DeviceRecord["cloudStatus"] }
 ): Promise<DeviceRecord> {
   const existing = await requireDevice(deviceId);
+  const now = new Date().toISOString();
+  // Only an "online" signal counts as freshly seen -- an offline event
+  // (LWT firing, or the staleness sweep below) tells us the OPPOSITE, that
+  // nothing has actually been heard from the device, so it must never
+  // advance lastSeenAt.
+  const seenNow = status.mqttStatus === "online" || status.cloudStatus === "online";
   const updatedDevice: DeviceRecord = {
     ...existing,
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
+    ...(seenNow ? { lastSeenAt: now } : {}),
     ...(status.mqttStatus ? { mqttStatus: status.mqttStatus } : {}),
     ...(status.cloudStatus ? { cloudStatus: status.cloudStatus } : {})
   };
   return deviceRepository.save(updatedDevice);
+}
+
+/**
+ * Dead-man's-switch for connectivity status -- LWT (handleRuntimeDeviceLwtMessage)
+ * only ever fires on an ungraceful disconnect of a session that was
+ * actually established, which can't help a device that never connected at
+ * all under its current credentials, or one whose will got dropped by a
+ * broker restart. This is the backstop: any device still marked "online"
+ * that hasn't been heard from (lastSeenAt, falling back to updatedAt) in
+ * `staleAfterMs` gets force-flipped offline, regardless of whether any
+ * MQTT event ever told us to. Called on a fixed interval from main.ts.
+ */
+export async function sweepStaleDevicesOffline(staleAfterMs: number): Promise<number> {
+  const now = Date.now();
+  const devices = await deviceRepository.list();
+  let flippedCount = 0;
+
+  for (const device of devices) {
+    if (device.mqttStatus !== "online" && device.cloudStatus !== "online") {
+      continue;
+    }
+
+    const lastSeenMs = new Date(device.lastSeenAt ?? device.updatedAt).getTime();
+    if (Number.isNaN(lastSeenMs) || now - lastSeenMs <= staleAfterMs) {
+      continue;
+    }
+
+    await deviceRepository.save({
+      ...device,
+      updatedAt: new Date().toISOString(),
+      mqttStatus: "offline",
+      cloudStatus: "offline"
+    });
+    flippedCount += 1;
+  }
+
+  return flippedCount;
 }
 
 function createRuntimeTelemetryIngressMessage(

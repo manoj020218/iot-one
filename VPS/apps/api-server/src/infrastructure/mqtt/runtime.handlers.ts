@@ -315,6 +315,21 @@ const canonicalStatusHandlersByPid: Record<
 export async function handleRuntimeDeviceStatusMessage(
   message: RuntimeDeviceTopicMessage
 ): Promise<void> {
+  // Receiving ANY status message is proof the device is alive and
+  // reachable right now -- mark it online with a fresh lastSeenAt for
+  // every canonical device, not just the PIDs with a dedicated payload
+  // handler below. This is the "comes back online" half of the LWT fix:
+  // LWT only ever marks a device offline on disconnect: until this,
+  // nothing ever marked one back online after it reconnected.
+  try {
+    await applyDeviceConnectivityStatus(message.deviceId, {
+      mqttStatus: "online",
+      cloudStatus: "online"
+    });
+  } catch {
+    // Device not registered yet — nothing to update.
+  }
+
   const handler = canonicalStatusHandlersByPid[message.pid];
 
   if (!handler) {

@@ -28,6 +28,7 @@ import { useAuthPersistenceStore } from "./modules/auth/auth.model";
 import { createMongoAuthPersistenceStore } from "./modules/auth/auth.mongo-store";
 import { useDeviceRepository } from "./modules/devices/device.model";
 import { createMongoDeviceRepository } from "./modules/devices/device.mongo-store";
+import { sweepStaleDevicesOffline } from "./modules/devices/device.service";
 import { useHomePersistenceStore } from "./modules/homes/home.model";
 import { createMongoHomePersistenceStore } from "./modules/homes/home.mongo-store";
 import {
@@ -410,10 +411,26 @@ async function bootstrap() {
         `[api-server] ota delivery worker enabled with ${config.otaDeliveryWorkerIntervalMs}ms interval`
       );
     }
+
+    console.log(
+      `[api-server] device offline sweep enabled: ${config.deviceOfflineSweepIntervalMs}ms interval, ${config.deviceOfflineStaleAfterMs}ms staleness`
+    );
   });
+
+  // Dead-man's-switch backstop for device connectivity -- see
+  // sweepStaleDevicesOffline's own doc comment for why LWT alone isn't
+  // enough. Deliberately a plain interval, not the queue-worker pattern
+  // above: jenix-one-api runs as a single pm2 fork-mode process, so there's
+  // no multi-instance work to coordinate/lock here.
+  const deviceOfflineSweepTimer = setInterval(() => {
+    sweepStaleDevicesOffline(config.deviceOfflineStaleAfterMs).catch((error) => {
+      console.error("[api-server] device offline sweep failed", error);
+    });
+  }, config.deviceOfflineSweepIntervalMs);
 
   async function shutdown(signal: string) {
     console.log(`[api-server] received ${signal}, shutting down`);
+    clearInterval(deviceOfflineSweepTimer);
     sceneRuntimeScheduler?.stop();
     sceneRuntimeWorker?.stop();
     sceneActionWorker?.stop();
