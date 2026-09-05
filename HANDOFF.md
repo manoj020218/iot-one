@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-09-01
+> Last updated: 2026-09-05
 
 ---
 
@@ -234,10 +234,116 @@ when quoted. For anything beyond a single pipe-free one-liner, write a
 `.sh` file, `pscp` it over, then run it with one simple
 `plink ... "bash /root/thefile.sh"` call.
 
-## 5. Feature Status (as of 2026-09-01)
+## 5. Feature Status (as of 2026-09-05)
 
 All of the below are **live and deployed** unless noted otherwise, most recent first:
 
+- **Permanent fix for devices getting stuck "online" forever** (commit
+  `a632d53`) — root-caused as two separate structural gaps, on top of the
+  deviceId bug below:
+  1. Nothing ever marked a device back **online** after it reconnected.
+     `handleRuntimeDeviceStatusMessage` (`infrastructure/mqtt/
+     runtime.handlers.ts`) dispatched straight to per-PID payload handlers
+     (which only ever wrote to `deviceUiRuntimeStore`) without touching the
+     main device record at all — a device's real online transition
+     depended entirely on whether that specific product's own backend
+     module happened to call `applyDeviceTelemetryState` itself (QRunlock's
+     separate `@jenix/qrunlock-backend` package does; the generic canonical
+     path didn't). Fixed: every incoming `.../status` message now calls
+     `applyDeviceConnectivityStatus(deviceId, {mqttStatus:"online",
+     cloudStatus:"online"})` first, unconditionally, before any per-PID
+     handler runs.
+  2. LWT can only ever fire for an MQTT session that was actually
+     established — structurally powerless for a device that's never
+     connected under its current credentials at all, or one whose
+     registered will got dropped by a broker restart. Added
+     `sweepStaleDevicesOffline` (`device.service.ts`), a dead-man's-switch
+     run every `DEVICE_OFFLINE_SWEEP_INTERVAL_MS` (default 60s) that
+     force-flips any device still marked online past
+     `DEVICE_OFFLINE_STALE_AFTER_MS` (default 5 min) without being heard
+     from — no MQTT event required at all. Plain `setInterval` in
+     `main.ts`, not the queue-worker pattern the scene/OTA workers use —
+     `jenix-one-api` runs single-instance (`pm2` fork mode), so there's no
+     cross-instance coordination to build.
+  - **If a device ever looks stuck online/offline again, these two plus
+    the deviceId-mismatch bug below are the three things to check, in
+    that order** — routing (deviceId match), online-refresh (does
+    anything ever mark it back online), staleness (does the sweep
+    interval/threshold make sense for that product's telemetry cadence).
+- **Home page: offline devices are now unmistakable, and Tuya-style
+  remove/unpair** (commit `6a3948b`) —
+  - Offline tiles are grayscale + dimmed as a whole (`.is-offline` in
+    `home.css`), not just a status-chip color that's easy to miss.
+  - Tapping an offline device no longer opens its detail/remote-package UI
+    at all (gated once in `HomeDeviceSection.tsx`'s `tryOpen`, not
+    per-product) — it can't hear anything sent to it, so letting someone
+    press buttons there just looked like the app silently doing nothing.
+    Shows a toast instead.
+  - Long-press a tile (~550ms, `useLongPressGuard.ts`) to remove it:
+    unpairs the device from the account (new `DELETE /api/v1/devices/
+    :deviceId`, `device.service.ts`'s `removeDevice`) and best-effort
+    sends it a `FACTORY_RESET` command so the physical unit re-enters
+    provisioning mode, ready to be added again. The reset send is
+    fire-and-forget on purpose — the device is usually already offline
+    when someone wants to remove it, and unpairing must never block on an
+    unreachable device.
+- **Token Dispenser touch-button LED: real multi-pixel WS2812 driver +
+  runtime-configurable count/brightness** (commits `1061537`, `a203582`) —
+  `JenixLedStatus.h` (the shared header, `IOT_Device/
+  JenixLedStatus_for_provisioning_WS2812.h`, copied into each product's
+  firmware) previously drove exactly one pixel via `neopixelWrite()` (a
+  single-pixel API by design), so a 3-LED strip only ever lit the first
+  one. Rewritten to build and send an N-pixel RMT frame directly, uniform
+  color across the chain. Ready-to-print is now a steady full-brightness
+  glow (was a mostly-off heartbeat blink); printing dims to 25% of that
+  brightness to free current headroom for the printer's motor/heater right
+  when it needs it most. LED count (default 3, 1-8) and brightness are
+  persisted `DevConfig` fields, changeable without reflashing three ways
+  that all funnel through the same value: the local web UI's Device tab,
+  a new `SET_LED_COUNT` MQTT command (mirrors `SET_TOKEN_COUNTER`'s exact
+  pattern), and the app's device action panel via a new
+  `set-led-count` REST endpoint.
+  - **Real hardware gotcha, confirmed by tracing the actual RMT driver
+    source (not guessing): the ESP32-C3 has only 2 TX-capable RMT
+    channels x 48 words each** (`SOC_RMT_TX_CANDIDATES_PER_GROUP` /
+    `SOC_RMT_MEM_WORDS_PER_CHANNEL` in ESP-IDF's `soc_caps.h`). The first
+    version of this rewrite requested `RMT_MEM_256` (4 channel-blocks),
+    which `rmtInit()` can never satisfy on this chip — it returned `NULL`
+    every time, so the LED driver silently never initialized and the
+    strip just froze on whatever it last showed under the prior
+    single-pixel firmware (including looking unresponsive to the button's
+    transient flash). Fixed to `RMT_MEM_64` (one channel) — sufficient
+    regardless of pixel count, since `rmt_write_items()` (what
+    `rmtWriteBlocking()` calls) refills the hardware memory via interrupt
+    as it streams, the same way every ESP32 NeoPixel driver pushes far
+    more data than one channel's tiny memory through a single channel.
+    **This fix was flashed to and verified on real hardware before it was
+    committed to git** — caught only because a later `git status` check
+    showed the working tree still dirty; if you ever fix something on a
+    connected board and it works, commit it in the same breath, don't
+    trust "I'll do it later."
+- **Found and fixed a stale/broken remote-package deploy, unrelated to
+  anything above:** `token-dispenser-mobile`'s UI-package bundle, as
+  actually served from `manoj020218/IOT_Devices` (see the three-repos note
+  in §4), was a stale early draft — `exportName:
+  "TokenDispenserDynamicPage"` instead of the real `register.ts`'s
+  `TokenDispenserApp`, a different `templateId`/`capabilities` shape than
+  every other working package (compare `qrunlock-mobile`'s manifest), and
+  missing its built CSS file entirely. The dynamic page could never have
+  mounted correctly in production, independent of any deviceId/online-
+  status work. Rebuilt and pushed the real bundle.
+- **Found and fixed a real deploy-topology gap, independent of any one
+  feature:** `deploy-iot-one.sh` only ever deploys `iot-one`'s `main`
+  branch — a full session's worth of work can sit pushed, typechecked, and
+  seemingly "deployed" (a `pm2 restart` after building from a feature
+  branch's own checkout still reports healthy) while actually changing
+  nothing live, since `pm2` runs from a separate rsync target
+  (`/root/projects/IOT_one`) that only ever gets refreshed from `main`.
+  **Before assuming a deploy did anything, check
+  `git rev-list --count origin/main..origin/<your-branch>` is `0`** — if
+  it isn't, fast-forward first (`git push origin <branch>:main`; direct
+  pushes to `main` are blocked for the assistant by Claude Code's
+  auto-mode classifier, the user runs that one).
 - **Token Dispenser (`JNX-TD-C3-01`) brought to QRunlock parity, real
   hardware onboarded end-to-end** (commits `9402dda`, `7e5a0c6`, `6851ad4`
   on `codex/smart-speaker-20260813`) — VPS now speaks the canonical
@@ -403,6 +509,18 @@ All of the below are **live and deployed** unless noted otherwise, most recent f
 
 ## 6. Known Open Items
 
+- **Pick up here next session:** the bench Token Dispenser
+  (`JNX-TD-C3-01`, MAC suffix `CC0E80`) was removed from the account
+  during testing of the new long-press-to-unpair feature (§5) — its old,
+  permanently-stuck-online Mongo record is gone, which is a clean slate,
+  not a loss (it predated the deviceId fix anyway). It's sitting
+  unprovisioned on the bench, LED strip verified working. Next step is
+  just: re-onboard it through the app's Smart Mode / BLE flow (PoP should
+  auto-fill from its factory record — flash it again first if that record
+  ever got cleared) and confirm end-to-end that a real disconnect now
+  flips it offline within the sweep's ~5-minute window without any manual
+  DB intervention, closing the loop on this session's whole online-status
+  saga.
 - **Play Store upload — waiting on account verification, not a code
   blocker.** The signed `.aab`/`.apk` are built and verified (see §5
   above and `RELEASE_SIGNING.md`); the Play Console developer account
