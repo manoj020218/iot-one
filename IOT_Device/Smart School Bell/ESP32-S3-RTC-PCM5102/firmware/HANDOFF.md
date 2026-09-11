@@ -1,3 +1,143 @@
+# Soft PTT Bench Validation — 2026-09-11
+
+Tested from a browser WebSocket client (Jenix One platform session, not the
+APK) directly against the live unit's `/api/v1/announcement/ws` at its LAN
+IP, following `SOFT_PTT_CONTRACT.md` exactly, no wired/serial access this
+session. Result: **passes, end-to-end, on real hardware** — resolves the
+soft-PTT half of the "Open Risks" line below.
+
+- `start` → device replied
+  `{"type":"ready","format":"pcm_s16le","sample_rate":22050,"channels":1}`
+  in ~110ms.
+- Streamed a synthetic 440 Hz tone as raw 16-bit PCM frames (40ms/frame,
+  22,050 Hz mono, per contract) for ~2s — user confirmed hearing it play
+  through the physical PCM5102/speaker, so this is real audio through the
+  live path, not just a protocol handshake.
+- `stop` → device replied `{"type":"stopped"}` correctly.
+- `GET /api/v1/announcement/status` afterward confirmed a clean return to
+  idle: `announcement_active:false`, `soft_ptt_active:false`,
+  `announcement_source:"none"`, no stuck/busy state.
+
+Not tested: **physical PTT** (GPIO15) — needs someone at the bench to short
+it to GND, not doable remotely. Also not tested: real microphone input
+(this used a synthetic tone, not a live mic), the actual APK client, or
+mouth-to-speaker latency against the contract's <150ms target.
+
+---
+
+# Provisioning Pilot Update — 2026-09-11
+
+Context: `../../PROVISIONING_PARITY_MASTER_PROMPT.md` and
+`../../../../PROVISIONING.md` Sections 8a/11 — School Bell had no BLE stack
+and a fixed, un-secured SoftAP setup scheme, so no real unit could be
+onboarded through the Jenix One app. This pass built the shared
+`jenix_provisioning` component (`IOT_Device/_shared/jenix_provisioning/`,
+Security Scheme 2 over BLE) and wired School Bell as its first consumer, in
+a brand-new `esp32-s3-schoolbell-prov` PlatformIO env that **does not touch**
+the shipping `esp32-s3-schoolbell` env — same board/platform/partitions, the
+component and the standard `JNXSB{6-hex-MAC}` naming only take effect under
+that env's `JENIX_PROV_STANDARD` build flag. No physical hardware access
+during this pass, so this is build-verified only (both envs compile AND
+link cleanly — see below), not bench-tested.
+
+**Build verification note**: this checkout's own path
+(`D:\IOT Device\...\Smart School Bell\...`) has two independent, pre-existing,
+provisioning-unrelated build breaks caused by spaces in the path, neither
+introduced by this pass:
+1. `-fmacro-prefix-map=<project>=` breaks `cc1plus` on every source file —
+   fixed for real by adding `# CONFIG_COMPILER_HIDE_PATHS_MACROS is not set`
+   to `sdkconfig.defaults` (same fix QRunlock's own `sdkconfig.defaults`
+   already documents and applies for the identical symptom).
+2. `managed_components/espressif__esp_audio_codec/CMakeLists.txt`'s
+   `target_link_libraries(... "-L ${CMAKE_CURRENT_SOURCE_DIR}/lib/...")`
+   breaks at final link (`-L` argument gets space-split, library not found,
+   `undefined reference to esp_mp3_dec_register` etc.) — this is a bug in
+   the *vendored* component-manager package, not something to patch in a
+   gitignored `managed_components/` tree. **Not fixed**, worked around only:
+   verified both envs by building from a no-space mirror
+   (robocopy of this tree, preserving the same relative depth to
+   `IOT_Device/_shared/`), which is consistent with how this firmware has
+   actually always been built per this file's own history (the
+   `0.6.2-sd-stat-fix` build/flash above ran from
+   `C:\Users\User\.codex\memories\jenix-schoolbell-fw-preview-fix-20260910`,
+   not this path). Both envs link clean from a no-space path:
+   `esp32-s3-schoolbell` 56.0% flash / 13.5% RAM (matches the
+   `0.6.2-sd-stat-fix` figures above almost exactly — zero regression);
+   `esp32-s3-schoolbell-prov` 64.1% flash / 16.5% RAM.
+   Building/flashing for real bench validation (item 1 below) needs either
+   the same no-space-mirror approach or a real fix to the vendored `-L`
+   flag issue.
+
+**Done:**
+- `IOT_Device/_shared/jenix_provisioning/` — shared ESP-IDF component,
+  `wifi_provisioning` + `protocomm`, Security Scheme 2 (SRP6a/AES-256-GCM),
+  parameterized by product code / PID / PoP source, generalized from
+  QRunlock's proven `BleProvisioningService.cpp` `EnsureSec2Material()`
+  pattern. See its own `README.md`.
+- Product code `SB` reserved in `PROVISIONING.md` Section 2.
+- New `esp32-s3-schoolbell-prov` env (`platformio.ini`): pulls in the shared
+  component through `components/jenix_provisioning/` — a thin
+  forwarding-stub `CMakeLists.txt` (no duplicated source) that ESP-IDF
+  auto-discovers with zero extra config, pointing at
+  `IOT_Device/_shared/jenix_provisioning/`. (Originally tried
+  `EXTRA_COMPONENT_DIRS` in the root `CMakeLists.txt` instead — reverted:
+  this repo's space-containing path breaks ESP-IDF's
+  `split_paths_by_spaces.py` heuristic once a second space-containing entry
+  is added alongside PlatformIO's own `src` entry, confirmed 2026-09-11.)
+  A conditional `REQUIRES` in `src/CMakeLists.txt` (gated on the
+  `JENIX_PROV_STANDARD` cmake var, set only by this env's
+  `board_build.cmake_extra_args`) is what actually pulls the stub into the
+  build — the default env never references it. Plus `sdkconfig.prov.defaults`
+  (BLE NimBLE + Security Scheme 2 Kconfig, merged only for this env via
+  `SDKCONFIG_DEFAULTS`, not into the shared `sdkconfig.defaults`).
+- `include/services/provisioning_service.h` / `src/services/provisioning_service.cpp`
+  — thin wrapper service (matches the existing `WifiService`/`CloudService`
+  pattern); always compiles in both envs, only does anything under
+  `JENIX_PROV_STANDARD`.
+- `app_main.cpp`: after `wifi_service_.init()`, if
+  `!wifi_service_.hasStationConfig()` (Section 3 Phase 0), starts BLE
+  provisioning. Already-provisioned units, and the default env entirely,
+  are unaffected.
+- `device_identity_service.cpp`: under `JENIX_PROV_STANDARD` only, device id
+  becomes the standard `JNXSB{6-hex-MAC}` (was `JNX-SB-S3-{mac}`). Confirmed
+  no backend/app code depends on the old device-id-with-MAC format before
+  doing this (only the unrelated PID string `JNX-SB-S3-001` appears
+  elsewhere, in `PWA_APK`'s `schoolBellPid.ts` — untouched by this rename).
+
+**Explicitly not done — next steps, in order:**
+1. **Hardware bench validation** — build and flash
+   `esp32-s3-schoolbell-prov` to a real unit, confirm it advertises as
+   `JNXSB{mac}` over BLE, watch Serial for the generated Proof-of-Possession
+   line (`[JENIX-PROVISIONING] first-boot Proof-of-Possession = ...`), pair
+   from the app's Smart Mode / BLE provisioning screen, confirm Wi-Fi
+   credential exchange and connect. `-t upload` needs the vendored
+   `-L` link bug (above) actually fixed or a no-space mirror — plain
+   `pio run` (no upload) works fine from this path as-is. Build/flash
+   commands:
+   ```
+   pio run -e esp32-s3-schoolbell-prov
+   pio run -e esp32-s3-schoolbell-prov -t upload --upload-port <COMx>
+   pio device monitor -e esp32-s3-schoolbell-prov
+   ```
+2. **SoftAP scheme** — only BLE is wired so far, matching QRunlock's own
+   BLE-first rollout phasing. School Bell's existing AP control panel
+   already owns the AP interface/HTTP server, so reconciling that with
+   `wifi_provisioning`'s own SoftAP transport is a real design question to
+   work out once BLE is proven, not before.
+3. **Real platform bind** — `cloud_service.cpp`'s local-NVS `home_id` bench
+   mechanism is untouched and still the only way `home_id` gets set. The
+   real claim/bind REST contract isn't implemented anywhere in this repo
+   yet (checked both `provisioningApi.ts` and QRunlock's
+   `CloudBridgeService.cpp` — QRunlock has the identical open gap). Don't
+   invent an endpoint here; this needs the platform side first.
+4. **QRunlock refactor onto the shared component** — Section 8a's actual
+   end state (QRunlock as a consumer, not the original). Deferred past
+   item 1 above on purpose: QRunlock's `esp32-c3-supermini-prov2` env has
+   its own unresolved Arduino-vs-ESP-IDF-5.3.1 build wall, unrelated to
+   this work, and risky to touch without hardware to validate against.
+5. Manufacturing-time PoP burn (both School Bell and QRunlock still use the
+   first-boot-generate interim).
+
 # Current Product Objective
 
 Build a sellable Jenix SchoolBell appliance around `ESP32-S3 + SD + DS3231 +
@@ -274,7 +414,9 @@ Backend files added today:
 - the new LittleFS partition is installed and mounted but its file operations
   still need UI-level testing
 - the preview fix is flashed but still needs confirmation from the phone browser
-- physical and soft PTT have no real amplifier/microphone/Wi-Fi bench result yet
+- physical PTT has no real amplifier/microphone bench result yet; soft PTT's
+  amplifier/Wi-Fi path is now bench-validated (see "Soft PTT Bench
+  Validation — 2026-09-11" above) but not with a real microphone or the APK
 - firmware HTTP playback has compile validation but not bench validation
 - firmware still assumes canonical WAV input; no resampling fallback exists
 - backend stream endpoints currently have no authentication or rate limits

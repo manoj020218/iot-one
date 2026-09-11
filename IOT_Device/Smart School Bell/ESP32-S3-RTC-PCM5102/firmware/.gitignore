@@ -3,4 +3,5 @@
 managed_components/
 sdkconfig.*
 !sdkconfig.defaults
+!sdkconfig.prov.defaults
 .diagnostics/

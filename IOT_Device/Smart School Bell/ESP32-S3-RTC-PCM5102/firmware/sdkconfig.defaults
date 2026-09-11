@@ -1,5 +1,14 @@
 CONFIG_COMPILER_CXX_EXCEPTIONS=y
 CONFIG_COMPILER_CXX_RTTI=y
+# PlatformIO's ESP-IDF builder reparses CMake compiler fragments and breaks
+# on this repo's space-containing project path ("D:/IOT Device/...") when
+# this option emits -fmacro-prefix-map=<project>= -- confirmed 2026-09-11,
+# cc1plus.exe: error: invalid argument 'D:/IOT' to '-fmacro-prefix-map',
+# failing every single source file, unrelated to any provisioning change.
+# Same root cause and same fix QRunlock's prov2 pilot already documented
+# and applied in IOT_Device/QRunlock/sdkconfig.defaults. Disabling this only
+# affects embedded debug-info path prefixes, not runtime behavior.
+# CONFIG_COMPILER_HIDE_PATHS_MACROS is not set
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=24576
 CONFIG_FREERTOS_HZ=1000
 CONFIG_ESP_TASK_WDT_EN=y

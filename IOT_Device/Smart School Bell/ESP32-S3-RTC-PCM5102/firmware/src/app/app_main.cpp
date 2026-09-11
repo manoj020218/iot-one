@@ -103,6 +103,26 @@ esp_err_t FirmwareApp::bootstrap() {
   }
   app_state_.setWifiReady(wifi_service_.isReady());
 
+  // PROVISIONING.md Section 3 Phase 0: only start provisioning when no
+  // station credentials are already stored. Already-provisioned units are
+  // completely unaffected by this call. No-op (ESP_ERR_NOT_SUPPORTED) in
+  // the default env -- see services::ProvisioningService.
+  if (err == ESP_OK && !wifi_service_.hasStationConfig()) {
+    const esp_err_t prov_err = provisioning_service_.begin(
+        "SB", app::config::kProductId,
+        [this](const std::string& device_id, const std::string& ip) {
+          log_service_.info("provisioning",
+                             ("Wi-Fi connected via provisioning, device_id=" + device_id +
+                              " ip=" + ip)
+                                 .c_str());
+        });
+    if (prov_err == ESP_OK) {
+      log_service_.info("provisioning", "BLE Security Scheme 2 provisioning started");
+    } else if (prov_err != ESP_ERR_NOT_SUPPORTED) {
+      log_service_.warn("provisioning", "Failed to start BLE provisioning");
+    }
+  }
+
   err = cloud_service_.init(device_config.device_id, [this]() { return makeCloudStatus(); });
   if (err != ESP_OK) log_service_.warn("cloud", "Cloud bridge init failed; local bell remains available");
 

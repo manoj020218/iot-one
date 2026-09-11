@@ -1,0 +1,16 @@
+# Merge these into a consumer's own sdkconfig.defaults (this file is not
+# picked up automatically -- ESP-IDF only reads sdkconfig.defaults at the
+# project root). Values proven working by QRunlock's esp32-c3-supermini-prov2
+# pilot (IOT_Device/QRunlock/sdkconfig.defaults); reused as-is here rather
+# than re-derived, since they're already hardware-verified for Security
+# Scheme 2 over BLE.
+
+# NimBLE, not Bluedroid -- smaller footprint, what QRunlock's pilot uses.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+
+# Security Scheme 2 is the Jenix One standard (PROVISIONING.md Section 1).
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
+CONFIG_WIFI_PROV_BLE_SEC_CONN=y

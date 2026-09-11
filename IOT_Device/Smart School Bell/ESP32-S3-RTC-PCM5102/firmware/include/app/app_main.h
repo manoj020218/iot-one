@@ -14,6 +14,7 @@
 #include "services/holiday_service.h"
 #include "services/log_service.h"
 #include "services/ota_service.h"
+#include "services/provisioning_service.h"
 #include "services/schedule_service.h"
 #include "services/storage_service.h"
 #include "services/sync_service.h"
@@ -53,6 +54,7 @@ class FirmwareApp {
   services::TimeService time_service_{rtc_driver_};
   services::AudioService audio_service_{storage_service_, pcm5102_driver_};
   services::WifiService wifi_service_;
+  services::ProvisioningService provisioning_service_;
   services::OtaService ota_service_;
   services::CloudService cloud_service_{ota_service_};
   services::SyncService sync_service_{log_service_};
