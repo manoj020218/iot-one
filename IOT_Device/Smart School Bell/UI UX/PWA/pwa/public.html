@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#07071a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Bell Schedule</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07071a;--bg-card:#0d0d24;--bg-surface:#121230;
+  --amber:#f5a623;--amber-soft:#f5a62318;--amber-glow:#f5a62340;
+  --teal:#00d4b4;--teal-soft:#00d4b418;
+  --green:#2ecc71;--green-soft:#2ecc7118;
+  --red:#ff4757;--red-soft:#ff475718;
+  --violet:#8b5cf6;--violet-soft:#8b5cf618;
+  --blue:#3b82f6;--blue-soft:#3b82f618;
+  --text-1:#eeeeff;--text-2:#8888bb;--text-3:#44447a;
+  --border:#ffffff0d;--border-lit:#f5a62328;
+  --radius:14px;--radius-sm:9px;
+  --font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+html{font-size:15px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-1);min-height:100vh;overflow-x:hidden;padding-bottom:env(safe-area-inset-bottom)}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;opacity:.5}
+
+.wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 16px 32px}
+
+/* ── HEADER ── */
+.hdr{text-align:center;padding:28px 0 20px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.hdr-badge{display:inline-flex;align-items:center;gap:6px;background:var(--amber-soft);border:1px solid var(--amber-glow);border-radius:20px;padding:4px 12px;font-size:.68rem;font-weight:700;color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.school-name{font-family:var(--font-head);font-size:1.5rem;font-weight:800;color:var(--text-1);line-height:1.2;margin-bottom:4px}
+.school-sub{font-size:.8rem;color:var(--text-3);margin-bottom:14px}
+.clock-time{font-family:var(--font-head);font-size:1.9rem;font-weight:800;color:var(--teal);letter-spacing:.05em}
+.clock-date{font-size:.78rem;color:var(--text-2);margin-top:2px}
+
+/* ── PARENT FILTER BAR ── */
+.parent-bar{margin-bottom:14px}
+.parent-opt-btn{
+  width:100%;padding:11px 16px;background:var(--green-soft);border:1px dashed #2ecc7140;
+  border-radius:var(--radius-sm);color:var(--green);font-size:.82rem;font-weight:600;
+  cursor:pointer;font-family:var(--font-body);text-align:left;display:flex;align-items:center;gap:8px;
+  transition:all .15s;
+}
+.parent-opt-btn:hover{background:#2ecc7120;border-color:var(--green)}
+.class-active-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.class-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;
+  background:var(--green-soft);border:1px solid #2ecc7140;color:var(--green);
+  font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-body);
+  transition:all .15s;
+}
+.class-chip.active{background:var(--green);color:#000;border-color:var(--green)}
+.class-chip-x{background:none;border:none;color:inherit;font-size:1rem;cursor:pointer;line-height:1;padding:0 0 0 2px;opacity:.7}
+.add-child-btn{font-size:.78rem;color:var(--green);background:none;border:1px dashed #2ecc7140;border-radius:20px;padding:7px 12px;cursor:pointer;font-family:var(--font-body);font-weight:600}
+
+/* ── PARENT SETUP PANEL ── */
+.parent-setup{
+  background:var(--bg-card);border:1px solid #2ecc7128;border-radius:var(--radius);
+  padding:18px 18px 14px;margin-bottom:14px;
+}
+.ps-title{font-size:.82rem;font-weight:700;color:var(--green);margin-bottom:10px}
+.ps-inputs{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.ps-row{display:flex;gap:8px;align-items:center}
+.ps-row input{flex:1;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-1);font-family:var(--font-body);font-size:.875rem;outline:none;transition:border-color .15s}
+.ps-row input:focus{border-color:var(--green)}
+.ps-row input::placeholder{color:var(--text-3)}
+.ps-row-x{background:none;border:none;color:var(--text-3);font-size:1rem;cursor:pointer;padding:4px;line-height:1;flex-shrink:0}
+.ps-actions{display:flex;gap:8px}
+.ps-btn{padding:9px 18px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:none;transition:all .15s}
+.ps-btn.primary{background:var(--green);color:#000}
+.ps-btn.ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+.add-row-btn{font-size:.78rem;color:var(--green);background:none;border:none;cursor:pointer;font-family:var(--font-body);font-weight:600;padding:4px 0}
+
+/* ── DEVIATION BANNER ── */
+.dev-banner{
+  background:linear-gradient(135deg,#1a1200,#1f1800);border:1px solid #f5a62360;
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;
+  display:flex;align-items:flex-start;gap:12px;animation:bIn .35s ease;
+}
+@keyframes bIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.dev-icon{font-size:1.3rem;flex-shrink:0}
+.dev-body{flex:1}.dev-title{font-size:.8rem;font-weight:700;color:var(--amber);margin-bottom:2px}
+.dev-note{font-size:.78rem;color:var(--text-2);line-height:1.5}
+.dev-x{background:none;border:none;color:var(--text-3);font-size:1rem;cursor:pointer;padding:2px 4px;line-height:1;flex-shrink:0}
+
+/* ── HOLIDAY BANNER ── */
+.holiday-card{background:var(--red-soft);border:1px solid #ff475728;border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.hc-icon{font-size:1.8rem;flex-shrink:0}
+.hc-title{font-weight:700;font-size:.95rem;color:var(--red);margin-bottom:2px}
+.hc-sub{font-size:.78rem;color:var(--text-2)}
+
+/* ── NEXT BELL ── */
+.next-card{background:linear-gradient(135deg,#0d0d24,#16103a);border:1px solid var(--border-lit);border-radius:var(--radius);padding:20px 22px 16px;margin-bottom:6px;box-shadow:0 0 40px var(--amber-glow);position:relative;overflow:hidden}
+.next-card::before{content:'🔔';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:4.5rem;opacity:.05;pointer-events:none}
+.next-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;color:var(--amber);text-transform:uppercase;margin-bottom:5px}
+.next-name{font-family:var(--font-head);font-size:1.05rem;font-weight:700;margin-bottom:2px}
+.next-time{font-family:var(--font-head);font-size:2.5rem;font-weight:800;color:var(--amber);line-height:1;margin-bottom:4px}
+.next-cd{font-size:.82rem;color:var(--text-2)}
+.next-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+
+/* ── SEC LABEL ── */
+.sec-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;padding:0 2px;margin:20px 0 10px}
+
+/* ── BELL ROWS ── */
+.bell-list{display:flex;flex-direction:column;gap:7px}
+.bell-row{display:flex;align-items:center;gap:13px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .15s}
+.bell-row.next-bell-row{border-color:var(--amber);background:var(--amber-soft);box-shadow:0 0 16px var(--amber-glow)}
+.bell-row.past{opacity:.38}
+.bell-time{font-family:var(--font-head);font-weight:700;font-size:1.05rem;color:var(--amber);min-width:50px;flex-shrink:0}
+.bell-name{flex:1;font-size:.875rem;font-weight:500}
+.bell-sub{font-size:.7rem;color:var(--text-3);margin-top:1px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:.65rem;font-weight:700;flex-shrink:0}
+.chip.period{background:var(--teal-soft);color:var(--teal)}
+.chip.break{background:var(--amber-soft);color:var(--amber)}
+.chip.prayer{background:var(--green-soft);color:var(--green)}
+.chip.dismiss{background:var(--red-soft);color:var(--red)}
+.chip.exam{background:var(--violet-soft);color:var(--violet)}
+.chip.assembly{background:var(--blue-soft);color:var(--blue)}
+.meta-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:.65rem;font-weight:600;background:var(--bg-surface);border:1px solid var(--border);color:var(--text-3)}
+.empty-state{text-align:center;padding:28px 20px;color:var(--text-3);font-size:.85rem}
+.empty-state .ei{font-size:2.2rem;margin-bottom:8px;opacity:.4}
+
+/* ── SUGGEST CARD ── */
+.suggest-card{margin-top:28px;background:linear-gradient(135deg,#0a1a0a,#071207);border:1px solid #25D36630;border-radius:var(--radius);padding:22px 20px;text-align:center}
+.suggest-title{font-family:var(--font-head);font-size:1rem;font-weight:800;color:var(--text-1);margin-bottom:6px}
+.suggest-sub{font-size:.82rem;color:var(--text-2);line-height:1.6;margin-bottom:18px}
+.wa-btn{display:inline-flex;align-items:center;gap:10px;background:#25D366;color:#fff;border:none;border-radius:50px;padding:12px 24px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);text-decoration:none;box-shadow:0 4px 20px #25D36644;transition:all .2s}
+.wa-btn:hover{background:#1ebe57;transform:translateY(-2px)}
+.wa-btn svg{width:20px;height:20px;flex-shrink:0}
+.suggest-note{font-size:.7rem;color:var(--text-3);margin-top:10px;line-height:1.5}
+
+/* ── FOOTER ── */
+.brand-footer{text-align:center;margin-top:32px;padding:20px 16px;border-top:1px solid var(--border)}
+.bf-powered{font-size:.68rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.bf-logo{display:inline-flex;align-items:center;gap:9px;background:var(--bg-card);border:1px solid var(--border-lit);border-radius:12px;padding:10px 18px;font-family:var(--font-head);font-size:.95rem;font-weight:800}
+.bf-icon{width:30px;height:30px;background:var(--amber);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 12px var(--amber-glow)}
+.bf-name em{color:var(--amber);font-style:normal}
+.bf-tagline{font-size:.72rem;color:var(--text-3);margin-top:8px;line-height:1.5}
+.bf-link{color:var(--amber);text-decoration:none;font-weight:600}
+
+/* ── MISC ── */
+.loading{text-align:center;padding:48px 20px}
+.spin{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.refresh-dot{position:fixed;top:12px;right:12px;z-index:99;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:rdot 3s infinite}
+@keyframes rdot{0%,100%{opacity:1}50%{opacity:.25}}
+@media(max-width:360px){.school-name{font-size:1.3rem}.next-time{font-size:2rem}.clock-time{font-size:1.6rem}}
+</style>
+</head>
+<body>
+<div class="refresh-dot" title="Live — auto-refreshes"></div>
+
+<div class="wrap">
+
+  <div id="loadingState" class="loading">
+    <div class="spin"></div>
+    <div style="font-size:.85rem;color:var(--text-3)">Loading bell schedule…</div>
+  </div>
+
+  <div id="mainContent" style="display:none">
+
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-badge">🔔 Live Bell Schedule</div>
+      <div class="school-name" id="schoolName">—</div>
+      <div class="school-sub" id="schoolSub">—</div>
+      <div class="clock-time" id="clkTime">00:00:00</div>
+      <div class="clock-date" id="clkDate">—</div>
+    </div>
+
+    <!-- PARENT CLASS FILTER -->
+    <div class="parent-bar" id="parentBar">
+      <!-- Toggles between opt-in button, setup panel, and active class chips -->
+    </div>
+
+    <!-- DEVIATION BANNER -->
+    <div id="deviationBanner" style="display:none" class="dev-banner">
+      <div class="dev-icon">⚠️</div>
+      <div class="dev-body">
+        <div class="dev-title">Schedule Change Today</div>
+        <div class="dev-note" id="deviationNote">—</div>
+      </div>
+      <button class="dev-x" onclick="document.getElementById('deviationBanner').style.display='none'">✕</button>
+    </div>
+
+    <!-- HOLIDAY BANNER -->
+    <div class="holiday-card" id="holidayCard" style="display:none">
+      <div class="hc-icon">🏖️</div>
+      <div>
+        <div class="hc-title" id="holidayName">Holiday Today</div>
+        <div class="hc-sub">No bells scheduled for today. Enjoy your day!</div>
+      </div>
+    </div>
+
+    <!-- NEXT BELL -->
+    <div id="nextBellCard" class="next-card">
+      <div class="next-label">⏰ Next Bell</div>
+      <div class="next-name" id="nextName">—</div>
+      <div class="next-time" id="nextTime">--:--</div>
+      <div class="next-cd" id="nextCd">Calculating…</div>
+      <div class="next-meta" id="nextMeta"></div>
+    </div>
+
+    <!-- TODAY'S SCHEDULE -->
+    <div class="sec-label" id="todayLabel">📋 Today's Schedule</div>
+    <div class="bell-list" id="todayList">
+      <div class="empty-state"><div class="ei">🗓️</div>No bells scheduled for today</div>
+    </div>
+
+    <!-- FULL SCHEDULE (all days) — hidden when parent mode active -->
+    <div id="fullSchedSection">
+      <div class="sec-label">🔔 All Bell Times</div>
+      <div class="bell-list" id="fullList">
+        <div class="empty-state"><div class="ei">🔔</div>No schedules added yet</div>
+      </div>
+    </div>
+
+    <!-- SUGGEST CARD -->
+    <div class="suggest-card">
+      <div style="font-size:2rem;margin-bottom:10px">📣</div>
+      <div class="suggest-title">Does your school still ring bells manually?</div>
+      <div class="suggest-sub">Share this free software with your school's principal or admin.<br>One message — and your school could go fully automatic.</div>
+      <a class="wa-btn" href="#" onclick="suggestOnWhatsApp(event)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Suggest on WhatsApp
+      </a>
+      <div class="suggest-note">Opens WhatsApp with a ready-made message. You choose who to send it to.</div>
+    </div>
+
+    <div class="brand-footer">
+      <div class="bf-powered">Powered by</div>
+      <div class="bf-logo">
+        <div class="bf-icon">🔔</div>
+        <div class="bf-name">Jenix <em>School</em>Bell</div>
+      </div>
+      <div class="bf-tagline">Free · Offline · Automated school bell system<br>
+        <a class="bf-link" href="https://jenixschoolbell.com" target="_blank">jenixschoolbell.com</a>
+      </div>
+    </div>
+
+  </div><!-- /mainContent -->
+</div><!-- /wrap -->
+
+<script>
+const API       = window.location.origin;
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_SHORT= ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const TYPE_CHIP = {period:'period',break:'break',prayer:'prayer',dismiss:'dismiss',exam:'exam',assembly:'assembly'};
+const LS = {
+  g:(k,d)=>{try{const v=localStorage.getItem('jx_pub_'+k);return v!==null?JSON.parse(v):d;}catch{return d;}},
+  s:(k,v)=>{try{localStorage.setItem('jx_pub_'+k,JSON.stringify(v));}catch{}}
+};
+
+let state = {
+  schedules:[],holidays:[],school:null,deviations:[],
+  isHoliday:false,holidayName:'',
+  // parent mode
+  classes:[],       // ['10-A','7-B']
+  activeClass:0,
+  classSchedules:{} // { '10-A': [...] }
+};
+let nextBellData  = null;
+let setupVisible  = false;
+
+// ── BOOT ───────────────────────────────────────
+async function boot() {
+  state.classes       = LS.g('classes',[]);
+  state.activeClass   = LS.g('activeClass',0);
+  state.classSchedules= LS.g('classSchedules',{});
+  await loadData();
+  document.getElementById('loadingState').style.display='none';
+  document.getElementById('mainContent').style.display='block';
+  render();
+  startClock();
+  setInterval(loadData,60000);
+}
+
+async function loadData() {
+  try {
+    const [schRes,holRes,schoolRes,devRes] = await Promise.all([
+      fetch(API+'/api/schedules').then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(API+'/api/holidays').then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(API+'/api/school').then(r=>r.ok?r.json():{}).catch(()=>{}),
+      fetch(API+'/api/deviations').then(r=>r.ok?r.json():[]).catch(()=>[])
+    ]);
+    state.schedules   = Array.isArray(schRes) ? schRes.filter(s=>s.enabled) : [];
+    state.holidays    = Array.isArray(holRes) ? holRes : [];
+    state.school      = (schoolRes&&schoolRes.name) ? schoolRes : null;
+    state.deviations  = Array.isArray(devRes) ? devRes : [];
+    const today       = new Date().toISOString().split('T')[0];
+    const hol         = state.holidays.find(h=>h.date===today);
+    state.isHoliday   = !!hol;
+    state.holidayName = hol ? hol.name : '';
+
+    // Refresh class-specific schedules if parent mode active
+    for (const cls of state.classes) {
+      try {
+        const rows = await fetch(API+'/api/class/'+encodeURIComponent(cls)+'/schedule').then(r=>r.json()).catch(()=>[]);
+        if (Array.isArray(rows)) state.classSchedules[cls]=rows;
+      } catch {}
+    }
+    LS.s('classSchedules',state.classSchedules);
+    if (document.getElementById('mainContent').style.display!=='none') render();
+  } catch {}
+}
+
+// ── RENDER ─────────────────────────────────────
+function render() {
+  // Header
+  const sn=document.getElementById('schoolName');
+  const ss=document.getElementById('schoolSub');
+  if (state.school) {
+    sn.textContent=state.school.name||'Your School';
+    ss.textContent=[state.school.city,state.school.board].filter(Boolean).join(' · ')||'Bell Schedule';
+  } else { sn.textContent='School Bell Schedule'; ss.textContent='Live schedule view'; }
+
+  // Holiday
+  const hCard=document.getElementById('holidayCard');
+  if (state.isHoliday) {
+    hCard.style.display='flex';
+    document.getElementById('holidayName').textContent=state.holidayName||'Holiday Today';
+  } else hCard.style.display='none';
+
+  renderParentBar();
+  renderDeviationBanner();
+  renderTodayList();
+  renderFullList();
+  updateNextBell(new Date());
+}
+
+// ── PARENT BAR ─────────────────────────────────
+function renderParentBar() {
+  const bar = document.getElementById('parentBar');
+  if (state.classes.length === 0) {
+    if (setupVisible) {
+      renderSetupPanel(bar); return;
+    }
+    bar.innerHTML = `<button class="parent-opt-btn" onclick="showSetup()">
+      👨‍👩‍👧 Track your child's class schedule →
+    </button>`;
+  } else {
+    bar.innerHTML = `<div class="class-active-bar">
+      ${state.classes.map((cls,i)=>`
+        <button class="class-chip${i===state.activeClass?' active':''}" onclick="switchClass(${i})">
+          Class ${esc(cls)}
+          <button class="class-chip-x" onclick="removeClass(event,${i})">✕</button>
+        </button>`).join('')}
+      ${state.classes.length<4?`<button class="add-child-btn" onclick="showAddChild()">+ Add child</button>`:''}
+    </div>`;
+  }
+}
+
+function showSetup() { setupVisible=true; renderParentBar(); }
+function hideSetup() { setupVisible=false; renderParentBar(); }
+
+let addChildMode = false;
+function showAddChild() { addChildMode=true; setupVisible=true; renderParentBar(); }
+
+function renderSetupPanel(bar) {
+  bar.innerHTML = `<div class="parent-setup">
+    <div class="ps-title">👨‍👩‍👧 ${addChildMode?'Add another child':'Track your child\'s schedule'}</div>
+    <div class="ps-inputs" id="psInputs">
+      <div class="ps-row" id="psr0">
+        <input id="pci0" placeholder="Class/Section e.g. 10-A" maxlength="10" autocapitalize="characters"
+          onkeydown="if(event.key==='Enter')saveClasses()">
+      </div>
+    </div>
+    <button class="add-row-btn" id="addRowBtn" onclick="addPsRow()">+ Add another child</button>
+    <div style="margin-top:12px" class="ps-actions">
+      <button class="ps-btn primary" onclick="saveClasses()">Show Schedule</button>
+      <button class="ps-btn ghost" onclick="cancelSetup()">Cancel</button>
+    </div>
+  </div>`;
+}
+
+let psRowCount = 1;
+function addPsRow() {
+  if (psRowCount >= 4) return;
+  const cont = document.getElementById('psInputs');
+  const div = document.createElement('div');
+  div.className='ps-row'; div.id='psr'+psRowCount;
+  div.innerHTML=`<input id="pci${psRowCount}" placeholder="Class/Section e.g. 7-B" maxlength="10" autocapitalize="characters">
+    <button class="ps-row-x" onclick="removePsRow(${psRowCount})">✕</button>`;
+  cont.appendChild(div); psRowCount++;
+  if (psRowCount>=4) document.getElementById('addRowBtn').style.display='none';
+}
+function removePsRow(i) { const el=document.getElementById('psr'+i); if(el) el.remove(); }
+
+async function saveClasses() {
+  const newCls=[];
+  for(let i=0;i<10;i++){const el=document.getElementById('pci'+i);if(el){const v=el.value.trim().toUpperCase();if(v) newCls.push(v);}}
+  if(!newCls.length) return;
+  if (addChildMode) {
+    state.classes=[...new Set([...state.classes,...newCls])];
+  } else {
+    state.classes=newCls;
+  }
+  state.activeClass=0; addChildMode=false; setupVisible=false; psRowCount=1;
+  LS.s('classes',state.classes); LS.s('activeClass',0);
+  // Fetch class schedules
+  for(const cls of state.classes){
+    try{
+      const rows=await fetch(API+'/api/class/'+encodeURIComponent(cls)+'/schedule').then(r=>r.json()).catch(()=>[]);
+      if(Array.isArray(rows)) state.classSchedules[cls]=rows;
+    }catch{}
+  }
+  LS.s('classSchedules',state.classSchedules);
+  render();
+}
+
+function cancelSetup() { setupVisible=false; addChildMode=false; psRowCount=1; renderParentBar(); }
+
+function switchClass(i) {
+  state.activeClass=i; LS.s('activeClass',i);
+  renderParentBar(); renderDeviationBanner(); renderTodayList(); updateNextBell(new Date());
+}
+
+function removeClass(e, i) {
+  e.stopPropagation();
+  state.classes.splice(i,1);
+  if(state.activeClass>=state.classes.length) state.activeClass=Math.max(0,state.classes.length-1);
+  LS.s('classes',state.classes); LS.s('activeClass',state.activeClass);
+  render();
+}
+
+// ── DEVIATION BANNER ───────────────────────────
+function renderDeviationBanner() {
+  const banner=document.getElementById('deviationBanner');
+  const noteEl=document.getElementById('deviationNote');
+  if (!state.classes.length) { banner.style.display='none'; return; }
+  const cls    = state.classes[state.activeClass];
+  const today  = new Date().toISOString().split('T')[0];
+  const dev    = state.deviations.find(d=>d.date===today&&(d.class_name==='ALL'||d.class_name.toUpperCase()===cls.toUpperCase()));
+  if (dev) { noteEl.textContent=dev.note; banner.style.display='flex'; }
+  else banner.style.display='none';
+}
+
+// ── ACTIVE SCHEDULE (parent or all) ────────────
+function activeSchedules() {
+  if (state.classes.length) {
+    const cls = state.classes[state.activeClass];
+    return state.classSchedules[cls] || state.schedules;
+  }
+  return state.schedules;
+}
+
+// ── TODAY LIST ─────────────────────────────────
+function todaySchedules(now) {
+  if (state.isHoliday) return [];
+  const day=now.getDay();
+  return activeSchedules()
+    .filter(s=>{const d=Array.isArray(s.days)?s.days:(s.days||'').split(',').map(Number);return d.includes(day);})
+    .sort((a,b)=>a.time.localeCompare(b.time));
+}
+
+function renderTodayList() {
+  const now=new Date(), todays=todaySchedules(now);
+  const timeNow=pad(now.getHours())+':'+pad(now.getMinutes());
+  const el=document.getElementById('todayList');
+  if(!todays.length){el.innerHTML='<div class="empty-state"><div class="ei">🗓️</div>No bells scheduled for today</div>';return;}
+  el.innerHTML=todays.map(s=>{
+    const isPast=s.time<timeNow;
+    const isNext=nextBellData&&nextBellData.id===s.id;
+    const meta=[s.class_name,s.subject,s.room_no?'Room '+s.room_no:null].filter(Boolean).join(' · ');
+    return `<div class="bell-row${isPast?' past':''}${isNext?' next-bell-row':''}">
+      <div class="bell-time">${s.time}</div>
+      <div style="flex:1">
+        <div class="bell-name">${esc(s.name)}</div>
+        ${meta?`<div class="bell-sub">${esc(meta)}</div>`:''}
+      </div>
+      <span class="chip ${TYPE_CHIP[s.type]||'period'}">${isNext?'▶ NEXT':cap(s.type||'period')}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── FULL LIST ──────────────────────────────────
+function renderFullList() {
+  const fullSection=document.getElementById('fullSchedSection');
+  // Hide full-schedule section in parent mode (they see class-specific only)
+  if (state.classes.length) { fullSection.style.display='none'; return; }
+  fullSection.style.display='';
+  const all=[...state.schedules].sort((a,b)=>a.time.localeCompare(b.time));
+  const el=document.getElementById('fullList');
+  if(!all.length){el.innerHTML='<div class="empty-state"><div class="ei">🔔</div>No schedules added yet</div>';return;}
+  el.innerHTML=all.map(s=>{
+    const days=Array.isArray(s.days)?s.days:(s.days||'').split(',').map(Number);
+    const dots=DAYS_SHORT.map((d,i)=>`<span style="width:18px;height:18px;border-radius:50%;font-size:.58rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:${days.includes(i)?'var(--amber-soft)':'var(--bg-surface)'};color:${days.includes(i)?'var(--amber)':'var(--text-3)'}">${d}</span>`).join('');
+    return `<div class="bell-row">
+      <div class="bell-time">${s.time}</div>
+      <div style="flex:1"><div class="bell-name">${esc(s.name)}</div><div style="display:flex;gap:3px;margin-top:4px">${dots}</div></div>
+      <span class="chip ${TYPE_CHIP[s.type]||'period'}">${cap(s.type||'period')}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── NEXT BELL ──────────────────────────────────
+function updateNextBell(now) {
+  const todays=todaySchedules(now);
+  const timeNow=pad(now.getHours())+':'+pad(now.getMinutes());
+  const upcoming=todays.filter(s=>s.time>=timeNow);
+  const nameEl=document.getElementById('nextName');
+  const timeEl=document.getElementById('nextTime');
+  const cdEl=document.getElementById('nextCd');
+  const metaEl=document.getElementById('nextMeta');
+  const card=document.getElementById('nextBellCard');
+
+  if(!upcoming.length){
+    nextBellData=null;
+    nameEl.textContent=state.isHoliday?'Holiday — No Bells':'No more bells today';
+    timeEl.textContent='--:--'; cdEl.textContent=state.isHoliday?'Enjoy your holiday!':'See you tomorrow!';
+    metaEl.innerHTML=''; card.style.boxShadow='none'; return;
+  }
+
+  const next=upcoming[0]; nextBellData=next;
+  const [h,m]=next.time.split(':').map(Number);
+  const bellDate=new Date(now); bellDate.setHours(h,m,0,0);
+  const diffMs=bellDate-now, diffMin=Math.floor(diffMs/60000), diffSec=Math.floor((diffMs%60000)/1000);
+  nameEl.textContent=next.name; timeEl.textContent=next.time;
+  if(diffMin>60){cdEl.textContent=`in ${Math.floor(diffMin/60)}h ${diffMin%60}m`;}
+  else if(diffMin>0){cdEl.textContent=`in ${diffMin} min ${diffSec}s`;}
+  else if(diffSec>0){cdEl.textContent=`in ${diffSec} seconds`;}
+  else cdEl.textContent='Ringing now!';
+  const chips=[next.class_name?`<span class="meta-chip">🏫 ${esc(next.class_name)}</span>`:'',
+    next.subject?`<span class="meta-chip">📚 ${esc(next.subject)}</span>`:'',
+    next.room_no?`<span class="meta-chip">📍 Room ${esc(next.room_no)}</span>`:''].filter(Boolean).join('');
+  metaEl.innerHTML=chips;
+  card.style.boxShadow='0 0 40px var(--amber-glow)';
+}
+
+// ── CLOCK ──────────────────────────────────────
+function startClock() {
+  function tick(){
+    const now=new Date();
+    const t=`${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const d=`${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MON_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+    const ce=document.getElementById('clkTime');if(ce)ce.textContent=t;
+    const de=document.getElementById('clkDate');if(de)de.textContent=d;
+    updateNextBell(now);
+    if(now.getSeconds()===0) renderTodayList();
+  }
+  tick(); setInterval(tick,1000);
+}
+
+// ── WHATSAPP SUGGEST ───────────────────────────
+function suggestOnWhatsApp(e) {
+  e.preventDefault();
+  const school=state.school?.name?`*${state.school.name}*`:'a nearby school';
+  const msg=`Sir/Ma'am, I just saw that ${school} is using a free automatic school bell system called *Jenix SchoolBell* 🔔
+
+It rings bells automatically at scheduled times — no manual work needed at all.
+
+✅ 100% Free  ✅ Works fully offline  ✅ Easy to set up on any Windows PC  ✅ Manage schedule from your phone
+
+I think it would be very useful for our school too!
+
+👉 Download free at: https://jenixschoolbell.com`;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+
+// ── UTILS ──────────────────────────────────────
+function pad(n){return String(n).padStart(2,'0');}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+boot();
+</script>
+</body>
+</html>

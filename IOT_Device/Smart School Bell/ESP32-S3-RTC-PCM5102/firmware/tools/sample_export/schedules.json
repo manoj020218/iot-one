@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "name": "Morning Assembly",
+    "time": "08:00",
+    "type": "assembly",
+    "sound_id": "school",
+    "duration": 10,
+    "days": [1, 2, 3, 4, 5],
+    "enabled": true
+  },
+  {
+    "id": 2,
+    "name": "Period Change",
+    "time": "08:45",
+    "type": "period",
+    "sound_id": "default",
+    "duration": 5,
+    "days": [1, 2, 3, 4, 5],
+    "enabled": true
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "active_profile_id": "regular",
+  "automation_enabled": true,
+  "profiles": [
+    {
+      "id": "regular",
+      "name": "Regular Timetable",
+      "category": "regular",
+      "enabled": true,
+      "schedules": [
+        {
+          "id": 1,
+          "name": "Morning Assembly",
+          "time": "08:00",
+          "type": "assembly",
+          "sound_id": "16-Assembly",
+          "duration": 10,
+          "days": [1, 2, 3, 4, 5, 6],
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "summer",
+      "name": "Summer Timetable",
+      "category": "summer",
+      "enabled": true,
+      "schedules": []
+    },
+    {
+      "id": "winter",
+      "name": "Winter Timetable",
+      "category": "winter",
+      "enabled": true,
+      "schedules": []
+    },
+    {
+      "id": "exam",
+      "name": "Exam Timetable",
+      "category": "exam",
+      "enabled": true,
+      "schedules": []
+    }
+  ],
+  "calendar_rules": [
+    {
+      "id": 1,
+      "name": "Winter season",
+      "profile_id": "winter",
+      "start_date": "2026-11-01",
+      "end_date": "2027-02-28",
+      "priority": 10,
+      "repeat_yearly": true,
+      "days": [1, 2, 3, 4, 5, 6],
+      "enabled": true
+    }
+  ]
+}

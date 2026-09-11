@@ -1,0 +1,27 @@
+dependencies:
+  espressif/esp_audio_codec:
+    component_hash: a5b9275af74247e3ce536d16a7080e4d77207a185b63e1bea368eb4d57176c2b
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 2.6.2
+  espressif/mdns:
+    component_hash: 3ba256ac95e07c274be53cbd73f06cb846c403b61e8fbdf1be57bdb79db7a63e
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 1.12.0
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 5.3.1
+  joltwallet/littlefs:
+    component_hash: 3af20a3d75c49db9dc2286fd50862c34055c9f578419ad1f2bf7ed3ed01391fe
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 1.22.3
+manifest_hash: 0f8e5ef7dabf71cd60007af086f3ada0b4509640b2a1c3d468ee4341d35ce6c4
+target: esp32s3
+version: 1.0.0

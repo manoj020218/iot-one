@@ -1,0 +1,54 @@
+{
+  "profiles": {
+    "sd-default": {
+      "name": "Local SD Card WAV",
+      "source": "sd-card",
+      "transport": "file",
+      "format": "wav",
+      "enabled": true
+    },
+    "sd-mp3": {
+      "name": "Local SD Card MP3",
+      "source": "sd-card",
+      "transport": "file",
+      "format": "mp3",
+      "enabled": true
+    },
+    "url-primary": {
+      "name": "Remote HTTP WAV",
+      "source": "url",
+      "transport": "http",
+      "format": "wav",
+      "enabled": true
+    },
+    "vps-live": {
+      "name": "VPS Hosted WAV",
+      "source": "vps",
+      "transport": "http",
+      "format": "wav",
+      "endpoint": "http://example.com/audio/live-bell.wav",
+      "enabled": true
+    }
+  },
+  "sounds": {
+    "default": {
+      "profile": "sd-mp3",
+      "file": "sounds/00.mp3",
+      "duration": 5
+    },
+    "school": {
+      "profile": "sd-mp3",
+      "file": "sounds/16-Assembly.mp3",
+      "duration": 10
+    },
+    "remote-demo": {
+      "profile": "url-primary",
+      "url": "http://example.com/audio/remote-demo.wav",
+      "duration": 8
+    },
+    "vps-demo": {
+      "profile": "vps-live",
+      "duration": 8
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@jenix/school-bell-media-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained Node backend that normalizes mixed audio sources into firmware-ready HTTP WAV endpoints.",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  }
+}

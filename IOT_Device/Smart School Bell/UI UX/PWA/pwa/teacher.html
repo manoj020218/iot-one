@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#07071a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Teacher Portal — Jenix SchoolBell</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07071a;--bg-card:#0d0d24;--bg-surface:#121230;
+  --amber:#f5a623;--amber-soft:#f5a62318;--amber-glow:#f5a62340;
+  --teal:#00d4b4;--teal-soft:#00d4b418;
+  --green:#2ecc71;--green-soft:#2ecc7118;
+  --red:#ff4757;--red-soft:#ff475718;
+  --violet:#8b5cf6;
+  --text-1:#eeeeff;--text-2:#8888bb;--text-3:#44447a;
+  --border:#ffffff0d;--border-lit:#f5a62328;
+  --radius:14px;--radius-sm:9px;
+  --font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+html{font-size:15px;-webkit-font-smoothing:antialiased;height:100%}
+body{
+  font-family:var(--font-body);background:var(--bg);color:var(--text-1);
+  min-height:100vh;overflow-x:hidden;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;pointer-events:none;opacity:.5;
+}
+
+/* ── SCREENS ──────────────────────────────────── */
+.screen{
+  position:relative;z-index:1;width:100%;max-width:420px;
+  padding:28px 20px 32px;display:none;flex-direction:column;
+  min-height:100vh;
+}
+.screen.active{display:flex}
+
+/* ── TOP BRAND ────────────────────────────────── */
+.top-brand{text-align:center;margin-bottom:32px;padding-top:16px}
+.top-icon{
+  width:56px;height:56px;background:var(--amber);border-radius:14px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:24px;box-shadow:0 0 24px var(--amber-glow);margin-bottom:12px;
+}
+.top-name{font-family:var(--font-head);font-weight:800;font-size:1.35rem}
+.top-name em{color:var(--amber);font-style:normal}
+.top-sub{font-size:.75rem;color:var(--text-3);margin-top:3px}
+
+/* ── CARD ─────────────────────────────────────── */
+.card{
+  background:var(--bg-card);border:1px solid var(--border-lit);
+  border-radius:var(--radius);padding:26px 22px;width:100%;margin-bottom:14px;
+}
+.card-title{font-family:var(--font-head);font-weight:700;font-size:1.1rem;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:var(--text-2);line-height:1.55;margin-bottom:20px}
+
+/* ── FORM ─────────────────────────────────────── */
+.fgroup{margin-bottom:16px}
+.flabel{display:block;font-size:.7rem;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.finput{
+  width:100%;padding:13px 15px;background:var(--bg-surface);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text-1);font-family:var(--font-body);font-size:.9rem;
+  transition:border-color .18s;outline:none;
+}
+.finput:focus{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-soft)}
+.finput::placeholder{color:var(--text-3)}
+
+/* ── BUTTONS ──────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 20px;border-radius:var(--radius-sm);font-size:.9rem;
+  font-weight:600;cursor:pointer;border:none;font-family:var(--font-body);
+  transition:all .18s;width:100%;
+}
+.btn-primary{background:var(--amber);color:#000;box-shadow:0 3px 16px var(--amber-glow)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px var(--amber-glow)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg-surface);color:var(--text-1)}
+.btn-danger{background:var(--red-soft);color:var(--red);border:1px solid #ff475728}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+/* ── ERROR ────────────────────────────────────── */
+.err{color:var(--red);font-size:.8rem;margin-top:10px;text-align:center;min-height:18px}
+
+/* ── PIN PAD ──────────────────────────────────── */
+.pin-display{
+  display:flex;justify-content:center;gap:16px;margin:20px 0;
+}
+.pin-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--text-3);background:transparent;transition:all .15s;
+}
+.pin-dot.filled{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px var(--amber-glow)}
+.pin-dot.error{background:var(--red);border-color:var(--red)}
+.pin-pad{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  margin:0 auto;max-width:280px;width:100%;
+}
+.pin-key{
+  height:62px;border-radius:12px;border:1px solid var(--border);
+  background:var(--bg-surface);color:var(--text-1);font-size:1.3rem;
+  font-weight:600;cursor:pointer;font-family:var(--font-head);
+  transition:all .12s;display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;user-select:none;
+}
+.pin-key:active{background:var(--amber-soft);border-color:var(--amber);transform:scale(.94)}
+.pin-key.zero{grid-column:2}
+.pin-key.back{grid-column:3;font-size:1.1rem;color:var(--text-2)}
+.pin-key.back:active{background:var(--red-soft);border-color:var(--red)}
+
+/* ── DASHBOARD HEADER ─────────────────────────── */
+.dash-header{
+  background:linear-gradient(135deg,#0d0d24,#16103a);
+  border:1px solid var(--border-lit);border-radius:var(--radius);
+  padding:20px 20px 16px;width:100%;margin-bottom:14px;
+  box-shadow:0 0 30px var(--amber-glow);
+}
+.dh-greeting{font-size:.68rem;color:var(--amber);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.dh-name{font-family:var(--font-head);font-size:1.3rem;font-weight:800}
+.dh-zone{font-size:.8rem;color:var(--text-2);margin-top:2px}
+.dh-clock{font-family:var(--font-head);font-size:1.5rem;font-weight:800;color:var(--teal);margin-top:12px}
+.dh-date{font-size:.75rem;color:var(--text-2);margin-top:1px}
+
+/* ── NEXT CLASS CARD ──────────────────────────── */
+.next-card{
+  background:var(--bg-card);border:1px solid var(--amber);border-radius:var(--radius);
+  padding:18px 20px;width:100%;margin-bottom:14px;
+  box-shadow:0 0 20px var(--amber-glow);
+  position:relative;overflow:hidden;
+}
+.next-card::before{content:'🔔';position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:3.5rem;opacity:.06}
+.nc-label{font-size:.62rem;color:var(--amber);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.nc-name{font-family:var(--font-head);font-size:1rem;font-weight:700;margin-bottom:2px}
+.nc-time{font-family:var(--font-head);font-size:2rem;font-weight:800;color:var(--amber);line-height:1;margin-bottom:3px}
+.nc-cd{font-size:.8rem;color:var(--text-2);margin-bottom:10px}
+.nc-meta{display:flex;flex-wrap:wrap;gap:8px}
+.meta-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:600;
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--text-2);
+}
+.no-class{text-align:center;padding:24px 16px;color:var(--text-3);font-size:.85rem}
+
+/* ── SCHEDULE LIST ────────────────────────────── */
+.bell-list{display:flex;flex-direction:column;gap:7px;width:100%}
+.bell-row{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+}
+.bell-row.past{opacity:.35}
+.bell-row.next{border-color:var(--amber);background:var(--amber-soft)}
+.bt{font-family:var(--font-head);font-weight:700;font-size:1rem;color:var(--amber);min-width:48px}
+.bn{flex:1}
+.bn-name{font-size:.875rem;font-weight:500}
+.bn-meta{font-size:.7rem;color:var(--text-3);margin-top:2px}
+.sec-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;padding:0 2px;margin:18px 0 8px;width:100%}
+
+/* ── NOTIFICATION PREF ────────────────────────── */
+.notif-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;width:100%;margin-bottom:14px;
+}
+.notif-title{font-size:.85rem;font-weight:600;margin-bottom:12px}
+.pref-row{display:flex;gap:8px;flex-wrap:wrap}
+.pref-btn{
+  flex:1;min-width:80px;padding:10px 8px;border-radius:var(--radius-sm);
+  font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font-body);
+  border:1px solid var(--border);background:var(--bg-surface);color:var(--text-2);
+  transition:all .15s;text-align:center;
+}
+.pref-btn.active{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
+.notif-status{font-size:.72rem;color:var(--text-3);margin-top:10px;line-height:1.5}
+
+/* ── BOTTOM NAV ───────────────────────────────── */
+.logout-row{margin-top:8px;width:100%}
+
+/* ── TOAST ────────────────────────────────────── */
+.toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;width:calc(100% - 32px);max-width:380px}
+.toast{
+  background:var(--bg-card);border:1px solid var(--border-lit);border-radius:10px;
+  padding:11px 16px;font-size:.84rem;animation:tIn .3s ease;
+  box-shadow:0 4px 20px #00000060;display:flex;align-items:center;gap:10px;
+}
+@keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toast.s{border-color:#2ecc7128}.toast.e{border-color:#ff475728}.toast.w{border-color:var(--amber-glow)}
+
+/* ── MISC ─────────────────────────────────────── */
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .65s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:24px;color:var(--text-3);font-size:.82rem}
+.refresh-dot{position:fixed;top:10px;right:10px;z-index:99;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:rdot 3s infinite}
+@keyframes rdot{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ── SCHEDULE UPDATE BANNER ───────────────────── */
+.upd-banner{
+  width:100%;background:linear-gradient(135deg,#1a1a00,#241e00);
+  border:1px solid var(--amber);border-radius:12px;
+  padding:14px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px;
+  animation:tIn .4s ease;
+}
+.upd-icon{font-size:1.4rem;flex-shrink:0}
+.upd-body{flex:1}
+.upd-title{font-size:.875rem;font-weight:700;color:var(--amber);margin-bottom:2px}
+.upd-sub{font-size:.75rem;color:var(--text-2)}
+.upd-x{background:none;border:none;color:var(--text-3);font-size:1rem;cursor:pointer;padding:2px 6px;line-height:1}
+</style>
+</head>
+<body>
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="refresh-dot" id="rdot" style="display:none" title="Live"></div>
+
+<!-- ── SCREEN: LOGIN ───────────────────────────── -->
+<div class="screen active" id="screenLogin">
+  <div class="top-brand">
+    <div class="top-icon">🔔</div>
+    <div class="top-name">Jenix <em>School</em>Bell</div>
+    <div class="top-sub">Teacher Portal</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Teacher Login</div>
+    <div class="card-sub">Enter your name and mobile number as registered by your admin.</div>
+    <div class="fgroup">
+      <label class="flabel">Your Name *</label>
+      <input class="finput" id="loginName" placeholder="e.g. Priya Sharma" autocomplete="name">
+    </div>
+    <div class="fgroup" style="margin-bottom:0">
+      <label class="flabel">Mobile Number *</label>
+      <input class="finput" id="loginMobile" type="tel" placeholder="e.g. 9876543210" autocomplete="tel">
+    </div>
+    <div class="err" id="loginErr"></div>
+    <button class="btn btn-primary" style="margin-top:16px" id="loginBtn" onclick="doLogin()">Continue →</button>
+  </div>
+</div>
+
+<!-- ── SCREEN: SET PIN ─────────────────────────── -->
+<div class="screen" id="screenSetPin">
+  <div class="top-brand">
+    <div class="top-icon">🔒</div>
+    <div class="top-name">Set Your PIN</div>
+    <div class="top-sub">You only need to do this once</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Welcome, <span id="setPinName">Teacher</span>!</div>
+    <div class="card-sub">Set a 4-digit PIN. You'll use this to log in next time — faster and secure.</div>
+    <div class="pin-display" id="setPinDisplay">
+      <div class="pin-dot" id="spd0"></div><div class="pin-dot" id="spd1"></div>
+      <div class="pin-dot" id="spd2"></div><div class="pin-dot" id="spd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('set',1)">1</button>
+      <button class="pin-key" onclick="pinKey('set',2)">2</button>
+      <button class="pin-key" onclick="pinKey('set',3)">3</button>
+      <button class="pin-key" onclick="pinKey('set',4)">4</button>
+      <button class="pin-key" onclick="pinKey('set',5)">5</button>
+      <button class="pin-key" onclick="pinKey('set',6)">6</button>
+      <button class="pin-key" onclick="pinKey('set',7)">7</button>
+      <button class="pin-key" onclick="pinKey('set',8)">8</button>
+      <button class="pin-key" onclick="pinKey('set',9)">9</button>
+      <button class="pin-key zero" onclick="pinKey('set',0)">0</button>
+      <button class="pin-key back" onclick="pinBack('set')">⌫</button>
+    </div>
+    <div class="err" id="setPinErr"></div>
+  </div>
+  <button class="btn btn-ghost" onclick="showScreen('screenLogin')" style="margin-top:8px">← Back to Login</button>
+</div>
+
+<!-- ── SCREEN: VERIFY PIN ─────────────────────── -->
+<div class="screen" id="screenVerifyPin">
+  <div class="top-brand">
+    <div class="top-icon">🔒</div>
+    <div class="top-name">Enter PIN</div>
+    <div class="top-sub">Welcome back</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Hello, <span id="verifyPinName">Teacher</span>!</div>
+    <div class="card-sub">Enter your 4-digit PIN to view your schedule.</div>
+    <div class="pin-display">
+      <div class="pin-dot" id="vpd0"></div><div class="pin-dot" id="vpd1"></div>
+      <div class="pin-dot" id="vpd2"></div><div class="pin-dot" id="vpd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('verify',1)">1</button>
+      <button class="pin-key" onclick="pinKey('verify',2)">2</button>
+      <button class="pin-key" onclick="pinKey('verify',3)">3</button>
+      <button class="pin-key" onclick="pinKey('verify',4)">4</button>
+      <button class="pin-key" onclick="pinKey('verify',5)">5</button>
+      <button class="pin-key" onclick="pinKey('verify',6)">6</button>
+      <button class="pin-key" onclick="pinKey('verify',7)">7</button>
+      <button class="pin-key" onclick="pinKey('verify',8)">8</button>
+      <button class="pin-key" onclick="pinKey('verify',9)">9</button>
+      <button class="pin-key zero" onclick="pinKey('verify',0)">0</button>
+      <button class="pin-key back" onclick="pinBack('verify')">⌫</button>
+    </div>
+    <div class="err" id="verifyPinErr"></div>
+  </div>
+  <button class="btn btn-ghost" onclick="showScreen('screenLogin')" style="margin-top:8px">← Not you? Switch user</button>
+</div>
+
+<!-- ── SCREEN: DASHBOARD ───────────────────────── -->
+<div class="screen" id="screenDashboard">
+  <div class="refresh-dot" style="display:block"></div>
+
+  <!-- Header -->
+  <div class="dash-header">
+    <div class="dh-greeting">🎓 Teacher Portal</div>
+    <div class="dh-name" id="dhName">—</div>
+    <div class="dh-zone" id="dhZone"></div>
+    <div class="dh-clock" id="dhClock">00:00:00</div>
+    <div class="dh-date" id="dhDate">—</div>
+  </div>
+
+  <!-- Notification preference -->
+  <div class="notif-card">
+    <div class="notif-title">🔔 Notification Style</div>
+    <div class="pref-row">
+      <div class="pref-btn active" id="pref-sound" onclick="setPref('sound')">🔊 Sound + Vibrate</div>
+      <div class="pref-btn" id="pref-vibrate" onclick="setPref('vibrate')">📳 Vibrate Only</div>
+      <div class="pref-btn" id="pref-silent" onclick="setPref('silent')">🔕 Silent</div>
+    </div>
+    <div class="notif-status" id="notifStatus">Tap "Allow" when your browser asks to enable notifications.</div>
+    <button class="btn btn-ghost" style="margin-top:10px;font-size:.78rem;padding:8px 14px;width:auto" onclick="requestNotifPermission()">🔔 Enable Notifications</button>
+  </div>
+
+  <!-- Schedule updated banner (hidden by default) -->
+  <div id="scheduleUpdBanner" style="display:none" class="upd-banner">
+    <div class="upd-icon">🔄</div>
+    <div class="upd-body">
+      <div class="upd-title">Schedule Updated</div>
+      <div class="upd-sub">Your admin has updated your class schedule. Showing latest timetable.</div>
+    </div>
+    <button class="upd-x" onclick="document.getElementById('scheduleUpdBanner').style.display='none'">✕</button>
+  </div>
+
+  <!-- Next class -->
+  <div class="sec-label">⏰ Next Class</div>
+  <div id="nextClassCard"></div>
+
+  <!-- Today's schedule -->
+  <div class="sec-label" id="todayLabel">📋 Today's Classes</div>
+  <div class="bell-list" id="todayList"></div>
+
+  <!-- Share with parents -->
+  <div style="margin-top:20px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px">
+    <div style="font-weight:700;color:var(--text-1);font-size:.9rem;margin-bottom:6px">📢 Share Bell Schedule with Parents</div>
+    <div style="font-size:.78rem;color:var(--text-2);line-height:1.6;margin-bottom:12px">
+      Share the school bell view with your class parents. Parents can also tap "Track your child's class" to see their child's personalised timetable.
+    </div>
+    <button class="btn btn-ghost" onclick="shareParentView()" style="font-size:.82rem;padding:9px 18px">🔗 Share with Parents</button>
+  </div>
+
+  <!-- Logout -->
+  <div class="logout-row" style="margin-top:24px">
+    <button class="btn btn-danger" onclick="logout()" style="width:auto;padding:10px 24px;font-size:.82rem">← Logout</button>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ── STATE ──────────────────────────────────────
+let T = {
+  id: null, name: '', classZone: '', notifPref: 'sound',
+  schedule: [], pinSet: false
+};
+let pinBuffer = { set: '', verify: '' };
+let notifiedClasses = new Set();
+let audioCtx = null;
+let scheduleHash = null;   // detects admin schedule changes
+let teacherSessionToken = null;
+let schedulePollTimer = null;
+let dashboardClockTimer = null;
+
+// ── BOOT ───────────────────────────────────────
+function boot() {
+  const saved = getSavedSession();
+  if (saved) {
+    T = { ...T, ...saved };
+    teacherSessionToken = saved.sessionToken || null;
+    showDashboard();
+  }
+  // else: login screen is already shown
+}
+
+function getSavedSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem('jx_teacher') || 'null');
+    if (!s || !s.authenticated || !s.id) return null;
+    // Expire after 7 days
+    if (Date.now() - s.ts > 7 * 24 * 60 * 60 * 1000) { localStorage.removeItem('jx_teacher'); return null; }
+    return s;
+  } catch { return null; }
+}
+
+function saveSession(data) {
+  localStorage.setItem('jx_teacher', JSON.stringify({
+    ...data,
+    sessionToken: teacherSessionToken,
+    authenticated: true,
+    ts: Date.now()
+  }));
+}
+
+function clearDashboardTimers() {
+  // These pages can be entered multiple times during one browser lifetime.
+  // Clearing old intervals prevents duplicate polling and clock updates.
+  if (schedulePollTimer) { clearInterval(schedulePollTimer); schedulePollTimer = null; }
+  if (dashboardClockTimer) { clearInterval(dashboardClockTimer); dashboardClockTimer = null; }
+}
+
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (teacherSessionToken) headers['x-teacher-session'] = teacherSessionToken;
+  return headers;
+}
+
+// ── SCREEN NAV ─────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── LOGIN ──────────────────────────────────────
+async function doLogin() {
+  const name   = document.getElementById('loginName').value.trim();
+  const mobile = document.getElementById('loginMobile').value.trim();
+  const err    = document.getElementById('loginErr');
+  const btn    = document.getElementById('loginBtn');
+  if (!name || !mobile) { err.textContent = 'Please enter your name and mobile number.'; return; }
+  err.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<div class="spin"></div>';
+  try {
+    const r = await fetch(API + '/api/teacher/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, mobile}) });
+    const data = await r.json();
+    btn.disabled = false; btn.textContent = 'Continue →';
+    if (!data.success) { err.textContent = data.error || 'Login failed.'; return; }
+    T.id = data.teacherId; T.name = data.name; T.classZone = data.classZone;
+    T.notifPref = data.notifPref || 'sound'; T.pinSet = data.pinSet;
+    if (!data.pinSet) {
+      document.getElementById('setPinName').textContent = data.name.split(' ')[0];
+      pinBuffer.set = '';
+      updatePinDisplay('set', '');
+      showScreen('screenSetPin');
+    } else {
+      document.getElementById('verifyPinName').textContent = data.name.split(' ')[0];
+      pinBuffer.verify = '';
+      updatePinDisplay('verify', '');
+      showScreen('screenVerifyPin');
+    }
+  } catch {
+    btn.disabled = false; btn.textContent = 'Continue →';
+    err.textContent = 'Cannot reach school server. Make sure you are on school WiFi.';
+  }
+}
+
+// ── PIN PAD ────────────────────────────────────
+function pinKey(mode, digit) {
+  const buf = pinBuffer[mode];
+  if (buf.length >= 4) return;
+  pinBuffer[mode] = buf + digit;
+  updatePinDisplay(mode, pinBuffer[mode]);
+  if (pinBuffer[mode].length === 4) {
+    if (mode === 'set') submitSetPin();
+    else submitVerifyPin();
+  }
+}
+
+function pinBack(mode) {
+  pinBuffer[mode] = pinBuffer[mode].slice(0, -1);
+  updatePinDisplay(mode, pinBuffer[mode]);
+}
+
+function updatePinDisplay(mode, val, error = false) {
+  const prefix = mode === 'set' ? 'spd' : 'vpd';
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById(prefix + i);
+    if (!dot) continue;
+    dot.classList.toggle('filled', i < val.length);
+    dot.classList.toggle('error', error);
+  }
+}
+
+async function submitSetPin() {
+  const pin = pinBuffer.set;
+  document.getElementById('setPinErr').textContent = '';
+  try {
+    const r = await fetch(API + '/api/teacher/set-pin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({teacherId: T.id, pin}) });
+    const data = await r.json();
+    if (!data.success) {
+      updatePinDisplay('set', pin, true);
+      document.getElementById('setPinErr').textContent = data.error || 'Failed to set PIN.';
+      setTimeout(() => { pinBuffer.set = ''; updatePinDisplay('set', ''); }, 1000);
+      return;
+    }
+    teacherSessionToken = data.sessionToken || null;
+    T.pinSet = true;
+    saveSession({ id: T.id, name: T.name, classZone: T.classZone, notifPref: T.notifPref });
+    showDashboard();
+    toast('PIN set! You\'re logged in 🎉', 's');
+  } catch {
+    document.getElementById('setPinErr').textContent = 'Server error. Try again.';
+    pinBuffer.set = ''; updatePinDisplay('set', '');
+  }
+}
+
+async function submitVerifyPin() {
+  const pin = pinBuffer.verify;
+  document.getElementById('verifyPinErr').textContent = '';
+  try {
+    const r = await fetch(API + '/api/teacher/verify-pin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({teacherId: T.id, pin}) });
+    const data = await r.json();
+    if (!data.success) {
+      updatePinDisplay('verify', pin, true);
+      document.getElementById('verifyPinErr').textContent = data.error || 'Incorrect PIN.';
+      setTimeout(() => { pinBuffer.verify = ''; updatePinDisplay('verify', ''); }, 900);
+      return;
+    }
+    teacherSessionToken = data.sessionToken || null;
+    saveSession({ id: T.id, name: T.name, classZone: T.classZone, notifPref: T.notifPref });
+    showDashboard();
+    toast('Welcome back, ' + T.name.split(' ')[0] + '!', 's');
+  } catch {
+    document.getElementById('verifyPinErr').textContent = 'Server error. Try again.';
+    pinBuffer.verify = ''; updatePinDisplay('verify', '');
+  }
+}
+
+// ── DASHBOARD ──────────────────────────────────
+async function showDashboard() {
+  clearDashboardTimers();
+  showScreen('screenDashboard');
+  document.getElementById('dhName').textContent = T.name;
+  document.getElementById('dhZone').textContent = T.classZone || '';
+  applyPref(T.notifPref);
+  await loadSchedule();
+  startClock();
+  requestNotifPermission();
+  document.getElementById('rdot').style.display = 'block';
+  // Poll schedule every 60s to catch admin updates
+  schedulePollTimer = setInterval(loadSchedule, 60 * 1000);
+}
+
+async function loadSchedule() {
+  try {
+    const r = await fetch(API + '/api/teacher/' + T.id + '/schedule', { headers: authHeaders() });
+    if (r.status === 401) {
+      toast('Session expired. Please log in again.', 'w');
+      logout();
+      return;
+    }
+    const data = await r.json();
+    // Build a simple hash to detect admin-side changes
+    const newHash = JSON.stringify(data.map(s=>`${s.id}:${s.time}:${s.class_name}:${s.subject}:${s.room_no}`).sort());
+    if (scheduleHash !== null && newHash !== scheduleHash) {
+      // Schedule changed — show banner and vibrate
+      document.getElementById('scheduleUpdBanner').style.display = 'flex';
+      navigator.vibrate?.([100, 80, 100]);
+      toast('Your schedule was updated by admin', 'w');
+    }
+    scheduleHash = newHash;
+    T.schedule = data;
+    renderToday();
+  } catch {}
+}
+
+function renderToday() {
+  const now  = new Date();
+  const day  = now.getDay();
+  const tNow = pad(now.getHours()) + ':' + pad(now.getMinutes());
+  const todays = T.schedule
+    .filter(s => { const d = Array.isArray(s.days) ? s.days : s.days.split(',').map(Number); return d.includes(day); })
+    .sort((a, b) => a.time.localeCompare(b.time));
+
+  // Next class
+  const upcoming = todays.filter(s => s.time >= tNow);
+  const nextClass = upcoming[0] || null;
+  const nc = document.getElementById('nextClassCard');
+  if (!nextClass) {
+    nc.innerHTML = '<div class="no-class">🎉 No more classes today!</div>';
+  } else {
+    const [h,m] = nextClass.time.split(':').map(Number);
+    const bellDate = new Date(now); bellDate.setHours(h,m,0,0);
+    const diffMin = Math.floor((bellDate - now) / 60000);
+    const diffSec = Math.floor(((bellDate - now) % 60000) / 1000);
+    const cdText = diffMin > 60 ? `in ${Math.floor(diffMin/60)}h ${diffMin%60}m` : diffMin > 0 ? `in ${diffMin}m ${diffSec}s` : diffSec > 0 ? `in ${diffSec}s` : 'Starting now!';
+    nc.innerHTML = `<div class="next-card">
+      <div class="nc-label">⏰ Next Class</div>
+      <div class="nc-name">${esc(nextClass.name)}</div>
+      <div class="nc-time">${nextClass.time}</div>
+      <div class="nc-cd">${cdText}</div>
+      <div class="nc-meta">
+        ${nextClass.class_name ? `<span class="meta-chip">🏫 ${esc(nextClass.class_name)}</span>` : ''}
+        ${nextClass.subject   ? `<span class="meta-chip">📚 ${esc(nextClass.subject)}</span>` : ''}
+        ${nextClass.room_no   ? `<span class="meta-chip">📍 Room ${esc(nextClass.room_no)}</span>` : ''}
+      </div>
+    </div>`;
+    checkUpcomingNotification(nextClass, diffMin, diffSec);
+  }
+
+  // Today's list
+  const list = document.getElementById('todayList');
+  if (!todays.length) {
+    list.innerHTML = '<div class="empty">No classes assigned to you today.</div>';
+    return;
+  }
+  list.innerHTML = todays.map(s => {
+    const isPast = s.time < tNow;
+    const isNext = nextClass && nextClass.id === s.id;
+    const details = [s.class_name, s.subject, s.room_no ? 'Room ' + s.room_no : ''].filter(Boolean).join(' · ');
+    return `<div class="bell-row${isPast?' past':''}${isNext?' next':''}">
+      <div class="bt">${s.time}</div>
+      <div class="bn">
+        <div class="bn-name">${esc(s.name)}</div>
+        ${details ? `<div class="bn-meta">${esc(details)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── CLOCK ──────────────────────────────────────
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const d = `${DAY_NAMES[now.getDay()]}, ${now.getDate()} ${MON_NAMES[now.getMonth()]}`;
+    const ce = document.getElementById('dhClock'); if(ce) ce.textContent = t;
+    const de = document.getElementById('dhDate');  if(de) de.textContent = d;
+    // Update every 30s
+    if (now.getSeconds() % 30 === 0) renderToday();
+  }
+  tick();
+  dashboardClockTimer = setInterval(tick, 1000);
+}
+
+// ── NOTIFICATION PREFERENCE ────────────────────
+function applyPref(pref) {
+  ['sound','vibrate','silent'].forEach(p => {
+    const el = document.getElementById('pref-' + p);
+    if (el) el.classList.toggle('active', p === pref);
+  });
+  T.notifPref = pref;
+  const statusEl = document.getElementById('notifStatus');
+  const msgs = { sound:'🔊 Sound + vibration on class alerts', vibrate:'📳 Vibration only on class alerts', silent:'🔕 In-app alerts only (no sound or vibration)' };
+  if (statusEl) statusEl.textContent = msgs[pref] || '';
+}
+
+async function setPref(pref) {
+  applyPref(pref);
+  const saved = getSavedSession();
+  if (saved) { saved.notifPref = pref; saveSession(saved); }
+  try {
+    const r = await fetch(API + '/api/teacher/' + T.id + '/notif-pref', { method:'PATCH', headers: authHeaders(), body: JSON.stringify({pref}) });
+    if (r.status === 401) {
+      toast('Session expired. Please log in again.', 'w');
+      logout();
+      return;
+    }
+  } catch {}
+  toast('Notification style updated', 's');
+}
+
+// ── BROWSER NOTIFICATIONS ──────────────────────
+function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') sendTeacherVpsCount();
+    });
+  } else if (Notification.permission === 'granted') {
+    sendTeacherVpsCount();
+  }
+}
+
+async function sendTeacherVpsCount() {
+  const counted = localStorage.getItem('jx_teacher_vps_counted');
+  if (counted) return;
+  try {
+    // Fetch school device_id to tag the count to a school
+    const info = await fetch(API + '/api/school').then(r=>r.json()).catch(()=>null);
+    const did  = info?.device_id;
+    if (!did) return;
+    await fetch('http://154.61.69.200:7291/api/stats/user-register', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'teacher', device_id: did }),
+      signal: AbortSignal.timeout(5000)
+    });
+    localStorage.setItem('jx_teacher_vps_counted', '1');
+  } catch {}
+}
+
+function checkUpcomingNotification(cls, diffMin, diffSec) {
+  const key = cls.id + '_' + cls.time;
+  if (notifiedClasses.has(key)) return;
+  // Fire when 2 minutes (or less) remaining
+  if (diffMin <= 2 && diffMin >= 0 && (diffMin > 0 || diffSec > 0)) {
+    notifiedClasses.add(key);
+    fireNotification(cls, diffMin, diffSec);
+  }
+}
+
+function fireNotification(cls, diffMin, diffSec) {
+  const pref = T.notifPref || 'sound';
+  const timeLeft = diffMin > 0 ? `${diffMin} min` : `${diffSec} seconds`;
+  const body = [
+    cls.class_name ? 'Class: ' + cls.class_name : '',
+    cls.subject    ? 'Subject: ' + cls.subject   : '',
+    cls.room_no    ? 'Room: ' + cls.room_no       : ''
+  ].filter(Boolean).join('\n');
+
+  // In-app toast always shown
+  toast(`⏰ "${cls.name}" starts in ${timeLeft}!`, 'w');
+
+  // Browser notification
+  if (pref !== 'silent' && 'Notification' in window && Notification.permission === 'granted') {
+    new Notification(`⏰ Class starts in ${timeLeft}`, {
+      body: body || cls.name,
+      icon: '/icons/icon-192.png',
+      badge:'/icons/icon-192.png',
+      tag: 'class-' + cls.id,
+      requireInteraction: true
+    });
+  }
+
+  // Sound
+  if (pref === 'sound') playAlert();
+
+  // Vibration
+  if (pref === 'sound' || pref === 'vibrate') {
+    navigator.vibrate?.([200, 100, 200, 100, 400]);
+  }
+}
+
+function playAlert() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Three ascending notes: C5, E5, G5
+    [[523, 0], [659, 0.2], [784, 0.4]].forEach(([freq, delay]) => {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = audioCtx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.5, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t); osc.stop(t + 0.4);
+    });
+    // Play twice for emphasis
+    setTimeout(() => {
+      [[523, 0], [659, 0.2], [784, 0.4]].forEach(([freq, delay]) => {
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = audioCtx.currentTime + delay;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.5, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        osc.start(t); osc.stop(t + 0.4);
+      });
+    }, 700);
+  } catch {}
+}
+
+// ── SHARE WITH PARENTS ─────────────────────────
+function shareParentView() {
+  const url  = window.location.origin + '/view';
+  const school = localStorage.getItem('jx_teacher') ? JSON.parse(localStorage.getItem('jx_teacher'))?.name || '' : '';
+  const text = 'View our school bell schedule' + (school ? ' — ' + school : '') + '. Parents: tap "Track your child\'s class" to see the personalised timetable.';
+  if (navigator.share) {
+    navigator.share({ title: 'School Bell Schedule', text, url }).catch(()=>{});
+    return;
+  }
+  // Fallback share sheet
+  const msg = encodeURIComponent(text + '\n' + url);
+  const wa  = 'https://wa.me/?text=' + msg;
+  const sms = 'sms:?body=' + msg;
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:0 12px';
+  d.innerHTML = `
+    <div style="background:var(--card);border-radius:18px 18px 0 0;padding:22px 20px 28px;width:100%;max-width:460px;border:1px solid var(--border);border-bottom:none">
+      <div style="font-weight:700;color:var(--text-1);margin-bottom:12px">Share Bell Schedule with Parents</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <a href="${wa}" target="_blank" rel="noopener" onclick="this.closest('[style]').remove()" style="display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);border-radius:12px;text-decoration:none">
+          <span style="font-size:1.8rem">💬</span>
+          <span style="font-size:.72rem;color:#aaa;font-weight:500">WhatsApp</span>
+        </a>
+        <a href="${sms}" onclick="this.closest('[style]').remove()" style="display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;text-decoration:none">
+          <span style="font-size:1.8rem">📱</span>
+          <span style="font-size:.72rem;color:#aaa;font-weight:500">SMS</span>
+        </a>
+        <button onclick="navigator.clipboard?.writeText('${url}');toast('Copied!');this.closest('[style]').remove()" style="display:flex;flex-direction:column;align-items:center;gap:7px;padding:15px 8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;cursor:pointer;font-size:inherit">
+          <span style="font-size:1.8rem">📋</span>
+          <span style="font-size:.72rem;color:#aaa;font-weight:500">Copy Link</span>
+        </button>
+      </div>
+      <button onclick="this.closest('[style]').remove()" class="btn btn-ghost" style="width:100%">Cancel</button>
+    </div>`;
+  d.addEventListener('click', e => { if (e.target === d) d.remove(); });
+  document.body.appendChild(d);
+}
+
+// ── LOGOUT ─────────────────────────────────────
+function logout() {
+  clearDashboardTimers();
+  teacherSessionToken = null;
+  localStorage.removeItem('jx_teacher');
+  T = { id:null, name:'', classZone:'', notifPref:'sound', schedule:[], pinSet:false };
+  notifiedClasses.clear();
+  scheduleHash = null;
+  document.getElementById('loginName').value = '';
+  document.getElementById('loginMobile').value = '';
+  document.getElementById('loginErr').textContent = '';
+  showScreen('screenLogin');
+}
+
+// ── TOAST ──────────────────────────────────────
+function toast(msg, type='s') {
+  const icons = {s:'✅',e:'❌',w:'⚡'};
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── UTILS ──────────────────────────────────────
+function pad(n) { return String(n).padStart(2,'0'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+boot();
+</script>
+</body>
+</html>

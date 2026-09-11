@@ -1,0 +1,16 @@
+{
+  "device_id": "ESP32S3-DEMO-001",
+  "school_name": "Jenix Demo School",
+  "timezone": "Asia/Kolkata",
+  "volume_percent": 80,
+  "wifi": {
+    "mode": "client",
+    "ssid": "",
+    "password": ""
+  },
+  "sync": {
+    "source": "sd-card",
+    "last_sync_utc": "2026-08-01T06:00:00Z",
+    "content_version": 1
+  }
+}

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#07071a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Parent Portal — Jenix SchoolBell</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07071a;--bg-card:#0d0d24;--bg-surface:#121230;
+  --amber:#f5a623;--amber-soft:#f5a62318;--amber-glow:#f5a62340;
+  --teal:#00d4b4;--teal-soft:#00d4b418;
+  --green:#2ecc71;--green-soft:#2ecc7118;
+  --red:#ff4757;--red-soft:#ff475718;
+  --violet:#8b5cf6;
+  --text-1:#eeeeff;--text-2:#8888bb;--text-3:#44447a;
+  --border:#ffffff0d;--border-lit:#f5a62328;
+  --radius:14px;--radius-sm:9px;
+  --font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+html{font-size:15px;-webkit-font-smoothing:antialiased;height:100%}
+body{
+  font-family:var(--font-body);background:var(--bg);color:var(--text-1);
+  min-height:100vh;overflow-x:hidden;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;pointer-events:none;opacity:.5;
+}
+
+/* SCREENS */
+.screen{position:relative;z-index:1;width:100%;max-width:460px;padding:24px 18px 32px;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* BRAND */
+.top-brand{text-align:center;margin-bottom:28px;padding-top:20px}
+.top-icon{width:56px;height:56px;background:var(--green);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 0 24px var(--green-soft);margin-bottom:12px}
+.top-name{font-family:var(--font-head);font-weight:800;font-size:1.35rem}
+.top-name em{color:var(--green);font-style:normal}
+.top-sub{font-size:.75rem;color:var(--text-3);margin-top:3px}
+
+/* CARD */
+.card{background:var(--bg-card);border:1px solid var(--border-lit);border-radius:var(--radius);padding:24px 20px;width:100%;margin-bottom:14px}
+.card-title{font-family:var(--font-head);font-weight:700;font-size:1.1rem;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:var(--text-2);line-height:1.55;margin-bottom:18px}
+
+/* FORM */
+.fgroup{margin-bottom:14px}
+.flabel{display:block;font-size:.68rem;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.finput{width:100%;padding:12px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-1);font-family:var(--font-body);font-size:.9rem;transition:border-color .18s;outline:none}
+.finput:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.finput::placeholder{color:var(--text-3)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:var(--radius-sm);font-size:.9rem;font-weight:600;cursor:pointer;border:none;font-family:var(--font-body);transition:all .18s;width:100%}
+.btn-primary{background:var(--green);color:#000;box-shadow:0 3px 16px var(--green-soft)}
+.btn-primary:hover{transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg-surface);color:var(--text-1)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.err{color:var(--red);font-size:.8rem;margin-top:8px;min-height:18px}
+
+/* CHILD ROW */
+.child-row{margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.child-row .finput{flex:1}
+.child-remove{background:none;border:none;color:var(--text-3);font-size:1.2rem;cursor:pointer;padding:4px 6px;line-height:1;flex-shrink:0}
+.child-remove:hover{color:var(--red)}
+
+/* DASHBOARD HEADER */
+.dash-header{
+  background:linear-gradient(135deg,#0a160a,#0d200d);
+  border:1px solid #2ecc7130;border-radius:var(--radius);
+  padding:18px 20px;width:100%;margin-bottom:12px;
+  box-shadow:0 0 24px var(--green-soft);
+}
+.dh-label{font-size:.62rem;color:var(--green);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.dh-school{font-family:var(--font-head);font-weight:800;font-size:1.1rem}
+.dh-date{font-size:.78rem;color:var(--text-2);margin-top:4px}
+.dh-offline{font-size:.7rem;color:var(--amber);margin-top:4px;display:none}
+
+/* CLASS TABS */
+.class-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;width:100%}
+.class-tab{
+  padding:8px 16px;border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer;
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--text-2);
+  transition:all .15s;font-family:var(--font-body);
+}
+.class-tab.active{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+
+/* DAY TABS */
+.day-tabs{display:flex;gap:6px;margin-bottom:14px;width:100%;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.day-tabs::-webkit-scrollbar{display:none}
+.day-tab{
+  flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--text-2);
+  transition:all .15s;font-family:var(--font-body);
+}
+.day-tab.active{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
+.day-tab.today{font-weight:700}
+
+/* DEVIATION BANNER */
+.dev-banner{
+  width:100%;background:linear-gradient(135deg,#1a1200,#1f1800);
+  border:1px solid #f5a62360;border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:12px;
+  display:flex;align-items:flex-start;gap:12px;
+  animation:bIn .35s ease;
+}
+@keyframes bIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.dev-icon{font-size:1.3rem;flex-shrink:0;margin-top:1px}
+.dev-body{flex:1}
+.dev-title{font-size:.8rem;font-weight:700;color:var(--amber);margin-bottom:3px}
+.dev-note{font-size:.78rem;color:var(--text-2);line-height:1.5}
+.dev-x{background:none;border:none;color:var(--text-3);font-size:1rem;cursor:pointer;padding:2px 4px;line-height:1;flex-shrink:0}
+
+/* SCHEDULE ROWS */
+.bell-list{display:flex;flex-direction:column;gap:7px;width:100%;margin-bottom:14px}
+.bell-row{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);
+}
+.bell-row.past{opacity:.35}
+.bell-row.now{border-color:var(--green);background:var(--green-soft)}
+.bt{font-family:var(--font-head);font-weight:700;font-size:1rem;color:var(--amber);min-width:48px}
+.bn{flex:1}
+.bn-name{font-size:.875rem;font-weight:500}
+.bn-meta{font-size:.7rem;color:var(--text-3);margin-top:2px}
+.bn-chip{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;background:var(--bg-surface);border:1px solid var(--border);color:var(--text-3);margin-top:3px;margin-right:4px}
+.sec-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;padding:0 2px;margin:14px 0 8px;width:100%}
+.empty{text-align:center;padding:28px;color:var(--text-3);font-size:.82rem}
+
+/* FOOTER */
+.pf{text-align:center;font-size:.7rem;color:var(--text-3);margin-top:10px;padding:10px}
+.pf strong{color:var(--text-2)}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;width:calc(100% - 32px);max-width:380px}
+.toast{background:var(--bg-card);border:1px solid var(--border-lit);border-radius:10px;padding:11px 16px;font-size:.84rem;animation:tIn .3s ease;box-shadow:0 4px 20px #00000060;display:flex;align-items:center;gap:10px}
+@keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toast.s{border-color:#2ecc7128}.toast.e{border-color:#ff475728}.toast.w{border-color:var(--amber-glow)}
+
+/* MISC */
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .65s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;animation:rdot 3s infinite}
+@keyframes rdot{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
+</head>
+<body>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ── SCREEN: SETUP ────────────────────────── -->
+<div class="screen active" id="screenSetup">
+  <div class="top-brand">
+    <div class="top-icon">🏫</div>
+    <div class="top-name">Jenix <em>School</em>Bell</div>
+    <div class="top-sub">Parent Portal</div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="setupSchoolName">School Timetable</div>
+    <div class="card-sub">Enter your child's class and section to follow their daily bell schedule.</div>
+    <div id="classInputList"></div>
+    <button onclick="addChildInput()" style="background:none;border:none;color:var(--green);font-size:.82rem;font-weight:600;cursor:pointer;padding:4px 0;margin-bottom:12px;font-family:var(--font-body)">+ Add another child</button>
+    <div class="err" id="setupErr"></div>
+    <button class="btn btn-primary" id="setupBtn" onclick="doSetup()">View Timetable →</button>
+  </div>
+  <div style="text-align:center;font-size:.72rem;color:var(--text-3);margin-top:8px;line-height:1.6">
+    Your data stays on your phone. No personal info is sent anywhere.
+  </div>
+</div>
+
+<!-- ── SCREEN: DASHBOARD ───────────────────── -->
+<div class="screen" id="screenDashboard">
+
+  <!-- Header -->
+  <div class="dash-header">
+    <div class="dh-label">🏫 Parent Portal &nbsp;<span class="live-dot" id="liveDot" style="display:none"></span></div>
+    <div class="dh-school" id="dhSchool">—</div>
+    <div class="dh-date" id="dhDate">—</div>
+    <div class="dh-offline" id="dhOffline">📶 Offline — showing cached schedule</div>
+  </div>
+
+  <!-- Class tabs (multiple children) -->
+  <div class="class-tabs" id="classTabs" style="display:none"></div>
+
+  <!-- Deviation banner -->
+  <div id="deviationBanner" style="display:none" class="dev-banner">
+    <div class="dev-icon">⚠️</div>
+    <div class="dev-body">
+      <div class="dev-title">Schedule Change Today</div>
+      <div class="dev-note" id="deviationNote">—</div>
+    </div>
+    <button class="dev-x" onclick="document.getElementById('deviationBanner').style.display='none'">✕</button>
+  </div>
+
+  <!-- Day tabs -->
+  <div class="day-tabs" id="dayTabs"></div>
+
+  <!-- Schedule -->
+  <div class="sec-label" id="schedLabel">Today's Schedule</div>
+  <div class="bell-list" id="scheduleList"><div class="empty">Loading schedule…</div></div>
+
+  <!-- Actions -->
+  <div style="display:flex;gap:10px;width:100%;margin-top:4px">
+    <button class="btn btn-ghost" onclick="resetParent()" style="font-size:.78rem;padding:9px">← Change Class</button>
+    <button class="btn btn-ghost" onclick="refreshData()" style="font-size:.78rem;padding:9px">🔄 Refresh</button>
+  </div>
+
+  <div class="pf">Powered by <strong>Jenix SchoolBell</strong></div>
+</div>
+
+<script>
+const API        = window.location.origin;
+const CLOUD_URL  = 'http://154.61.69.200:7291';
+const DAY_NAMES  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAY_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON_NAMES  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const LS = {
+  g:(k,d)=>{ try{const v=localStorage.getItem('jx_p_'+k);return v!==null?JSON.parse(v):d;}catch{return d;} },
+  s:(k,v)=>{ try{localStorage.setItem('jx_p_'+k,JSON.stringify(v));}catch{} }
+};
+
+let P = {
+  school: null,
+  classes: [],      // ['10-A', '7-B']
+  activeClass: 0,   // index into classes
+  schedules: {},    // { '10-A': [...] }
+  deviations: [],
+  activeDay: new Date().getDay(),
+  childCount: 1
+};
+let parentClockTimer = null;
+let parentPollTimer = null;
+
+// ── BOOT ──────────────────────────────────────
+function boot() {
+  const saved = LS.g('session', null);
+  if (saved && saved.classes && saved.classes.length) {
+    P.classes     = saved.classes;
+    P.activeClass = saved.activeClass || 0;
+    P.school      = LS.g('school', null);
+    P.schedules   = LS.g('schedules', {});
+    P.deviations  = LS.g('deviations', []);
+    showDashboard(false);
+  } else {
+    buildClassInputs(1);
+    fetchSchoolNameForSetup();
+  }
+}
+
+async function fetchSchoolNameForSetup() {
+  try {
+    const r = await fetch(API + '/api/school', { signal: AbortSignal.timeout(4000) });
+    const info = await r.json();
+    if (info && info.name) document.getElementById('setupSchoolName').textContent = info.name;
+  } catch {}
+}
+
+// ── SETUP ─────────────────────────────────────
+function buildClassInputs(n) {
+  const container = document.getElementById('classInputList');
+  container.innerHTML = '';
+  for (let i = 0; i < n; i++) addChildRow(i, n);
+  P.childCount = n;
+}
+
+function addChildInput() {
+  if (P.childCount >= 4) { toast('Maximum 4 children', 'w'); return; }
+  P.childCount++;
+  addChildRow(P.childCount - 1, P.childCount);
+}
+
+function addChildRow(i, total) {
+  const container = document.getElementById('classInputList');
+  const div = document.createElement('div');
+  div.className = 'child-row';
+  div.id = 'cr' + i;
+  div.innerHTML = `
+    <div style="flex:1">
+      <label class="flabel">Child ${i+1} — Class / Section</label>
+      <input class="finput" id="cls${i}" placeholder="e.g. 10-A or 7-B" maxlength="10" autocapitalize="characters"
+        onkeydown="if(event.key==='Enter') doSetup()">
+    </div>
+    ${i > 0 ? `<button class="child-remove" onclick="removeChildRow(${i})" title="Remove">✕</button>` : ''}
+  `;
+  container.appendChild(div);
+}
+
+function removeChildRow(i) {
+  const el = document.getElementById('cr' + i);
+  if (el) { el.remove(); P.childCount--; }
+}
+
+async function doSetup() {
+  const classes = [];
+  for (let i = 0; i < 10; i++) {
+    const el = document.getElementById('cls' + i);
+    if (el) {
+      const v = el.value.trim().toUpperCase();
+      if (v) classes.push(v);
+    }
+  }
+  if (!classes.length) { document.getElementById('setupErr').textContent = 'Enter at least one class.'; return; }
+  document.getElementById('setupErr').textContent = '';
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.innerHTML = '<div class="spin"></div>';
+  P.classes = classes; P.activeClass = 0;
+  await loadAllData(true);
+  btn.disabled = false; btn.textContent = 'View Timetable →';
+  LS.s('session', { classes: P.classes, activeClass: 0 });
+  sendVpsCount();
+  showDashboard(true);
+}
+
+// ── DATA LOADING ──────────────────────────────
+async function loadAllData(firstLoad = false) {
+  let online = false;
+  try {
+    const r = await fetch(API + '/api/status', { signal: AbortSignal.timeout(4000) });
+    online = r.ok;
+  } catch {}
+
+  const offlineEl = document.getElementById('dhOffline');
+  const liveEl    = document.getElementById('liveDot');
+  if (offlineEl) offlineEl.style.display = online ? 'none' : 'block';
+  if (liveEl)    liveEl.style.display    = online ? 'inline-block' : 'none';
+
+  if (!online) {
+    if (firstLoad) toast('Offline — showing cached schedule', 'w');
+    return;
+  }
+
+  // Fetch school info
+  try {
+    const info = await fetch(API + '/api/school').then(r=>r.json()).catch(()=>null);
+    if (info && info.name) { P.school = info; LS.s('school', info); }
+  } catch {}
+
+  // Fetch schedule for each class
+  for (const cls of P.classes) {
+    try {
+      const rows = await fetch(API + '/api/class/' + encodeURIComponent(cls) + '/schedule').then(r=>r.json()).catch(()=>[]);
+      if (Array.isArray(rows)) { P.schedules[cls] = rows; }
+    } catch {}
+  }
+  LS.s('schedules', P.schedules);
+
+  // Fetch deviations
+  try {
+    const devs = await fetch(API + '/api/deviations').then(r=>r.json()).catch(()=>[]);
+    if (Array.isArray(devs)) { P.deviations = devs; LS.s('deviations', devs); }
+  } catch {}
+}
+
+async function refreshData() {
+  toast('Refreshing…', 'w');
+  await loadAllData(false);
+  renderDashboard();
+  toast('Schedule refreshed', 's');
+}
+
+// ── DASHBOARD ─────────────────────────────────
+function showDashboard(animate) {
+  clearDashboardTimers();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screenDashboard').classList.add('active');
+  renderDashboard();
+  startClock();
+}
+
+function clearDashboardTimers() {
+  // Re-entering the dashboard from setup/reset should not leave old timers
+  // running in the background; otherwise polling and rendering duplicate.
+  if (parentClockTimer) { clearInterval(parentClockTimer); parentClockTimer = null; }
+  if (parentPollTimer) { clearInterval(parentPollTimer); parentPollTimer = null; }
+}
+
+function renderDashboard() {
+  // School name
+  const schoolEl = document.getElementById('dhSchool');
+  if (schoolEl) schoolEl.textContent = P.school?.name || 'Your School';
+
+  // Class tabs
+  const tabsEl = document.getElementById('classTabs');
+  if (P.classes.length > 1) {
+    tabsEl.style.display = 'flex';
+    tabsEl.innerHTML = P.classes.map((cls, i) =>
+      `<button class="class-tab${i===P.activeClass?' active':''}" onclick="switchClass(${i})">Class ${cls}</button>`
+    ).join('');
+  } else {
+    tabsEl.style.display = 'none';
+  }
+
+  // Day tabs
+  renderDayTabs();
+
+  // Deviations
+  checkDeviations();
+
+  // Schedule
+  renderSchedule();
+}
+
+function switchClass(i) {
+  P.activeClass = i;
+  LS.s('session', { classes: P.classes, activeClass: i });
+  renderDashboard();
+}
+
+function renderDayTabs() {
+  const today = new Date().getDay();
+  const tabs  = document.getElementById('dayTabs');
+  // Show Mon–Sat always, highlight today
+  const days  = [1,2,3,4,5,6,0]; // Mon to Sun
+  tabs.innerHTML = days.map(d =>
+    `<button class="day-tab${d===P.activeDay?' active':''}${d===today?' today':''}" onclick="switchDay(${d})">${DAY_SHORT[d]}${d===today?' ★':''}</button>`
+  ).join('');
+}
+
+function switchDay(d) {
+  P.activeDay = d;
+  renderDayTabs();
+  checkDeviations();
+  renderSchedule();
+}
+
+function checkDeviations() {
+  const cls     = P.classes[P.activeClass];
+  const todayStr = todayISO();
+  const devBanner = document.getElementById('deviationBanner');
+  const devNote   = document.getElementById('deviationNote');
+  // Show deviation if it's for today + (this class or ALL)
+  const dev = P.deviations.find(d => d.date === todayStr && (d.class_name === 'ALL' || d.class_name.toUpperCase() === cls.toUpperCase()));
+  if (dev && P.activeDay === new Date().getDay()) {
+    devNote.textContent = dev.note;
+    devBanner.style.display = 'flex';
+  } else {
+    devBanner.style.display = 'none';
+  }
+}
+
+function renderSchedule() {
+  const cls   = P.classes[P.activeClass];
+  const day   = P.activeDay;
+  const today = new Date();
+  const tNow  = pad(today.getHours()) + ':' + pad(today.getMinutes());
+  const isToday = day === today.getDay();
+
+  const label = document.getElementById('schedLabel');
+  if (label) label.textContent = isToday ? "Today's Schedule" : DAY_NAMES[day] + "'s Schedule";
+
+  const allSch = P.schedules[cls] || [];
+  const filtered = allSch
+    .filter(s => { const d = Array.isArray(s.days)?s.days:String(s.days).split(',').map(Number); return d.includes(day); })
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  const list = document.getElementById('scheduleList');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">No schedule for ${DAY_NAMES[day]}.</div>`;
+    return;
+  }
+
+  // Find "now" class (in-progress if bell just rang and 40min window)
+  const nowIdx = isToday ? filtered.findIndex((s,i) => {
+    const next = filtered[i+1];
+    return s.time <= tNow && (!next || next.time > tNow);
+  }) : -1;
+
+  list.innerHTML = filtered.map((s, i) => {
+    const isPast = isToday && s.time < tNow && i !== nowIdx;
+    const isNow  = i === nowIdx && isToday;
+    const meta   = [s.class_name&&s.class_name!==cls?s.class_name:null, s.subject, s.room_no?'Room '+s.room_no:null].filter(Boolean);
+    return `<div class="bell-row${isPast?' past':''}${isNow?' now':''}">
+      <div class="bt">${s.time}</div>
+      <div class="bn">
+        <div class="bn-name">${esc(s.name)}</div>
+        ${meta.length?`<div class="bn-meta">${meta.map(esc).join(' · ')}</div>`:''}
+      </div>
+      ${isNow?'<span style="font-size:.7rem;color:var(--green);font-weight:700">NOW</span>':''}
+    </div>`;
+  }).join('');
+}
+
+// ── CLOCK ─────────────────────────────────────
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const el  = document.getElementById('dhDate');
+    if (el) el.textContent = DAY_NAMES[now.getDay()] + ', ' + now.getDate() + ' ' + MON_NAMES[now.getMonth()];
+    // Re-render schedule every minute to update past/now state
+    if (now.getSeconds() === 0 && document.getElementById('screenDashboard').classList.contains('active')) {
+      renderSchedule();
+    }
+  }
+  tick();
+  parentClockTimer = setInterval(tick, 1000);
+  // Poll for schedule updates every 2 minutes when online
+  parentPollTimer = setInterval(async () => {
+    const prev = JSON.stringify(P.schedules);
+    await loadAllData(false);
+    if (JSON.stringify(P.schedules) !== prev) {
+      renderDashboard();
+      toast('Schedule updated', 'w');
+    } else {
+      renderSchedule();
+    }
+  }, 2 * 60 * 1000);
+}
+
+// ── RESET ─────────────────────────────────────
+function resetParent() {
+  if (!confirm('Change class / child setup?')) return;
+  clearDashboardTimers();
+  P.classes = []; P.activeClass = 0; P.schedules = {}; P.deviations = [];
+  LS.s('session', null);
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screenSetup').classList.add('active');
+  P.childCount = 1;
+  buildClassInputs(1);
+  fetchSchoolNameForSetup();
+}
+
+// ── VPS ANONYMOUS COUNT ────────────────────────
+async function sendVpsCount() {
+  // Only send once per device (stored in localStorage)
+  if (LS.g('vps_counted', false)) return;
+  try {
+    const schoolId = P.school?.device_id || '';
+    if (!schoolId) return;
+    await fetch(CLOUD_URL + '/api/stats/user-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'parent', device_id: schoolId }),
+      signal: AbortSignal.timeout(5000)
+    });
+    LS.s('vps_counted', true);
+  } catch {}
+}
+
+// ── UTILS ─────────────────────────────────────
+function pad(n) { return String(n).padStart(2,'0'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function todayISO() { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function toast(msg, type='s') {
+  const icons = {s:'✅',e:'❌',w:'⚡'};
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+boot();
+</script>
+</body>
+</html>

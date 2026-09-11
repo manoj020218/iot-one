@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "label": "Assembly Bell",
+    "sound_id": "16-Assembly",
+    "duration": 10,
+    "category": "assembly"
+  },
+  {
+    "id": 2,
+    "label": "Emergency Bell",
+    "sound_id": "21-Siren",
+    "duration": 20,
+    "category": "emergency"
+  }
+]
