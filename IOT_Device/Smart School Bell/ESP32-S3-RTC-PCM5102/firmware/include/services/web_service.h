@@ -39,6 +39,10 @@ class WebService {
 
   esp_err_t start(SnapshotProvider snapshot_provider, RingHandler ring_handler);
   void stop();
+  // For sharing this server with wifi_prov_scheme_softap_set_httpd_handle()
+  // instead of it starting a second one (see ProvisioningService::begin()).
+  // Null until start() has run.
+  httpd_handle_t httpHandle() const { return server_; }
 
  private:
   static esp_err_t handleUi(httpd_req_t* req);

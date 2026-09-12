@@ -33,6 +33,7 @@ class FirmwareApp {
   void loop();
   void applyLedPattern();
   void handleButtonEvent(ButtonEvent event);
+  void onProvisioningWifiConnected(const std::string& device_id, const std::string& ip);
   esp_err_t handleRingRequest(const RingRequest& request);
   RuntimeSnapshot makeSnapshot() const;
   std::string makeCloudStatus() const;

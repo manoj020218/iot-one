@@ -18,8 +18,9 @@ void HandleWifiConnected(const char* device_id, const char* ip, void* ctx) {
 
 }  // namespace
 
-esp_err_t ProvisioningService::begin(const std::string& product_code, const std::string& pid,
-                                      WifiConnectedHandler on_wifi_connected) {
+esp_err_t ProvisioningService::begin(Scheme scheme, const std::string& product_code,
+                                      const std::string& pid, WifiConnectedHandler on_wifi_connected,
+                                      void* softap_httpd_handle) {
   static WifiConnectedHandler stored_handler;
   stored_handler = std::move(on_wifi_connected);
 
@@ -27,21 +28,25 @@ esp_err_t ProvisioningService::begin(const std::string& product_code, const std:
   config.product_code = product_code.c_str();
   config.pid = pid.c_str();
   config.proof_of_possession = nullptr;  // first-boot-generate + persist to NVS
+  config.softap_httpd_handle = softap_httpd_handle;
 
   jenix_provisioning_callbacks_t callbacks = {};
   callbacks.on_wifi_connected = &HandleWifiConnected;
 
+  const jenix_provisioning_scheme_t native_scheme =
+      (scheme == Scheme::SoftAp) ? JENIX_PROV_SCHEME_SOFTAP : JENIX_PROV_SCHEME_BLE;
   const esp_err_t err =
-      jenix_provisioning_start(JENIX_PROV_SCHEME_BLE, &config, &callbacks, &stored_handler);
+      jenix_provisioning_start(native_scheme, &config, &callbacks, &stored_handler);
   active_ = (err == ESP_OK);
   return err;
 }
 
 #else
 
-esp_err_t ProvisioningService::begin(const std::string& /*product_code*/,
+esp_err_t ProvisioningService::begin(Scheme /*scheme*/, const std::string& /*product_code*/,
                                       const std::string& /*pid*/,
-                                      WifiConnectedHandler /*on_wifi_connected*/) {
+                                      WifiConnectedHandler /*on_wifi_connected*/,
+                                      void* /*softap_httpd_handle*/) {
   return ESP_ERR_NOT_SUPPORTED;
 }
 

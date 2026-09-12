@@ -109,12 +109,9 @@ esp_err_t FirmwareApp::bootstrap() {
   // the default env -- see services::ProvisioningService.
   if (err == ESP_OK && !wifi_service_.hasStationConfig()) {
     const esp_err_t prov_err = provisioning_service_.begin(
-        "SB", app::config::kProductId,
+        services::ProvisioningService::Scheme::Ble, "SB", app::config::kProductId,
         [this](const std::string& device_id, const std::string& ip) {
-          log_service_.info("provisioning",
-                             ("Wi-Fi connected via provisioning, device_id=" + device_id +
-                              " ip=" + ip)
-                                 .c_str());
+          onProvisioningWifiConnected(device_id, ip);
         });
     if (prov_err == ESP_OK) {
       log_service_.info("provisioning", "BLE Security Scheme 2 provisioning started");

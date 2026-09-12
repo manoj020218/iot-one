@@ -21,12 +21,22 @@ class ProvisioningService {
   using WifiConnectedHandler =
       std::function<void(const std::string& device_id, const std::string& ip)>;
 
-  // Starts BLE Security Scheme 2 provisioning advertised as
-  // JNX{product_code}{6-hex-STA-MAC}. Caller must have already confirmed no
-  // Wi-Fi station credentials are stored (PROVISIONING.md Section 3 Phase 0)
-  // -- this does not check that itself.
-  esp_err_t begin(const std::string& product_code, const std::string& pid,
-                  WifiConnectedHandler on_wifi_connected);
+  enum class Scheme { Ble, SoftAp };
+
+  // Starts (or switches to, if a different scheme is already active --
+  // wifi_prov_mgr is a singleton, only one scheme runs at a time) Security
+  // Scheme 2 provisioning advertised as JNX{product_code}{6-hex-STA-MAC}.
+  // Caller must have already confirmed no Wi-Fi station credentials are
+  // stored (PROVISIONING.md Section 3 Phase 0) -- this does not check that
+  // itself.
+  //
+  // softap_httpd_handle (httpd_handle_t, passed as void* to avoid dragging
+  // esp_http_server.h into this header) is only used for Scheme::SoftAp --
+  // pass an existing server (e.g. WebService's) so the provisioning
+  // endpoints share it instead of a second server conflicting for the AP
+  // interface/port 80. Ignored for Scheme::Ble.
+  esp_err_t begin(Scheme scheme, const std::string& product_code, const std::string& pid,
+                  WifiConnectedHandler on_wifi_connected, void* softap_httpd_handle = nullptr);
 
   bool active() const { return active_; }
 

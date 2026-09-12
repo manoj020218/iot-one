@@ -99,13 +99,41 @@ void FirmwareApp::handleButtonEvent(ButtonEvent event) {
   }
 
   if (event == ButtonEvent::LongPress) {
-    log_service_.info("button", "Long press reserved for future provisioning flow");
+    // PROVISIONING.md Sections 8a/9/11: wifi_prov_mgr only runs one
+    // transport scheme at a time (it's a true Espressif singleton), so
+    // BLE-by-default and SoftAP can't both be live simultaneously -- this
+    // is the explicit switch-to-SoftAP trigger for whoever can't use BLE
+    // (matches this exact button's own long-standing "reserved for future
+    // provisioning flow" placeholder). Only meaningful pre-Wi-Fi, same
+    // Phase 0 gate as the BLE default in app_main.cpp's bootstrap(); a
+    // no-op (ESP_ERR_NOT_SUPPORTED) in the default env.
+    if (wifi_service_.hasStationConfig()) {
+      log_service_.info("button", "Long press ignored: already provisioned");
+      return;
+    }
+    const esp_err_t prov_err = provisioning_service_.begin(
+        services::ProvisioningService::Scheme::SoftAp, "SB", app::config::kProductId,
+        [this](const std::string& device_id, const std::string& ip) {
+          onProvisioningWifiConnected(device_id, ip);
+        },
+        web_service_.httpHandle());
+    if (prov_err == ESP_OK) {
+      log_service_.info("button", "Switched to SoftAP provisioning");
+    } else if (prov_err != ESP_ERR_NOT_SUPPORTED) {
+      log_service_.warn("button", "Failed to switch to SoftAP provisioning");
+    }
     return;
   }
 
   if (event == ButtonEvent::FactoryReset) {
     log_service_.warn("button", "Factory reset requested but not implemented in scaffold");
   }
+}
+
+void FirmwareApp::onProvisioningWifiConnected(const std::string& device_id, const std::string& ip) {
+  log_service_.info(
+      "provisioning",
+      ("Wi-Fi connected via provisioning, device_id=" + device_id + " ip=" + ip).c_str());
 }
 
 esp_err_t FirmwareApp::handleRingRequest(const RingRequest& request) {

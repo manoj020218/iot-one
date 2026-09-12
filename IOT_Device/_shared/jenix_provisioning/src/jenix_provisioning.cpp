@@ -30,6 +30,7 @@ constexpr int kGeneratedPopChars = 12;
 
 bool g_mgr_initialized = false;
 bool g_active = false;
+jenix_provisioning_scheme_t g_active_scheme = JENIX_PROV_SCHEME_BLE;
 char g_service_name[32] = {};
 char g_device_id[32] = {};
 char g_generated_pop[kGeneratedPopChars + 1] = {};
@@ -177,7 +178,16 @@ esp_err_t jenix_provisioning_start(jenix_provisioning_scheme_t scheme,
                                     const jenix_provisioning_callbacks_t* callbacks,
                                     void* callback_ctx) {
   if (config == nullptr || config->product_code == nullptr) return ESP_ERR_INVALID_ARG;
-  if (g_active) return ESP_OK;
+  if (g_active && g_active_scheme == scheme) return ESP_OK;
+  if (g_active && g_active_scheme != scheme) {
+    // wifi_prov_mgr is a singleton (one static context, one scheme) -- switch
+    // by tearing the old scheme down first. wifi_prov_mgr_deinit() stops
+    // provisioning first if it's running, so this is safe to call directly.
+    ESP_LOGI(kTag, "Switching provisioning scheme, deinitializing current one first");
+    wifi_prov_mgr_deinit();
+    g_mgr_initialized = false;
+    g_active = false;
+  }
 
   const esp_err_t name_result =
       jenix_provisioning_build_name(config->product_code, g_service_name, sizeof(g_service_name));
@@ -227,6 +237,13 @@ esp_err_t jenix_provisioning_start(jenix_provisioning_scheme_t scheme,
     g_mgr_initialized = true;
   }
 
+  if (scheme == JENIX_PROV_SCHEME_SOFTAP && config->softap_httpd_handle != nullptr) {
+    // Reuse the caller's existing httpd server instead of starting a second
+    // one -- lets a device's own diagnostic HTTP routes keep working on the
+    // same AP+server the provisioning endpoints get registered onto.
+    wifi_prov_scheme_softap_set_httpd_handle(config->softap_httpd_handle);
+  }
+
   wifi_prov_security2_params_t sec2_params = {};
   sec2_params.salt = g_sec2_salt->data();
   sec2_params.salt_len = static_cast<uint16_t>(g_sec2_salt->size());
@@ -241,6 +258,7 @@ esp_err_t jenix_provisioning_start(jenix_provisioning_scheme_t scheme,
   }
 
   g_active = true;
+  g_active_scheme = scheme;
   return ESP_OK;
 }
 

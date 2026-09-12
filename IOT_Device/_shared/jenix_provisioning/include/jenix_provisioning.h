@@ -43,6 +43,16 @@ typedef struct {
   // until a manufacturing-time burn step exists. Pass a real burned value
   // here once that exists.
   const char* proof_of_possession;
+  // JENIX_PROV_SCHEME_SOFTAP only: an existing httpd_handle_t (cast to
+  // void*) to register the provisioning HTTP endpoints on, instead of
+  // starting a second httpd server -- the SoftAP scheme's own AP interface
+  // still gets (re)configured with the standard JNX{code}{mac} SSID, but
+  // sharing the handle lets a device's own diagnostic HTTP routes keep
+  // working on the same server (Espressif's documented
+  // wifi_prov_scheme_softap_set_httpd_handle() reuse pattern). NULL => let
+  // the SoftAP scheme start its own httpd (fine if the caller has no
+  // existing one to share). Ignored for JENIX_PROV_SCHEME_BLE.
+  void* softap_httpd_handle;
 } jenix_provisioning_config_t;
 
 typedef struct {
@@ -59,6 +69,16 @@ typedef struct {
 // callers must check for already-stored Wi-Fi station credentials
 // themselves and skip calling this entirely when found -- this function
 // does not make that check, it only implements Phases 1-3.
+//
+// wifi_prov_mgr is a true Espressif singleton (one static context, one
+// scheme at a time) -- there is no supported way to run BLE and SoftAP
+// simultaneously in one session (confirmed against ESP-IDF's own
+// manager.c and its reference wifi_prov_mgr example, which picks a scheme
+// at build time). Calling this with a *different* scheme than whatever is
+// currently active switches to it (stops/deinits the old one first, then
+// starts the new one) rather than failing -- e.g. a device offering BLE by
+// default can switch to SoftAP on some other trigger (a button, in School
+// Bell's case) without the caller needing to sequence stop()+start() itself.
 esp_err_t jenix_provisioning_start(jenix_provisioning_scheme_t scheme,
                                     const jenix_provisioning_config_t* config,
                                     const jenix_provisioning_callbacks_t* callbacks,
