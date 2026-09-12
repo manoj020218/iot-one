@@ -8,6 +8,7 @@ window stays responsive; log output streams into the text box live.
 
 import os
 import queue
+import sys
 import threading
 import tkinter as tk
 import webbrowser
@@ -17,11 +18,17 @@ import serial.tools.list_ports
 
 import flash_tool as ft
 
+# Optional: a per-device launcher (e.g. a product folder's own
+# "Launch Flash Tool.bat") can pass its model_id as argv[1] so the GUI opens
+# with that model preselected instead of whatever happens to be first in the
+# shared registry.
+DEFAULT_MODEL_ID = sys.argv[1] if len(sys.argv) > 1 else None
+
 
 class FlashToolApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("QRunlock Factory Flash Tool")
+        self.title("Jenix Factory Flash Tool")
         self.geometry("760x560")
         self.minsize(680, 480)
 
@@ -108,7 +115,8 @@ class FlashToolApp(tk.Tk):
         ids = [m["model_id"] for m in registry["models"]]
         self.model_combo["values"] = ids
         if ids and not self.model_var.get():
-            self.model_var.set(ids[0])
+            preferred = DEFAULT_MODEL_ID if DEFAULT_MODEL_ID in ids else ids[0]
+            self.model_var.set(preferred)
 
     def refresh_ports(self):
         ports = [p.device for p in serial.tools.list_ports.comports()]

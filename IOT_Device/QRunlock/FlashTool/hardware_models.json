@@ -9,7 +9,8 @@
       "vid_pid": "303A:1001",
       "project_dir": "..",
       "pio_env": "esp32-c3-supermini-prov2",
-      "notes": "Security Scheme 2 provisioning pilot build. Uses mixed arduino+espidf framework."
+      "notes": "Security Scheme 2 provisioning pilot build. Uses mixed arduino+espidf framework.",
+      "requires_token": true
     },
     {
       "model_id": "JNX-TD-C3-01",
@@ -22,7 +23,22 @@
       "pio_env": "jenix-td-c3-prov2",
       "notes": "Security Scheme 2 provisioning pilot, same pattern as QRunlock's prov2 env.",
       "vps_env_prefix": "TOKEN_DISPENSER",
-      "vps_dir_default": "/root/secrets/iot-one/token-dispenser-factory-records"
+      "vps_dir_default": "/root/secrets/iot-one/token-dispenser-factory-records",
+      "requires_token": true
+    },
+    {
+      "model_id": "JNX-SB-S3-01",
+      "display_name": "Jenix Smart School Bell (ESP32-S3)",
+      "chip": "esp32s3",
+      "manufacturer": "4D Systems",
+      "board": "GEN4-ESP32 16MB (ESP32S3-R8N16)",
+      "vid_pid": "1A86:7523",
+      "project_dir": "../../Smart School Bell/ESP32-S3-RTC-PCM5102/firmware",
+      "pio_env": "esp32-s3-schoolbell-prov",
+      "notes": "First consumer of the shared IOT_Device/_shared/jenix_provisioning component (see PROVISIONING.md Section 8a). BLE scheme only so far. VID:PID is the generic CH340 USB-serial adapter's, not unique to this board -- auto-detect is less precise here than for QRunlock/Token Dispenser's native-USB ESP32-C3 boards; use --force if multiple CH340 devices are connected.",
+      "vps_env_prefix": "SCHOOL_BELL",
+      "vps_dir_default": "/root/secrets/iot-one/school-bell-factory-records",
+      "requires_token": false
     }
   ]
 }

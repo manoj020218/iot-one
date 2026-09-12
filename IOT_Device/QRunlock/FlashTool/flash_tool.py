@@ -63,7 +63,7 @@ import urllib.request
 
 import serial.tools.list_ports
 
-from capture import capture_boot_record, missing_fields
+from capture import capture_boot_record, missing_fields, FULL_FIELDS, DEFAULT_REQUIRED_FIELDS
 
 TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
 REGISTRY_PATH = os.path.join(TOOL_DIR, "hardware_models.json")
@@ -134,7 +134,8 @@ def cmd_list_models(args):
 
 
 def register_model(model_id, display_name, chip, manufacturer, board, vid_pid,
-                    project_dir, pio_env, notes="", vps_env_prefix=None, vps_dir=None):
+                    project_dir, pio_env, notes="", vps_env_prefix=None, vps_dir=None,
+                    requires_token=False):
     registry = load_registry()
     if find_model(registry, model_id):
         raise FlashError(f"Model '{model_id}' is already registered. "
@@ -152,6 +153,7 @@ def register_model(model_id, display_name, chip, manufacturer, board, vid_pid,
         "notes": notes,
         "vps_env_prefix": vps_env_prefix or DEFAULT_VPS_ENV_PREFIX,
         "vps_dir_default": vps_dir or DEFAULT_VPS_DIR,
+        "requires_token": requires_token,
     })
     save_registry(registry)
 
@@ -160,7 +162,7 @@ def cmd_register_model(args):
     try:
         register_model(args.model_id, args.display_name, args.chip, args.manufacturer,
                         args.board, args.vid_pid, args.project_dir, args.pio_env,
-                        args.notes, args.vps_env_prefix, args.vps_dir)
+                        args.notes, args.vps_env_prefix, args.vps_dir, args.requires_token)
     except FlashError as exc:
         print(exc)
         sys.exit(1)
@@ -325,22 +327,28 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
                           "~/.platformio/packages - can't do a lightweight "
                           "reset for capture retries.")
 
+    # Whether this model's firmware produces a local HTTP API auth token
+    # (QRunlock/Token Dispenser's own concept) alongside the shared
+    # jenix_provisioning PoP fields. Defaults to False -- most future models
+    # built on the shared component won't have this.
+    required_fields = FULL_FIELDS if model.get("requires_token") else DEFAULT_REQUIRED_FIELDS
+
     log("\n== Capturing boot log ==")
     record = {}
     raw_lines = []
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
-        got, lines = capture_boot_record(port)
+        got, lines = capture_boot_record(port, required_fields=required_fields)
         record.update(got)
         raw_lines.extend(lines)
-        missing = missing_fields(record)
+        missing = missing_fields(record, required_fields=required_fields)
         if not missing:
             break
         log(f"Attempt {attempt}/{max_attempts}: still missing {missing}. "
             f"Triggering another reset and retrying...")
         if attempt < max_attempts:
             lightweight_reset(esptool_path, model["chip"], port)
-    missing = missing_fields(record)
+    missing = missing_fields(record, required_fields=required_fields)
     if missing:
         log(f"\nGiving up after {max_attempts} attempts - still missing {missing}.")
         log("Raw captured lines:")
@@ -355,7 +363,8 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
     log(f"PID:             {record['pid']}")
     log(f"PoP username:    {record['username']}")
     log(f"PoP:             {record['pop']}")
-    log(f"Local API token: {record['token']}")
+    if "token" in record:
+        log(f"Local API token: {record['token']}")
 
     factory_record = {
         "model_id": model["model_id"],
@@ -365,7 +374,7 @@ def run_factory_flash(model_id, port=None, skip_erase=False, force=False,
         "pid": record["pid"],
         "pop_username": record["username"],
         "pop": record["pop"],
-        "local_api_token": record["token"],
+        "local_api_token": record.get("token"),
         "firmware_commit": source_info["commit"],
         "firmware_source_url": source_info["source_url"],
         "firmware_dirty": source_info["dirty"],
@@ -541,6 +550,10 @@ def build_parser():
     p_register.add_argument("--vps-dir", default=None,
                              help="Remote VPS directory for this model's factory "
                                   "records (default: shared qrunlock-factory-records)")
+    p_register.add_argument("--requires-token", action="store_true",
+                             help="This model's firmware also prints a local HTTP API "
+                                  "auth token (QRunlock/Token Dispenser's own concept) "
+                                  "that capture should require and record")
     p_register.set_defaults(func=cmd_register_model)
 
     p_flash = sub.add_parser("flash", help="Erase, flash, and capture a factory record for one unit.")

@@ -255,7 +255,7 @@ identical configuration described in this document.
 | P10 Display | ESP32-C3 | PlatformIO + Arduino | pending |
 | SOS Siren | ESP32-C3 | PlatformIO + Arduino | pending — no BLE stack exists yet, clean implementation |
 | Smart Streamer | ESP32-P4 | native ESP-IDF | pending — simplest integration, already native ESP-IDF |
-| Smart School Bell | ESP32-S3 | native ESP-IDF | in progress — shared `jenix_provisioning` component built here first (Section 8a), BLE Security Scheme 2 wired in a new `esp32-s3-schoolbell-prov` env, build-verified (compiles and links clean, both envs) but not yet hardware-validated; SoftAP scheme and platform bind still open; see Section 11 and School Bell's own `HANDOFF.md` for two unrelated pre-existing space-in-path build bugs found/worked around along the way |
+| Smart School Bell | ESP32-S3 | native ESP-IDF | in progress — shared `jenix_provisioning` component built here first (Section 8a), BLE Security Scheme 2 live on real hardware 2026-09-12 (advertises `JNXSB{mac}`, Security Scheme 2 session ready) in a new `esp32-s3-schoolbell-prov` env; actual phone/app pairing, SoftAP scheme, and platform bind still open; see Section 11 and School Bell's own `HANDOFF.md` |
 
 **Token Dispenser pilot notes** — the Token Dispenser (not Tank Guard) became
 the de facto pilot, implemented in a separate `jenix-td-c3-prov2` PlatformIO
@@ -339,8 +339,8 @@ exists (see its own `README.md`), parameterized by product code, PID, and
 a PoP source exactly as specified above (no `bind_endpoint` parameter yet —
 that platform-side contract doesn't exist anywhere in this repo as of this
 writing; see Section 11's status note). School Bell (Section 11) is its
-first consumer, BLE scheme only so far, build-verified (compiles and links
-clean) but not yet hardware-validated. QRunlock's own `BleProvisioningService.*` has **not**
+first consumer, BLE scheme only so far, confirmed live on real hardware
+2026-09-12 (see School Bell's own `HANDOFF.md`). QRunlock's own `BleProvisioningService.*` has **not**
 been refactored onto it yet — deferred pending School Bell's hardware
 validation, since QRunlock's `esp32-c3-supermini-prov2` env has its own
 unresolved Arduino/ESP-IDF-5.3.1 build wall (Section 9) that's orthogonal
@@ -681,13 +681,15 @@ not a plan.
    `CloudBridgeService.cpp`); not something to invent a fake endpoint for.
    `cloud_service.cpp` is untouched, bench mechanism still works.
 6. Validate end-to-end against the app per Section 8's reuse checklist,
-   using a real unit (a `JNX-SB-S3-95A458`-class device was on the bench
-   and reachable during this audit, so hardware validation should not be a
-   blocker). **Still open** — no hardware access in the session that did
-   items 1-3; this is the next concrete step, see `HANDOFF.md`. SoftAP
-   scheme for this env is also still open (BLE first, matching Section 9's
-   own rollout phasing), per Section 8a/9's "no simultaneous BLE+SoftAP in
-   one `wifi_prov_mgr` session" note.
+   using a real unit (`JNX-SB-S3-95A458`). **Partly done, 2026-09-12** —
+   flashed to the real unit, BLE Security Scheme 2 session confirmed live
+   (advertises `JNXSB95A458`, PoP retrieved via the factory flash tool, see
+   `HANDOFF.md`'s "Provisioning Hardware Validation" entry). **Still open**:
+   the actual phone/app-side pairing through the Jenix One app itself
+   (no phone in the validating session). SoftAP scheme for this env is also
+   still open (BLE first, matching Section 9's own rollout phasing), per
+   Section 8a/9's "no simultaneous BLE+SoftAP in one `wifi_prov_mgr`
+   session" note.
 
 ### School Bell rollout recommendation
 

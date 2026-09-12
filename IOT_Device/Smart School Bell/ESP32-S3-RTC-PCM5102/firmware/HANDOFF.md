@@ -1,3 +1,70 @@
+# Provisioning Hardware Validation — 2026-09-12
+
+Real bench unit (`JNX-SB-S3-95A458` / MAC `44:1B:F6:95:A4:58`), connected via
+USB (CH340 on COM17 this session). This is the first actual hardware run of
+the `esp32-s3-schoolbell-prov` build from the "Provisioning Pilot Update"
+entry below — everything in that entry up to this point had been
+build-verified only.
+
+**Confirmed working, end to end, on real hardware:**
+- Flashed `esp32-s3-schoolbell-prov` (via a no-space mirror build, upload
+  itself is a plain `esptool` write and works fine directly from this repo's
+  own path — only the build/link step needs the mirror, see the build note
+  below).
+- NVS Wi-Fi credentials survive a flash unchanged (same partition table) —
+  confirmed the device just reconnected to its existing network first,
+  correctly skipping provisioning entirely (Section 3 Phase 0 working as
+  designed).
+- Cleared Wi-Fi via `PUT /api/v1/config {"wifi":{"ssid":"","password":""}}`
+  on the still-live control panel, then reset. Full boot log confirmed:
+  - `JenixProvisioning: Using persisted first-boot Proof-of-Possession` —
+    PoP persistence across boots works.
+  - BLE/NimBLE stack initializes cleanly alongside the existing SoftAP
+    control panel (`wifi:mode : softAP` at 192.168.4.1, `Setup AP ready:
+    JENIX-SCHOOL-BELL`) with no crash or resource conflict observed.
+  - `wifi_prov_mgr: Provisioning started with service name : JNXSB95A458`
+    and `JenixProvisioning: Provisioning started, service name=JNXSB95A458`
+    — the standard `JNX{code}{6-hex-MAC}` name, live, matching Section 2
+    exactly.
+  - `LogService: ... provisioning :: BLE Security Scheme 2 provisioning
+    started` confirms the full integration chain (`app_main.cpp` →
+    `ProvisioningService` → `jenix_provisioning` component →
+    `wifi_prov_mgr`) works together on real silicon.
+  - Found and fixed a real gap while doing this: the PoP was only ever
+    printed to Serial on first-ever generation, not on later boots while
+    still unprovisioned — useless for a bench operator who missed that one
+    boot. `jenix_provisioning.cpp` now prints a standardized
+    `[FACTORY] pid=... ble_name=... pop_username=... pop=...` line every
+    time provisioning starts, whether the PoP was just generated or loaded.
+    Captured PoP for this unit: `2NGBV7NDDAHH` (username `jenix`).
+
+**Not yet done:** actual phone-side BLE pairing through the Jenix One app
+(no phone in this session) — the device is currently sitting in
+provisioning mode, offline from its home Wi-Fi, advertising as
+`JNXSB95A458`, waiting for that pairing. Restoring it needs either that app
+pairing to complete, or someone with Wi-Fi-capable hardware joining its
+`JENIX-SCHOOL-BELL` AP hotspot and posting the SSID/password to the control
+panel directly — this machine has neither Wi-Fi nor Bluetooth hardware, so
+neither path is possible from here.
+
+**Factory flash tool**: registered as `JNX-SB-S3-01` in the shared tool at
+`IOT_Device/QRunlock/FlashTool/` (PROVISIONING.md Section 8a's "shared, not
+per-device copies" principle applied to tooling too) — see
+`../FlashTool/README.md` (sibling of this `firmware/` folder) for the local
+launcher. `capture.py` there was generalized to recognize the new
+`[FACTORY]` line format (in addition to QRunlock/Token Dispenser's own
+pre-existing format) and to not require their local-API-token field, which
+School Bell's firmware doesn't have.
+
+**Build note**: same two path-related issues as the "Provisioning Pilot
+Update" entry below — building/uploading from this repo's own path directly
+works for upload (plain esptool write) but not for a build that needs the
+vendored `esp_audio_codec` linker fix; the flash tool's own build step
+inherits that limitation too until either that vendored bug is fixed or it's
+run from a no-space mirror, same as `pio run` itself.
+
+---
+
 # Soft PTT Bench Validation — 2026-09-11
 
 Tested from a browser WebSocket client (Jenix One platform session, not the
@@ -105,20 +172,12 @@ introduced by this pass:
   elsewhere, in `PWA_APK`'s `schoolBellPid.ts` — untouched by this rename).
 
 **Explicitly not done — next steps, in order:**
-1. **Hardware bench validation** — build and flash
-   `esp32-s3-schoolbell-prov` to a real unit, confirm it advertises as
-   `JNXSB{mac}` over BLE, watch Serial for the generated Proof-of-Possession
-   line (`[JENIX-PROVISIONING] first-boot Proof-of-Possession = ...`), pair
-   from the app's Smart Mode / BLE provisioning screen, confirm Wi-Fi
-   credential exchange and connect. `-t upload` needs the vendored
-   `-L` link bug (above) actually fixed or a no-space mirror — plain
-   `pio run` (no upload) works fine from this path as-is. Build/flash
-   commands:
-   ```
-   pio run -e esp32-s3-schoolbell-prov
-   pio run -e esp32-s3-schoolbell-prov -t upload --upload-port <COMx>
-   pio device monitor -e esp32-s3-schoolbell-prov
-   ```
+1. ~~Hardware bench validation~~ — **done, 2026-09-12**, see the
+   "Provisioning Hardware Validation" entry above: real unit flashed,
+   advertises `JNXSB95A458` over BLE, PoP confirmed
+   (`2NGBV7NDDAHH`/`jenix`). Only the actual phone/app-side pairing itself
+   is still outstanding — needs a phone with the Jenix One app; open the
+   Smart Mode / BLE provisioning screen, it should discover `JNXSB95A458`.
 2. **SoftAP scheme** — only BLE is wired so far, matching QRunlock's own
    BLE-first rollout phasing. School Bell's existing AP control panel
    already owns the AP interface/HTTP server, so reconciling that with

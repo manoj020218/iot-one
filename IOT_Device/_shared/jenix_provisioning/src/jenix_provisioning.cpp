@@ -189,6 +189,13 @@ esp_err_t jenix_provisioning_start(jenix_provisioning_scheme_t scheme,
                          : GenerateOrLoadPop();
   if (!BuildSec2Material(pop)) return ESP_FAIL;
 
+  // Standardized, always-printed (not just on first-ever generation) factory
+  // capture line -- a bench/factory tool greps this once per boot instead of
+  // relying on the PoP only being visible the one time it was first
+  // generated. One shared format for every jenix_provisioning consumer.
+  printf("[FACTORY] pid=%s ble_name=%s pop_username=%s pop=%s\n",
+         config->pid != nullptr ? config->pid : "", g_service_name, kSec2Username, pop);
+
   if (callbacks != nullptr) {
     g_callbacks = *callbacks;
   } else {
