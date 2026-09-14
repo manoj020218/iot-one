@@ -55,4 +55,11 @@
          neverForLocation-style opt-out for this specific API. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- School Bell Soft Push-to-Talk: captures the phone's mic via
+         getUserMedia() inside the WebView and streams it to the device's
+         /api/v1/announcement/ws (see SOFT_PTT_CONTRACT.md). WebView's
+         getUserMedia still needs this declared natively even though the
+         actual runtime prompt is the standard browser permission dialog. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>
