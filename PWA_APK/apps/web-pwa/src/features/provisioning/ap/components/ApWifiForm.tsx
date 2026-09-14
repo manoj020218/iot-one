@@ -21,14 +21,15 @@ export function ApWifiForm({
 }: ApWifiFormProps) {
   return (
     <WifiCredentialForm
-      description={`The hotspot ${descriptor.apSsid} will pass your site network credentials to the device for cloud onboarding.`}
+      appearance="ap"
+      description={`${descriptor.apSsid} will pass this network to the device for cloud onboarding.`}
       detectedSsid={detectedSsid}
       detectingSsid={detectingSsid}
       loading={loading}
       onRefreshDetectedSsid={onRefreshDetectedSsid}
       onSubmit={onSubmit}
       submitLabel="Send credentials through AP mode"
-      title="Installer Wi-Fi credentials"
+      title="Send your site Wi-Fi"
     />
   );
 }

@@ -32,7 +32,7 @@ const AP_GATEWAY_URL = "http://192.168.4.1";
 const AP_PROVISION_TIMEOUT_MS = 15000;
 
 const apSetupDescriptor: ApSetupDescriptor = {
-  apSsid: "JENIX-SETUP-TG-C3",
+  apSsid: "JNX-SETUP-TG-C3",
   pid: foundationPidBlueprint.pid,
   productName: foundationPidBlueprint.productName
 };

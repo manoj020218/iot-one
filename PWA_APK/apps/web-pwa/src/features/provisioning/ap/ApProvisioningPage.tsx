@@ -1,5 +1,6 @@
 import { AppShell, StatusPill } from "@jenix/ui";
 import { useState } from "react";
+import { FiWifiOff, FiZap } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/hooks/useAuth";
@@ -132,21 +133,36 @@ export function ApProvisioningPage() {
         </div>
       </section>
       {mismatchedTarget ? (
-        <section className="panel">
-          <h2>AP Mode isn&apos;t available yet for {targetProduct?.name ?? "this product"}</h2>
+        <section className="panel apv2-panel">
+          <div className="apv2-hero-icon apv2-hero-warn">
+            <FiWifiOff aria-hidden="true" />
+          </div>
+          <span className="eyebrow">{targetProduct?.name ?? "This device"}</span>
+          <h2>AP Mode isn&apos;t wired up for this device yet</h2>
           <p>
-            This flow currently only supports {descriptor.productName}&apos;s own hotspot.
-            Use Smart Mode instead to set up {targetProduct?.name ?? "this device"}.
+            This hotspot handoff was only ever built and tested against one reference
+            unit, <strong>{descriptor.productName}</strong> —{" "}
+            {targetProduct?.name ?? "this device"}&apos;s own hotspot speaks a different
+            local contract that isn&apos;t connected here. Smart Mode doesn&apos;t have
+            that limit.
           </p>
-          <div className="card-actions">
+          <div className="apv2-btn-row">
             <button
-              className="primary-button"
+              className="apv2-btn apv2-btn-accent"
               onClick={() =>
                 navigate(`/provisioning/ble?pid=${encodeURIComponent(targetPid!)}`)
               }
               type="button"
             >
-              Use Smart Mode instead
+              <FiZap aria-hidden="true" />
+              Try Smart Mode for this device
+            </button>
+            <button
+              className="apv2-btn apv2-btn-ghost"
+              onClick={() => navigate("/devices")}
+              type="button"
+            >
+              Choose a different device
             </button>
           </div>
         </section>
@@ -159,22 +175,20 @@ export function ApProvisioningPage() {
       ) : null}
       {screen === "wifi" ? (
         <div className="content-grid">
-          <section className="panel">
-            <span className="eyebrow">Hotspot Context</span>
+          <section className="panel apv2-panel apv2-panel-compact">
+            <span className="eyebrow">Hotspot context</span>
             <h2>{descriptor.productName}</h2>
             <p>
-              Once credentials are sent from <strong>{descriptor.apSsid}</strong>, the
-              device will join <strong>{currentHome.name}</strong> in the cloud.
+              Once credentials are sent from <span className="mono">{descriptor.apSsid}</span>,
+              the device will join <strong>{currentHome.name}</strong> in the cloud.
             </p>
-            <div className="card-actions">
-              <button
-                className="text-button"
-                onClick={() => setScreen("instructions")}
-                type="button"
-              >
-                Review hotspot steps
-              </button>
-            </div>
+            <button
+              className="text-button"
+              onClick={() => setScreen("instructions")}
+              type="button"
+            >
+              Review hotspot steps
+            </button>
           </section>
           <ApWifiForm
             descriptor={descriptor}
@@ -191,15 +205,16 @@ export function ApProvisioningPage() {
             progress={progress}
           />
           {error ? (
-            <section className="panel">
-              <h2>Operator actions</h2>
+            <section className="panel apv2-panel apv2-panel-compact">
+              <span className="eyebrow">Operator actions</span>
+              <h2>Something didn&apos;t land</h2>
               <p>
                 Retry the Wi-Fi handoff or switch to Smart Mode if hotspot setup is no
                 longer required.
               </p>
-              <div className="card-actions">
+              <div className="apv2-btn-row">
                 <button
-                  className="primary-button"
+                  className="apv2-btn apv2-btn-primary"
                   onClick={() => setScreen("wifi")}
                   type="button"
                 >
@@ -219,6 +234,7 @@ export function ApProvisioningPage() {
       ) : null}
       {screen === "success" && summary ? (
         <ProvisioningSuccess
+          appearance="ap"
           onProvisionAnother={resetFlow}
           onViewDashboard={() => navigate("/home")}
           summary={summary}

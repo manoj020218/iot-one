@@ -296,11 +296,28 @@ async function ensureBleReady(ble: NativeBluetoothLePlugin): Promise<BleReadines
     permissionDenied = true;
   }
 
-  await ble.initialize({
-    androidNeverForLocation: false
-  });
+  try {
+    await ble.initialize({
+      androidNeverForLocation: false
+    });
+  } catch {
+    // initialize() itself throws on Android when the permission wasn't
+    // actually granted, even though requestPermissions() above resolved
+    // cleanly -- left uncaught, this escaped all the way to useBleScan's
+    // refresh(), which dumped the raw plugin error into scan.error and,
+    // because bluetoothEnabled/permissionDenied never left their optimistic
+    // defaults, sent the UI straight past the preflight checklist to the
+    // scan list showing that raw error instead.
+    permissionDenied = true;
+  }
 
-  let bluetoothEnabled = Boolean((await ble.isEnabled())?.value);
+  let bluetoothEnabled = false;
+
+  try {
+    bluetoothEnabled = Boolean((await ble.isEnabled())?.value);
+  } catch {
+    bluetoothEnabled = false;
+  }
 
   if (!bluetoothEnabled) {
     try {

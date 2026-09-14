@@ -11,9 +11,11 @@ import {
   FiRadio,
   FiShield,
   FiVideo,
+  FiVolume2,
   FiZap
 } from "react-icons/fi";
 import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
+import { SCHOOL_BELL_PID } from "../school-bell/schoolBellPid";
 
 export type DeviceCategoryId = "sense" | "automate" | "operate" | "protect" | "broadcast";
 export type DeviceCategoryFilter = DeviceCategoryId | "all";
@@ -47,5 +49,6 @@ export const deviceCatalog: DeviceCatalogEntry[] = [
   { pid: "JNX-P10-C3-01", name: "Token Display", category: "operate", icon: FiMonitor },
   { pid: "JNX-SOS-C3-001", name: "SOS Siren", category: "protect", icon: FiAlertTriangle },
   { pid: "JNX-SS-P4-001", name: "Smart Streamer", category: "broadcast", icon: FiVideo },
+  { pid: SCHOOL_BELL_PID, name: "Smart School Bell", category: "broadcast", icon: FiVolume2 },
   { pid: QRUNLOCK_PID, name: "QRunlock Smart RF Door Lock", category: "protect", icon: FiLock }
 ];

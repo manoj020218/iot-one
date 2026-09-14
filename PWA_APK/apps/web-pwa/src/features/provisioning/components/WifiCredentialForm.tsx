@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { FiEye, FiEyeOff, FiRefreshCw, FiWifi } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiLock, FiRefreshCw, FiWifi } from "react-icons/fi";
 
 import type { WifiCredentialPayload } from "../provisioning.types";
 
@@ -34,6 +34,14 @@ export interface WifiCredentialFormProps {
    */
   autoProofOfPossession?: string | null | undefined;
   autoProofOfPossessionLoading?: boolean | undefined;
+  /**
+   * "classic" (default, omit the prop) renders exactly the original markup
+   * -- every existing caller (BLE included) is untouched by this. "ap"
+   * opts into the AP-mode redesign's look (`.apv2-*` classes in
+   * styles.css); only ApWifiForm.tsx passes it. Same state/handlers either
+   * way -- this only changes what gets rendered, not how the form behaves.
+   */
+  appearance?: "classic" | "ap";
   onSubmit: (payload: WifiCredentialPayload) => Promise<void> | void;
 }
 
@@ -49,6 +57,7 @@ export function WifiCredentialForm({
   requireProofOfPossession = false,
   autoProofOfPossession,
   autoProofOfPossessionLoading = false,
+  appearance = "classic",
   onSubmit
 }: WifiCredentialFormProps) {
   const [ssid, setSsid] = useState(detectedSsid || initialSsid);
@@ -97,6 +106,124 @@ export function WifiCredentialForm({
         ? { proofOfPossession: proofOfPossession.trim() }
         : {})
     });
+  }
+
+  if (appearance === "ap") {
+    return (
+      <form
+        className="form-card apv2-panel"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
+        <span className="eyebrow">Step 2 of 3</span>
+        <h2>{title}</h2>
+        <p>{description}</p>
+
+        <div className="apv2-helper-note">
+          <FiWifi aria-hidden="true" />
+          <span>
+            This device only supports <strong>2.4 GHz</strong> Wi-Fi — double-check your
+            phone is still on a 2.4 GHz network, not 5 GHz, before you send it.
+          </span>
+        </div>
+
+        <label className="apv2-field" htmlFor="apv2-ssid">
+          <span>Network name</span>
+          <div className="apv2-field-input">
+            <FiWifi aria-hidden="true" />
+            <input
+              autoComplete="off"
+              id="apv2-ssid"
+              name="ssid"
+              onChange={(event) => {
+                setSsidTouched(true);
+                setSsid(event.target.value);
+              }}
+              placeholder="Your 2.4 GHz network name"
+              value={ssid}
+            />
+            {onRefreshDetectedSsid ? (
+              <button
+                aria-label="Detect current Wi-Fi network"
+                className={`apv2-icon-btn ${detectingSsid ? "apv2-spinning" : ""}`}
+                onClick={onRefreshDetectedSsid}
+                type="button"
+              >
+                <FiRefreshCw aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+          <span className="apv2-hint">
+            {detectedSsid
+              ? "Detected from your phone's current connection."
+              : "Connect your phone to the 2.4 GHz network first — it'll be picked up automatically."}
+          </span>
+        </label>
+
+        <label className="apv2-field" htmlFor="apv2-password">
+          <span>Password</span>
+          <div className="apv2-field-input">
+            <FiLock aria-hidden="true" />
+            <input
+              id="apv2-password"
+              name="password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter network password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+            />
+            <button
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="apv2-icon-btn"
+              onClick={() => setShowPassword((value) => !value)}
+              type="button"
+            >
+              {showPassword ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+            </button>
+          </div>
+        </label>
+
+        {requireProofOfPossession && autoProofOfPossession ? (
+          <div className="apv2-field">
+            <span>Device pairing code</span>
+            <span className="apv2-hint">
+              Verified automatically from this device&apos;s factory record — no need to
+              enter it.
+            </span>
+          </div>
+        ) : requireProofOfPossession ? (
+          <label className="apv2-field" htmlFor="apv2-pop">
+            <span>Device pairing code</span>
+            <div className="apv2-field-input">
+              <input
+                autoComplete="off"
+                id="apv2-pop"
+                name="proofOfPossession"
+                onChange={(event) => {
+                  setPopTouched(true);
+                  setProofOfPossession(event.target.value);
+                }}
+                placeholder={
+                  autoProofOfPossessionLoading
+                    ? "Looking up this device's pairing code..."
+                    : "Printed on the device label / factory record"
+                }
+                value={proofOfPossession}
+              />
+            </div>
+            <span className="apv2-hint">
+              {autoProofOfPossessionLoading
+                ? "Checking the factory record..."
+                : "No factory record found — enter the code printed on the device label."}
+            </span>
+          </label>
+        ) : null}
+
+        {error ? <p className="inline-error">{error}</p> : null}
+        <button className="apv2-btn apv2-btn-primary" disabled={loading} type="submit">
+          {loading ? "Sending Wi-Fi credentials..." : submitLabel}
+        </button>
+      </form>
+    );
   }
 
   return (

@@ -415,6 +415,81 @@ export const tokenDispenserPidBlueprint: CreatePidInput = {
   }
 };
 
+export const schoolBellPidRecord: PidIdentity = {
+  pid: "JNX-SB-S3-001",
+  productName: "Smart School Bell",
+  productCategory: "Institutional Audio",
+  productLine: "School Bell",
+  status: "beta",
+  matterMode: "NONE"
+};
+
+export const schoolBellPidBlueprint: CreatePidInput = {
+  ...schoolBellPidRecord,
+  brand: "JENIX",
+  description:
+    "ESP32-S3 school bell appliance — internal-flash + SD audio library, DS3231-driven " +
+    "ring schedules, and physical/soft push-to-talk announcements.",
+  hardware: {
+    mcu: "ESP32-S3",
+    hardwareRevision: "EdgeHex-N16R8",
+    hasBle: true,
+    hasWifi: true,
+    hasMatter: false,
+    hasThread: false,
+    hasEthernet: false,
+    hasRs485: false,
+    notes:
+      "16MB flash / 8MB PSRAM (4D Systems GEN4-ESP32S3-R8N16), SD card audio library, " +
+      "DS3231 RTC, PCM5102 I2S DAC, physical PTT on GPIO15 with mic on GPIO7"
+  },
+  firmware: {
+    // Matches this repo's own `Smart School Bell/ESP32-S3-RTC-PCM5102/firmware`
+    // platformio.ini APP_VERSION / HANDOFF.md as of 2026-09-12. No stableVersion
+    // yet -- the product is still at milestone M3, nothing has shipped as
+    // "stable" (see that firmware's own HANDOFF.md).
+    firmwareFamily: "jenix-schoolbell",
+    otaChannel: "beta",
+    betaVersion: "0.6.2-sd-stat-fix",
+    rollbackAllowed: true
+  },
+  matter: {
+    enabled: false,
+    mode: "NONE",
+    certificationStatus: "not_required",
+    bridgeSupported: false
+  },
+  api: {
+    enabled: true,
+    sellable: false,
+    allowedScopes: ["devices:read", "devices:write"],
+    webhookSupport: false,
+    mqttBridgeSupport: true
+  },
+  ui: {
+    // Same "every device UI is a dynamic remote package" pattern as QRunlock/
+    // Token Dispenser -- see PWA_APK/apps/web-pwa/public/ui-packages/school-bell-mobile/
+    // and DEVICE_PACKAGE_RUNTIME.md.
+    uiMode: "remote-package",
+    uiPackageId: "school-bell-mobile",
+    uiPackageVersion: "1.0.0"
+  },
+  dashboard: {
+    templateId: "school-bell-default",
+    dynamicPages: ["school-bell"],
+    icon: "volume-2",
+    cardLayout: "school-bell"
+  }
+  // No `automation` block yet: none of SceneActionCommand's existing values
+  // (packages/shared/src/types/scene.ts) fit a bell ring / start-announcement
+  // action, and per that field's own doc comment a new device-specific
+  // command must be added there first rather than reusing an unrelated one
+  // (e.g. "trigger_alarm") or inventing a value here that scene.ts doesn't
+  // know about. Add both together once School Bell needs scene/schedule
+  // integration -- until then the Scene builder's existing fallback (full
+  // platform command list) still applies to this device.
+};
+
 /**
  * Every locally-known PID blueprint in one place. Consumers that need to go
  * from "a product code segment" (e.g. the advertised BLE name's `QRU` in
@@ -428,5 +503,6 @@ export const allPidBlueprints: CreatePidInput[] = [
   foundationPidBlueprint,
   smartStreamerPidBlueprint,
   qrunlockPidBlueprint,
-  tokenDispenserPidBlueprint
+  tokenDispenserPidBlueprint,
+  schoolBellPidBlueprint
 ];

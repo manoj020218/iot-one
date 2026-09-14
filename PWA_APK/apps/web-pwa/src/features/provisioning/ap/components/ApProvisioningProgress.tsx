@@ -15,10 +15,11 @@ export function ApProvisioningProgress({
 }: ApProvisioningProgressProps) {
   return (
     <ProvisioningProgress
-      description={`The AP fallback flow is moving ${descriptor.productName} from hotspot mode into Wi-Fi, cloud, and MQTT connectivity.`}
+      appearance="ap"
+      description={`Moving ${descriptor.productName} from hotspot mode into Wi-Fi, cloud, and MQTT connectivity.`}
       error={error}
       progress={progress}
-      title={descriptor.productName}
+      title={`Connecting ${descriptor.productName}`}
     />
   );
 }

@@ -1,5 +1,6 @@
 import type { ProvisioningStatus } from "@jenix/shared";
 import { StatusPill } from "@jenix/ui";
+import { FiCheck, FiLoader } from "react-icons/fi";
 
 import type { ProvisioningProgressModel } from "../provisioning.types";
 
@@ -19,6 +20,13 @@ export interface ProvisioningProgressProps {
   title: string;
   description: string;
   error?: string | null | undefined;
+  /**
+   * "classic" (default, omit the prop) renders exactly the original markup
+   * -- BLE's call site is untouched by this. "ap" opts into the AP-mode
+   * redesign's checklist look (`.apv2-*` classes); only
+   * ApProvisioningProgress.tsx passes it.
+   */
+  appearance?: "classic" | "ap";
 }
 
 function getStepState(
@@ -44,8 +52,40 @@ export function ProvisioningProgress({
   progress,
   title,
   description,
-  error
+  error,
+  appearance = "classic"
 }: ProvisioningProgressProps) {
+  if (appearance === "ap") {
+    return (
+      <section className="form-card apv2-panel">
+        <span className="eyebrow">Step 3 of 3</span>
+        <h2>{title}</h2>
+        <p>{description}</p>
+        <ul className="apv2-checklist">
+          {progress.statuses.map((status) => {
+            const state = getStepState(progress.statuses, progress.currentStatus, status);
+            return (
+              <li data-state={state} key={status}>
+                <span className="apv2-checklist-mark">
+                  {state === "complete" ? (
+                    <FiCheck aria-hidden="true" />
+                  ) : state === "current" ? (
+                    <FiLoader aria-hidden="true" className="apv2-spinning" />
+                  ) : null}
+                </span>
+                <span className="apv2-checklist-text">
+                  <strong>{statusCopy[status]}</strong>
+                  <span className="apv2-checklist-code">{status}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {error ? <p className="inline-error">{error}</p> : null}
+      </section>
+    );
+  }
+
   return (
     <section className="form-card">
       <div className="provisioning-header-row">
