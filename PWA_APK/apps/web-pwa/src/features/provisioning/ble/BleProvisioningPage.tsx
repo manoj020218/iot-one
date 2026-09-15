@@ -99,6 +99,28 @@ export function BleProvisioningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Granting Bluetooth/location permission and toggling Bluetooth on both
+  // happen in OS Settings, outside this WebView -- the only signal we get
+  // back is the page regaining visibility when the user returns to the app.
+  // Without this, the red preflight screen sits there until the user taps
+  // "Check again" by hand even though the underlying state is already
+  // fixed. Re-running the same readiness check on visibility-regained lets
+  // the screen clear itself and fall straight through to the scan screen
+  // via the effect below, with no manual retry needed.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && screen === "preflight" && !scan.scanning) {
+        void handleEnableScan();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, scan.scanning]);
+
   useEffect(() => {
     if (!checked || screen !== "preflight" || scan.scanning) {
       return;
