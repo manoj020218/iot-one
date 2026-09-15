@@ -268,6 +268,8 @@ export function BleProvisioningPage() {
             </div>
           </section>
           <WifiCredentialForm
+            autoProofOfPossession={factoryPop}
+            autoProofOfPossessionLoading={factoryPopLoading}
             description="Send the Wi-Fi credentials so the device can join the cloud and register its telemetry stream."
             detectedSsid={currentWifi.ssid}
             detectingSsid={currentWifi.detecting}
