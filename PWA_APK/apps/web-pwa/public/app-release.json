@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
-  "channel": "preview",
-  "updatedAt": "2026-07-10",
-  "notes": "Current Jenix One local shell release.",
-  "downloadUrl": "/app/home"
+  "version": "1.0.2",
+  "channel": "beta",
+  "updatedAt": "2026-09-15",
+  "notes": "Bluetooth/location auto-recheck on app resume, School Bell provisioning fixes.",
+  "downloadUrl": "https://one.jenix.in/app"
 }

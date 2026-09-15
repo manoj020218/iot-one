@@ -1,4 +1,5 @@
 import packageJson from "../../../../package.json";
+import { apiOrigin } from "../../../app/apiOrigin";
 
 export interface AppUpdateStatus {
   currentVersion: string;
@@ -22,7 +23,18 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   const currentVersion = packageJson.version;
 
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}app-release.json?ts=${Date.now()}`);
+    // A relative path here resolves against the WebView's own origin inside
+    // the native app -- which serves this same build's bundled assets, not
+    // a live copy on the server. That made this check compare the app to
+    // itself: whatever version shipped in THIS install always "matched"
+    // because it was reading its own frozen snapshot, never a newer one
+    // published later. apiOrigin ("" on the hosted web PWA, the real host
+    // inside Capacitor) plus the PWA's own "/app/" mount point (see
+    // one.jenix.in.conf) is what actually reaches the live file either way.
+    const releaseUrl = apiOrigin
+      ? `${apiOrigin}/app/app-release.json?ts=${Date.now()}`
+      : `${import.meta.env.BASE_URL}app-release.json?ts=${Date.now()}`;
+    const response = await fetch(releaseUrl);
     const published = (await response.json()) as PublishedRelease;
 
     return {
