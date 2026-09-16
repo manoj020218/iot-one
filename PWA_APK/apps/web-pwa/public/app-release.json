@@ -1,7 +1,7 @@
 {
-  "version": "1.0.4",
+  "version": "1.0.5",
   "channel": "beta",
   "updatedAt": "2026-09-16",
-  "notes": "Keeps the screen awake during provisioning and explains the Bluetooth/location permission choice, so a screen lock mid-setup can no longer kill the app via a revoked one-time permission.",
+  "notes": "Routine version bump for the Closed Testing track.",
   "downloadUrl": "https://one.jenix.in/app"
 }
