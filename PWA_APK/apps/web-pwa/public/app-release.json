@@ -1,7 +1,7 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "channel": "beta",
-  "updatedAt": "2026-09-15",
-  "notes": "Bluetooth/location auto-recheck on app resume, School Bell provisioning fixes.",
+  "updatedAt": "2026-09-16",
+  "notes": "Factory PoP auto-fill actually wired up, app-update check fixed to read the live server.",
   "downloadUrl": "https://one.jenix.in/app"
 }
