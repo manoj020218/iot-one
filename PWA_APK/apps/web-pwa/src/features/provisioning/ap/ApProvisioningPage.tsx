@@ -12,6 +12,7 @@ import type {
   ProvisioningProgressModel,
   WifiCredentialPayload
 } from "../provisioning.types";
+import { useKeepScreenAwake } from "../hooks/useKeepScreenAwake";
 import {
   getInitialProvisioningStatus,
   getProvisioningSequence
@@ -35,6 +36,7 @@ function createInitialProgress(): ProvisioningProgressModel {
 }
 
 export function ApProvisioningPage() {
+  useKeepScreenAwake();
   const { session } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

@@ -1,7 +1,7 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "channel": "beta",
   "updatedAt": "2026-09-16",
-  "notes": "Factory PoP auto-fill actually wired up, app-update check fixed to read the live server.",
+  "notes": "Keeps the screen awake during provisioning and explains the Bluetooth/location permission choice, so a screen lock mid-setup can no longer kill the app via a revoked one-time permission.",
   "downloadUrl": "https://one.jenix.in/app"
 }

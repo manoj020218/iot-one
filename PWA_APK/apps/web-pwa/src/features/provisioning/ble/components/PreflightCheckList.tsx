@@ -52,6 +52,13 @@ export function PreflightCheckList({
           </div>
         </div>
       </div>
+      {permissionDenied ? (
+        <p className="prov-check-hint">
+          When Android asks for this permission, choose <strong>&quot;While using the
+          app&quot;</strong> — not &quot;Only this time.&quot; A one-time grant gets taken back
+          automatically if your screen locks partway through setup, which stops the process.
+        </p>
+      ) : null}
       <button className="primary-button" onClick={onRetry} type="button">
         Check again
       </button>

@@ -11,6 +11,7 @@ import {
 import { ProvisioningSuccess } from "../components/ProvisioningSuccess";
 import { WifiCredentialForm } from "../components/WifiCredentialForm";
 import { useCurrentWifiSsid } from "../hooks/useCurrentWifiSsid";
+import { useKeepScreenAwake } from "../hooks/useKeepScreenAwake";
 import type {
   BleScanDevice,
   ProvisionedDeviceSummary,
@@ -40,6 +41,7 @@ function createInitialProgress(): ProvisioningProgressModel {
 }
 
 export function BleProvisioningPage() {
+  useKeepScreenAwake();
   const { session } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
