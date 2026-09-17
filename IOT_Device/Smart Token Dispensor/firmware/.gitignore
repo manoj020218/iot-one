@@ -1,4 +1,5 @@
 .pio/
+.claude/
 
 # Ad-hoc debugging artifacts from live testing sessions (serial captures,
 # background process PID files, one-off MQTT test payloads). None of these

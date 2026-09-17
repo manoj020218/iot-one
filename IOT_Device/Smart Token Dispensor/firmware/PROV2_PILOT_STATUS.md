@@ -2,6 +2,22 @@
 
 Saved 2026-08-07. Read this first if picking the work back up after an interruption.
 
+## 2026-09-17 update
+
+- A dedicated `FlashTool/` now targets model `JNX-TD-C3-01` and environment
+  `jenix-td-c3-prov2`. It performs a full factory flash and captures both the
+  JSON manufacturing record and a separate `_POP.txt` provisioning record.
+- Security2 Wi-Fi credentials are now staged and committed only after
+  `WIFI_PROV_CRED_SUCCESS`. Failed credentials are cleared and the provisioning
+  state machine is reset for retry.
+- The BLE provisioning window is now 3 minutes. A field factory reset preserves
+  the factory-recorded PoP instead of silently changing the physical identity.
+- This remains an engineering pilot, not a production release. Security, OTA,
+  Web UI, ESP-NOW, printing, and release-process blockers are tracked in
+  `PRODUCTION_READINESS.md`.
+- The historical blocker narrative below is retained for traceability; it is no
+  longer the current build status.
+
 ## 2026-08-31 update
 
 - `pio run -e jenix-td-c3-prov2` now completes on this machine and emits
@@ -28,7 +44,7 @@ the old plaintext-JSON-over-BLE scheme in `src/ble_provisioning.cpp`. Token Disp
 is the de facto pilot device (ahead of Tank Guard, named in the standard doc), on the
 condition that the currently-shipping, tested `jenix-td-c3` build must not regress.
 
-## Status: code complete, build verification blocked on a toolchain bug
+## Historical status from 2026-08-07 (blocker now resolved)
 
 ### Done (all implemented, do not redo)
 
@@ -97,7 +113,7 @@ condition that the currently-shipping, tested `jenix-td-c3` build must not regre
   since all the above changes, both times producing a **byte-identical**
   `firmware.bin`: 1,350,296 bytes / 85.8% flash. Confirmed unaffected.
 
-### Current blocker — NOT a code problem, a PlatformIO toolchain bug
+### Historical blocker — PlatformIO toolchain issue
 
 Building `jenix-td-c3-prov2` (`pio run -e jenix-td-c3-prov2`) hit a chain of
 environment issues, each diagnosed from source, in order:
@@ -133,7 +149,7 @@ environment issues, each diagnosed from source, in order:
    vs. the ESP-IDF 4.4.7 / `framework-espidf@3.40407.240606` it auto-selected for
    `framework=arduino,espidf` mode) — not fixable from project files alone.
 
-## Plan to resolve the blocker (agreed with user, not yet executed)
+## Historical resolution plan
 
 Try in this order, stop and report back after each attempt rather than cascading
 silently, since option 2 touches shared machine tooling outside this repo:
@@ -157,7 +173,7 @@ silently, since option 2 touches shared machine tooling outside this repo:
    Revisit on a cleaner PlatformIO install or in CI rather than sinking more time
    into this specific machine's toolchain state.
 
-## Verification checklist (once the blocker clears)
+## Historical verification checklist
 
 1. Default env unaffected — re-confirm after any platform version change.
 2. `pio run -e jenix-td-c3-prov2` succeeds, `firmware.bin` fits the ~3MB `app0`

@@ -19,12 +19,7 @@
 // compile-time swap, not a rewrite.
 // ---------------------------------------------------------------------------
 
-#define PROV2_BLE_WINDOW_MS  900000   // 15 minutes for bench testing (was 2 min,
-                                       // matching BLE_WINDOW_MS) — real-device
-                                       // onboarding attempts kept racing the
-                                       // clock during interactive testing;
-                                       // revisit back down to 2 min before
-                                       // shipping, this is a testing convenience
+#define PROV2_BLE_WINDOW_MS  180000   // Bounded 3-minute commissioning window
 
 namespace Provisioning2 {
     void begin();

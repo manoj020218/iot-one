@@ -1,0 +1,18 @@
+{
+  "models": [
+    {
+      "model_id": "JNX-TD-C3-01",
+      "display_name": "Jenix Smart Token Dispenser (ESP32-C3)",
+      "chip": "esp32c3",
+      "manufacturer": "Espressif",
+      "board": "ESP32-C3 SuperMini HW-466AB",
+      "vid_pid": "303A:1001",
+      "project_dir": "..",
+      "pio_env": "jenix-td-c3-prov2",
+      "notes": "Official Espressif BLE Security2 provisioning (SRP6a and AES-256-GCM) with per-device PoP.",
+      "vps_env_prefix": "TOKEN_DISPENSER",
+      "vps_dir_default": "/root/secrets/iot-one/token-dispenser-factory-records",
+      "requires_token": true
+    }
+  ]
+}

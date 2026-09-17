@@ -1,9 +1,9 @@
 # Jenix Smart Token Dispenser Firmware
 ## PID: JNX-TD-C3-01 | v1.0.0 | Jenix One IoT Platform
 
-Production-grade firmware for the **ESP32-C3 Super Mini (HW-466AB)** running a CSN-A1X
-thermal printer. Integrates fully with the Jenix One IoT platform via MQTT, BLE provisioning,
-and the PWA/APK app.
+Firmware for the **ESP32-C3 Super Mini (HW-466AB)** running a CSN-A1X thermal printer.
+The Security2 build is currently an **engineering pilot, not an approved production release**.
+See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for the audited release blockers.
 
 ---
 
@@ -62,13 +62,29 @@ Printer Power Supply (SEPARATE from ESP32):
 
 ---
 
-## First Flash (PlatformIO)
+## Factory Flash (Security2 + unique PoP)
+
+Use the product-specific tool in `FlashTool/`. It builds and flashes the
+`jenix-td-c3-prov2` environment, captures the serial factory record, and saves a
+separate `_POP.txt` file for provisioning.
+
+```powershell
+cd FlashTool
+python flash_tool.py list-models
+python flash_tool.py flash --model-id JNX-TD-C3-01 --port COM5
+```
+
+Replace `COM5` with the connected ESP32-C3 port. Factory flashing erases the
+whole chip; inspect and approve the tool summary before continuing. Do not use
+`--allow-dirty` for production records.
+
+## Development Flash (legacy build)
 
 ```bash
 # 1. Install PlatformIO (VS Code extension or CLI)
 # 2. Connect ESP32-C3 via USB-C
 
-# Build and flash firmware
+# Legacy plaintext-BLE development build; not a production factory target
 pio run -e jenix-td-c3 -t upload
 
 # Upload web UI and templates to SPIFFS
@@ -82,12 +98,15 @@ pio device monitor -b 115200
 
 ## Provisioning (First Boot)
 
-### Option A — BLE (Mobile App)
-1. Open Jenix One app → Add Device → Scan for `JNX-TD-XXXX`
-2. Send WiFi credentials + tenant binding JSON.
-3. Device saves config to NVS and restarts.
+### Option A — Security2 BLE (Mobile App)
+1. Factory-flash the `jenix-td-c3-prov2` environment and retain its PoP record.
+2. Open the Jenix One app and scan for the device name printed in the factory record.
+3. Use Security2 username `wifiprov` and the device's unique PoP.
+4. Send the Wi-Fi credentials. They are committed only after a successful connection.
 
-BLE is active for **2 minutes** after boot then stops to save RF resources.
+Security2 BLE is available for **3 minutes** after boot. The legacy
+`jenix-td-c3` environment uses unauthenticated plaintext provisioning and must
+not be used as the production factory image.
 
 ### Option B — AP Mode (Browser)
 1. Connect phone/laptop to WiFi: `JNX-TD-XXXX` (open, no password).

@@ -188,7 +188,9 @@ void factoryReset() {
     p.begin("jnx_tok", false);  p.clear(); p.end();
     p.begin("jnx_pap", false);  p.clear(); p.end();
 #ifdef JENIX_PROV_V2
-    p.begin("jnx_pop", false);  p.clear(); p.end();
+    // Preserve the per-device PoP. It is manufacturing identity recorded by
+    // the factory tool and may be printed on the enclosure/QR label; a field
+    // reset must not silently invalidate that factory record.
     wifi_prov_mgr_reset_provisioning(); // clears esp_wifi's own persisted STA config
 #endif
 }

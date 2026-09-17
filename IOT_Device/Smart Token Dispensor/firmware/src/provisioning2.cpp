@@ -42,6 +42,8 @@ static bool     s_provisioned = false;
 static uint32_t s_startMs     = 0;
 static char     s_pop[33]     = {0};
 static char     s_bleName[16] = {0};
+static char     s_pendingSsid[33] = {0};
+static char     s_pendingPass[65] = {0};
 
 // Must stay valid for as long as the provisioning service is running —
 // protocomm holds onto this pointer, not a copy.
@@ -103,18 +105,34 @@ static void provEventHandler(void* /*arg*/, esp_event_base_t eventBase,
             ssid[32] = '\0';
             pass[64] = '\0';
 
-            strlcpy(ConfigStore::net().wifiSsid, ssid, sizeof(ConfigStore::net().wifiSsid));
-            strlcpy(ConfigStore::net().wifiPass, pass, sizeof(ConfigStore::net().wifiPass));
-            ConfigStore::saveNet();
-            EventLog::info("PROV", "WiFi credentials received via protocomm/BLE");
+            // Stage credentials until wifi_provisioning confirms association.
+            // A mistyped password must not overwrite the last known-good NVS
+            // configuration.
+            strlcpy(s_pendingSsid, ssid, sizeof(s_pendingSsid));
+            strlcpy(s_pendingPass, pass, sizeof(s_pendingPass));
+            EventLog::info("PROV", "WiFi credentials staged via protocomm/BLE");
             break;
         }
 
         case WIFI_PROV_CRED_FAIL:
+            memset(s_pendingSsid, 0, sizeof(s_pendingSsid));
+            memset(s_pendingPass, 0, sizeof(s_pendingPass));
+            wifi_prov_mgr_reset_sm_state_on_failure();
             EventLog::error("PROV", "WiFi credentials rejected (bad auth or AP not found)");
             break;
 
         case WIFI_PROV_CRED_SUCCESS:
+            if (s_pendingSsid[0] == '\0') {
+                EventLog::error("PROV", "WiFi connected but staged credentials are missing");
+                break;
+            }
+            strlcpy(ConfigStore::net().wifiSsid, s_pendingSsid,
+                    sizeof(ConfigStore::net().wifiSsid));
+            strlcpy(ConfigStore::net().wifiPass, s_pendingPass,
+                    sizeof(ConfigStore::net().wifiPass));
+            ConfigStore::saveNet();
+            memset(s_pendingSsid, 0, sizeof(s_pendingSsid));
+            memset(s_pendingPass, 0, sizeof(s_pendingPass));
             s_provisioned = true;
             EventLog::info("PROV", "Provisioning succeeded — WiFi connected");
             break;
