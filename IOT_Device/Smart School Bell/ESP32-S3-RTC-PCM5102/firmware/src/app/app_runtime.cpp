@@ -3,6 +3,7 @@
 #include "app_config.h"
 #include "cJSON.h"
 #include "esp_err.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -134,6 +135,22 @@ void FirmwareApp::onProvisioningWifiConnected(const std::string& device_id, cons
   log_service_.info(
       "provisioning",
       ("Wi-Fi connected via provisioning, device_id=" + device_id + " ip=" + ip).c_str());
+
+  // wifi_prov_mgr already applied these credentials to the running station
+  // config via esp_wifi_set_config(); mirror them into WifiService's own
+  // jenix_wifi NVS namespace so hasStationConfig() is true on the next boot
+  // instead of re-entering provisioning (see HANDOFF.md's 2026-09-13 entry).
+  wifi_config_t current_config = {};
+  if (esp_wifi_get_config(WIFI_IF_STA, &current_config) == ESP_OK) {
+    const std::string ssid(reinterpret_cast<const char*>(current_config.sta.ssid));
+    const std::string password(reinterpret_cast<const char*>(current_config.sta.password));
+    const esp_err_t persist_err = wifi_service_.persistStationConfig(ssid, password);
+    if (persist_err != ESP_OK) {
+      log_service_.warn("provisioning", "Failed to persist provisioned Wi-Fi credentials");
+    }
+  } else {
+    log_service_.warn("provisioning", "Could not read applied Wi-Fi config to persist");
+  }
 }
 
 esp_err_t FirmwareApp::handleRingRequest(const RingRequest& request) {

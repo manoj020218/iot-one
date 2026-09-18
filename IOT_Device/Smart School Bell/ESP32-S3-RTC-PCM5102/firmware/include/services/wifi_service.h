@@ -13,6 +13,11 @@ class WifiService {
   void setMdnsHostname(const std::string& hostname) { mdns_hostname_ = hostname; }
   esp_err_t init(const DeviceConfig& config);
   esp_err_t applyStationConfig(const std::string& ssid, const std::string& password);
+  // Mirrors credentials the Wi-Fi stack already has live (e.g. just applied
+  // by wifi_prov_mgr) into this service's own NVS namespace, without
+  // reconfiguring or reconnecting the radio. Needed because hasStationConfig()
+  // reflects this private namespace, not esp_wifi's internal persisted state.
+  esp_err_t persistStationConfig(const std::string& ssid, const std::string& password);
   void tick();
   bool isReady() const { return ap_started_ || connected_; }
   bool isConnected() const { return connected_; }

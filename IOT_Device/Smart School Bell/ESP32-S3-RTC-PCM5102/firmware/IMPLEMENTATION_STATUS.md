@@ -1,5 +1,11 @@
 # Firmware Implementation Status
 
+> Update 2026-09-14: ESP32-S3 physical PTT wiring is explicitly locked as
+> GPIO15 for the active-low PTT switch (switch to GND, internal pull-up) and
+> GPIO7 / ADC1_CH6 for the analog microphone signal. These are adjacent
+> left-header pins below the PCM5102 signals. Do not substitute the QRunlock
+> ESP32-C3 pin map.
+
 > Update 2026-09-11: firmware `0.6.2-sd-stat-fix` / API `1.4` is built,
 > flashed, and hardware-validated on COM30. Live serial capture identified the
 > SD manual-ring failure: `StorageService::exists("/sdcard/bells")` reached an
@@ -26,7 +32,7 @@
 > compile-validated. See `FIRMWARE_AUDIT_2026-09-08.md` and `HANDOFF.md` before
 > relying on the older milestone details below.
 
-Last updated: 2026-09-11
+Last updated: 2026-09-14
 Project: Jenix SchoolBell standalone ESP32-S3 bell box
 
 ## Purpose
@@ -98,7 +104,7 @@ Still placeholder or only partially hardened:
 
 - the firmware now targets EdgeHex N16R8 with `16MB` flash and custom partitions
 - the hardware baseline now targets EdgeHex N16R8 with onboard SDMMC
-- the locked school-bell pin map sets DS3231 `SDA=GPIO47`, `SCL=GPIO21`, optional `SQW=GPIO2`; PCM5102 `BCK=GPIO17`, `LCK=GPIO18`, `DIN=GPIO16`
+- the locked school-bell pin map sets DS3231 `SDA=GPIO47`, `SCL=GPIO21`, optional `SQW=GPIO2`; PCM5102 `BCK=GPIO17`, `LCK=GPIO18`, `DIN=GPIO16`; physical PTT switch `GPIO15` active-low; analog microphone input `GPIO7` / `ADC1_CH6`
 - ESP-IDF build tooling is unreliable from project paths containing spaces on Windows
 - if build work resumes on this machine, use a no-space working copy for `pio run`
 - compile validation succeeded from a no-space mirror on 2026-09-10

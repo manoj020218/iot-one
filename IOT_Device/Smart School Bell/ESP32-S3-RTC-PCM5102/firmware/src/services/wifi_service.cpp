@@ -112,6 +112,13 @@ esp_err_t WifiService::applyStationConfig(const std::string& ssid, const std::st
   return connect_result == ESP_ERR_WIFI_CONN ? ESP_OK : connect_result;
 }
 
+esp_err_t WifiService::persistStationConfig(const std::string& ssid, const std::string& password) {
+  ESP_RETURN_ON_ERROR(saveStation(ssid, password), kTag, "persist station credentials failed");
+  station_configured_ = true;
+  active_ssid_ = ssid;
+  return ESP_OK;
+}
+
 const char* WifiService::apSsid() const {
   return app::config::kSetupApSsid;
 }

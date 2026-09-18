@@ -1,3 +1,74 @@
+# Provisioning Phone + S3 Front-Panel Validation - 2026-09-13
+
+This section supersedes the 2026-09-12 phone-pairing-not-yet-done note and
+Provisioning Pilot next-step item 1 below.
+
+Real bench unit: JNX-SB-S3-95A458, Wi-Fi STA MAC 44:1B:F6:95:A4:58, CH340
+COM30. Firmware-only work; no APK was built or changed.
+
+**Provisioning result: the BLE/SRP6a hardware gate is passed.**
+
+- Built esp32-s3-schoolbell-prov from the exact repository source through the
+  documented no-space mirror, then uploaded it to the real ESP32-S3. Every
+  written region passed esptool hash verification.
+- The shared QRunlock factory tool's reset/capture implementation read a
+  complete record from Serial:
+  [FACTORY] pid=JNX-SB-S3-001 ble_name=JNXSB95A458
+  pop_username=wifiprov pop=2NGBV7NDDAHH
+- A real Android phone discovered JNXSB95A458 over BLE at bench range.
+  Jenix One physically saw the advertisement, but currently labels it
+  "Unrecognized Jenix device (SB)" and disables selection because School Bell
+  is absent from the app/shared PID blueprint catalog. This is a platform
+  catalog gate, not a BLE-radio failure.
+- Firmware pairing was therefore validated with Espressif's BLE provisioning
+  client on that same phone. Entered PoP 2NGBV7NDDAHH. The first attempt
+  generated the phone's SRP session key but the ESP rejected the proof.
+- Root cause was verified against actual QRunlock source, not copied board
+  settings: QRunlock Security 2 and Jenix One both use SRP username wifiprov,
+  while the shared School Bell component used jenix. QRunlock is ESP32-C3 and
+  School Bell is ESP32-S3; only the chip-independent Security 2 username
+  contract was reused.
+- Changed the shared provisioning username to wifiprov, rebuilt and reflashed.
+  The phone then completed SRP6a, submitted Wi-Fi credentials, and reported
+  Wi-Fi connected. This closes the requested phone-pairing bench gate.
+
+**New provisioning persistence integration gap observed:** after the later
+firmware-only pin/LED reflash (NVS was not erased), School Bell booted without
+a station config and started BLE provisioning again. WifiService loads only
+its private jenix_wifi namespace, while wifi_prov_mgr writes the standard
+ESP-IDF station configuration; the successful provisioning callback currently
+logs device/IP but does not mirror the received credentials into jenix_wifi.
+Treat phone SRP6a and the live first Wi-Fi join as passed, but persistent
+post-reboot onboarding is still open.
+
+**VPS/MQTT:** not changed here. The user assigned that connection/bind work to
+the platform/cloud developer. A failed MQTT connection is not used to qualify
+the BLE/SRP result.
+
+**ESP32-S3 front-panel pins (do not reuse on QRunlock C3):**
+
+- GPIO5: service/reset button, active-low to GND with the internal pull-up.
+  Existing behavior is retained: short press rings, 3-second press requests SoftAP,
+  and 10-second factory reset is still only a logged placeholder. A true reset
+  policy was not invented as part of this pin assignment.
+- GPIO6: data output for one WS2812 status LED. GPIO5 and GPIO6 are adjacent
+  on the School Bell board's left header and do not overlap its RTC, SDMMC,
+  PCM5102, PTT/microphone, USB, strapping, or N16R8 PSRAM assignments.
+- Replaced ordinary GPIO LED toggling with ESP-IDF RMT WS2812 signaling (GRB).
+  Status colors are blue boot, green ready, cyan sync, amber RTC-invalid, and
+  red fatal. This source was built and flashed successfully; firmware reached
+  "Firmware ready". Physical WS2812 illumination still needs an LED wired to
+  GPIO6/5V-or-3V3-as-rated/GND for visual confirmation.
+
+Latest build: SUCCESS, esp32-s3-schoolbell-prov, RAM 54,924 / 327,680 bytes
+(16.8%), flash 2,031,576 / 3,145,728 bytes (64.6%). Latest upload to COM30:
+SUCCESS with all hashes verified.
+Normal esp32-s3-schoolbell environment also builds successfully with the same
+WS2812 driver: RAM 45,168 / 327,680 bytes (13.8%), flash 1,776,568 /
+3,145,728 bytes (56.5%).
+
+---
+
 # Provisioning Hardware Validation — 2026-09-12
 
 Real bench unit (`JNX-SB-S3-95A458` / MAC `44:1B:F6:95:A4:58`), connected via

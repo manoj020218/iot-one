@@ -24,7 +24,9 @@ namespace {
 constexpr char kTag[] = "JenixProvisioning";
 constexpr char kNvsNamespace[] = "jnx_prov";
 constexpr char kNvsPopKey[] = "pop";
-constexpr char kSec2Username[] = "jenix";
+// Espressif Security 2 performs SRP6a over both this username and the PoP.
+// Keep this aligned with Jenix One and the hardware-proven QRunlock contract.
+constexpr char kSec2Username[] = "wifiprov";
 constexpr int kSec2SaltBytes = 16;
 constexpr int kGeneratedPopChars = 12;
 
