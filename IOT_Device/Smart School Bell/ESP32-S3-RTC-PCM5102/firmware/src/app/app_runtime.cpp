@@ -145,7 +145,9 @@ void FirmwareApp::onProvisioningWifiConnected(const std::string& device_id, cons
     const std::string ssid(reinterpret_cast<const char*>(current_config.sta.ssid));
     const std::string password(reinterpret_cast<const char*>(current_config.sta.password));
     const esp_err_t persist_err = wifi_service_.persistStationConfig(ssid, password);
-    if (persist_err != ESP_OK) {
+    if (persist_err == ESP_OK) {
+      log_service_.info("provisioning", ("Persisted Wi-Fi credentials for ssid=" + ssid).c_str());
+    } else {
       log_service_.warn("provisioning", "Failed to persist provisioned Wi-Fi credentials");
     }
   } else {
