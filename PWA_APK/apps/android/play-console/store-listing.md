@@ -63,7 +63,24 @@ defensible for a multi-device IoT management app).
 - Privacy policy: https://one.jenix.in/privacy (confirmed live, HTTP 200, as
   of 2026-09-14)
 
-## What's new / release notes (this version)
+## What's new / release notes
+
+### versionCode 7 / versionName 1.0.6 (this build, 2026-09-19)
+
+```
+• Smart School Bell is now fully supported for setup — fixed a bug where a
+  successfully set-up bell could show a setup error and fail to appear on
+  the Home dashboard.
+• More reliable error messages during device setup instead of a silent
+  failure that looked like success.
+```
+
+(Draft — adjust to match whatever versionCode is actually live in Play
+Console right now before submitting; earlier versionCode bumps in git
+history may or may not have actually been published. See `README.md`'s "I
+have not clicked Publish" note.)
+
+### Initial release text (kept for reference / first submission)
 
 ```
 Initial release of Jenix One for Android.
