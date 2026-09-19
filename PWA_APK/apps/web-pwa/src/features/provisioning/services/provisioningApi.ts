@@ -71,11 +71,48 @@ function getInitialStatus(method: ProvisioningMethod): ProvisioningStatus {
   return method === "ble" ? "BLE_CONNECTED" : "WIFI_SENT";
 }
 
+/**
+ * Thrown when the backend actually responded (with an error status), as
+ * opposed to the request never reaching it at all. Callers use this
+ * distinction to decide whether falling back to a local/demo record is
+ * appropriate (genuinely offline) or would hide a real backend problem
+ * (e.g. a 404 "PID not found" -- see registerProvisionedDevice()).
+ */
+class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+/**
+ * False only for ApiRequestError -- meaning the server was actually reached
+ * and responded with a real error, which must never be silently swallowed
+ * into a fake local success (see HANDOFF's "provisioned but not showing on
+ * dashboard" incident: a swallowed 404 PID-not-found looked identical to
+ * success). Anything else (fetch() itself throwing -- network down, DNS
+ * failure, CORS, offline, or a test double simulating "no backend") is
+ * treated as genuinely unreachable and falls back to the local/demo record.
+ */
+function isOfflineError(error: unknown): boolean {
+  return !(error instanceof ApiRequestError);
+}
+
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init);
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body?.error) message = body.error;
+    } catch {
+      // Response body wasn't JSON (or was empty) -- keep the generic message.
+    }
+    throw new ApiRequestError(response.status, message);
   }
 
   const payload = (await response.json()) as { data: T };
@@ -171,7 +208,8 @@ export async function registerProvisioningIntent(
         pid: input.pid ?? foundationPidBlueprint.pid
       })
     });
-  } catch {
+  } catch (error) {
+    if (!isOfflineError(error)) throw error;
     return createFallbackIntent(session, input);
   }
 }
@@ -195,7 +233,8 @@ export async function completeProvisioningIntent(
         body: JSON.stringify(input)
       }
     );
-  } catch {
+  } catch (error) {
+    if (!isOfflineError(error)) throw error;
     const existing = localIntentStore.get(provisioningId);
 
     if (!existing) {
@@ -250,7 +289,12 @@ export async function registerProvisionedDevice(
 
     upsertDemoDevice(session.user.userId, currentHome.homeId, record);
     return record;
-  } catch {
+  } catch (error) {
+    // A real backend error (e.g. "PID not found" for an unregistered
+    // product) must surface to the UI, not be masked as a fake success --
+    // see HANDOFF's School Bell incident, where this exact swallow hid a
+    // missing PID registration behind a false "Provisioning Success" screen.
+    if (!isOfflineError(error)) throw error;
     const record = createFallbackDevice(session, input);
     upsertDemoDevice(session.user.userId, currentHome.homeId, record);
     return record;
