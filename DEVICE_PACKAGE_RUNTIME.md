@@ -254,6 +254,13 @@ checks `/app/` before falling through to the marketing site's own SPA catch-all.
 
 ### Add a new device type
 
+**See `NEW_PRODUCT_LAUNCH_SOP.md` for the full checklist and the actual
+definition of done** — steps 1-5 below cover the package/registry side only
+and, on their own, are exactly what let QRunlock, Token Dispenser, and
+School Bell each independently ship without a working Home tile or a
+tap-to-open route to their own package (both required, see the SOP's
+checklist items 3 and 4).
+
 1. Create a new PID package under `IOT_Devices/devices/<PID>/`
 2. Add a package record in the platform package catalog
 3. Add or update PID schema defaults
