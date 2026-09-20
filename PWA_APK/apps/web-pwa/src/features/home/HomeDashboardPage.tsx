@@ -18,6 +18,7 @@ import { HomeSelectorSheet } from "../homes/components/HomeSelectorSheet";
 import { HomeFormSheet } from "../homes/components/HomeFormSheet";
 import { createHome, listHomes, type HomeUpsertInput } from "../homes/services/homeApi";
 import { QRUNLOCK_PID } from "../qrunlock/qrunlockPid";
+import { SCHOOL_BELL_PID } from "../school-bell/schoolBellPid";
 import { TOKEN_DISPENSER_PID } from "../token-dispenser/tokenDispenserPid";
 import "./theme/home.css";
 
@@ -55,6 +56,10 @@ export function HomeDashboardPage() {
     }
     if (device?.pid === TOKEN_DISPENSER_PID) {
       navigate(`/token-dispenser/${encodeURIComponent(deviceId)}`);
+      return;
+    }
+    if (device?.pid === SCHOOL_BELL_PID) {
+      navigate(`/school-bell/${encodeURIComponent(deviceId)}`);
       return;
     }
     navigate(`/devices/${encodeURIComponent(deviceId)}`);

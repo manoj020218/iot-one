@@ -3,12 +3,14 @@ import type { ComponentType, ReactNode } from "react";
 
 import type { DashboardDevice } from "../../dashboard/services/dashboardApi";
 import { QRUNLOCK_PID } from "../../qrunlock/qrunlockPid";
+import { SCHOOL_BELL_PID } from "../../school-bell/schoolBellPid";
 import { TOKEN_DISPENSER_PID } from "../../token-dispenser/tokenDispenserPid";
 import { useLongPressGuard } from "../hooks/useLongPressGuard";
 import type { MetricsMap } from "../hooks/useLiveMetrics";
 import { DeviceTile } from "./DeviceTile";
 import { HomeFilterTabs, type HomeFilter } from "./HomeFilterTabs";
 import { QrunlockHomeTile } from "./QrunlockHomeTile";
+import { SchoolBellHomeTile } from "./SchoolBellHomeTile";
 import { TokenDispenserHomeTile } from "./TokenDispenserHomeTile";
 
 /**
@@ -59,7 +61,8 @@ interface CompactTileProps {
  */
 const COMPACT_TILE_COMPONENTS: Record<string, ComponentType<CompactTileProps>> = {
   [QRUNLOCK_PID]: QrunlockHomeTile,
-  [TOKEN_DISPENSER_PID]: TokenDispenserHomeTile
+  [TOKEN_DISPENSER_PID]: TokenDispenserHomeTile,
+  [SCHOOL_BELL_PID]: SchoolBellHomeTile
 };
 
 export interface HomeDeviceSectionProps {
