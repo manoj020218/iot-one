@@ -5,6 +5,7 @@ set(app_requires
   esp_adc
   esp_audio_codec
   esp_event
+  esp_driver_rmt
   esp_http_client
   app_update
   mbedtls

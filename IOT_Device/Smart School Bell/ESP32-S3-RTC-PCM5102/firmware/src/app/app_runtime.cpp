@@ -3,6 +3,7 @@
 #include "app_config.h"
 #include "cJSON.h"
 #include "esp_err.h"
+#include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -11,7 +12,7 @@ namespace app {
 
 void FirmwareApp::loop() {
   while (true) {
-    led_driver_.tick();
+    provisioning_service_.tick();
     wifi_service_.tick();
     cloud_service_.tick(wifi_service_.isConnected());
     sync_service_.tick();
@@ -64,6 +65,20 @@ void FirmwareApp::loop() {
 }
 
 void FirmwareApp::applyLedPattern() {
+  if (button_driver_.isPressed()) {
+    led_driver_.setPattern(LedPattern::BlinkFactoryResetHold);
+    return;
+  }
+  if (!wifi_service_.hasStationConfig()) {
+    led_driver_.setPattern(LedPattern::BlinkProvisioning);
+    return;
+  }
+  if (!wifi_service_.isConnected() || !cloud_service_.configured() ||
+      !cloud_service_.connected()) {
+    led_driver_.setPattern(LedPattern::AlternateProvisioningIncomplete);
+    return;
+  }
+
   const RuntimeSnapshot snapshot = app_state_.snapshot();
   switch (snapshot.state) {
     case AppState::Booting:
@@ -127,7 +142,38 @@ void FirmwareApp::handleButtonEvent(ButtonEvent event) {
   }
 
   if (event == ButtonEvent::FactoryReset) {
-    log_service_.warn("button", "Factory reset requested but not implemented in scaffold");
+    log_service_.warn("button", "30-second hold detected; clearing Wi-Fi provisioning");
+
+    // Credentials can originate from the web configuration as well as NVS.
+    // Clear the JSON copy first so it cannot repopulate Wi-Fi on the next boot.
+    DeviceConfig device_config = config_service_.deviceConfig();
+    device_config.wifi.ssid.clear();
+    device_config.wifi.password.clear();
+    const esp_err_t config_err = config_service_.saveDeviceConfig(device_config);
+    if (config_err != ESP_OK) {
+      log_service_.error(
+          "button",
+          (std::string("Factory reset could not clear device config: ") +
+           esp_err_to_name(config_err))
+              .c_str());
+      return;
+    }
+
+    const esp_err_t reset_err = wifi_service_.clearStationConfig();
+    if (reset_err != ESP_OK) {
+      log_service_.error(
+          "button", (std::string("Factory reset failed: ") + esp_err_to_name(reset_err)).c_str());
+      return;
+    }
+    log_service_.warn(
+        "button", "Factory reset complete; release button to reboot into provisioning");
+
+    led_driver_.setPattern(LedPattern::BlinkFactoryResetComplete);
+    while (button_driver_.isPressed()) {
+      vTaskDelay(pdMS_TO_TICKS(25));
+    }
+
+    esp_restart();
   }
 }
 

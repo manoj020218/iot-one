@@ -11,10 +11,12 @@ namespace board {
 // pinout PDF. External peripheral signals are intentionally split by header:
 // DS3231 on the right-hand header and PCM5102 on three adjacent left-hand pins.
 
-inline constexpr gpio_num_t kStatusLed = GPIO_NUM_42;
-inline constexpr gpio_num_t kStatusLedOrange = GPIO_NUM_40;
-inline constexpr gpio_num_t kStatusLedWhite = GPIO_NUM_41;
-inline constexpr gpio_num_t kServiceButton = GPIO_NUM_48;
+// Product front-panel pair on adjacent left-header pins. The button input is
+// active-low (switch to GND, internal pull-up enabled). kStatusLed is the data
+// line for one external WS2812/NeoPixel, not a conventional two-pin LED.
+inline constexpr gpio_num_t kResetButton = GPIO_NUM_5;
+inline constexpr gpio_num_t kStatusLed = GPIO_NUM_6;
+inline constexpr gpio_num_t kServiceButton = kResetButton;
 inline constexpr gpio_num_t kManualRingButton = GPIO_NUM_NC;
 
 // GPIO33-37 are occupied by OPI PSRAM on N16R8 and must never be reused.

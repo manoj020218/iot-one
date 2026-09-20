@@ -5,8 +5,3 @@ sdkconfig.*
 !sdkconfig.defaults
 !sdkconfig.prov.defaults
 .diagnostics/
-# Moved out of managed_components/ (see HANDOFF.md) to work around a local
-# path-with-spaces link bug -- ESP-IDF's own suggested remedy for keeping a
-# local edit to a component-manager package, but it's still a 47MB vendored
-# binary blob, not something to commit.
-components/espressif__esp_audio_codec/

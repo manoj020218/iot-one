@@ -112,6 +112,47 @@ esp_err_t WifiService::applyStationConfig(const std::string& ssid, const std::st
   return connect_result == ESP_ERR_WIFI_CONN ? ESP_OK : connect_result;
 }
 
+esp_err_t WifiService::clearStationConfig() {
+  if (!stack_ready_) return ESP_ERR_INVALID_STATE;
+
+  // Stop the disconnect event from immediately reconnecting while the
+  // persistent configuration is being erased.
+  station_configured_ = false;
+  connected_ = false;
+  active_ssid_.clear();
+  station_ip_.clear();
+  const esp_err_t disconnect_result = esp_wifi_disconnect();
+  if (disconnect_result != ESP_OK && disconnect_result != ESP_ERR_WIFI_NOT_CONNECT) {
+    ESP_LOGW(kTag, "Wi-Fi disconnect during factory reset failed: %s",
+             esp_err_to_name(disconnect_result));
+  }
+
+  // This is the same operation used by wifi_prov_mgr_reset_provisioning(); it
+  // clears the Wi-Fi driver's NVS-backed STA configuration.
+  const esp_err_t restore_result = esp_wifi_restore();
+
+  nvs_handle_t handle = 0;
+  esp_err_t nvs_result = nvs_open(kNvsNamespace, NVS_READWRITE, &handle);
+  if (nvs_result == ESP_OK) {
+    nvs_result = nvs_erase_all(handle);
+    if (nvs_result == ESP_OK) nvs_result = nvs_commit(handle);
+    nvs_close(handle);
+  }
+
+  if (restore_result != ESP_OK) {
+    ESP_LOGE(kTag, "Could not clear ESP-IDF Wi-Fi configuration: %s",
+             esp_err_to_name(restore_result));
+    return restore_result;
+  }
+  if (nvs_result != ESP_OK) {
+    ESP_LOGE(kTag, "Could not clear saved Wi-Fi credentials: %s", esp_err_to_name(nvs_result));
+    return nvs_result;
+  }
+
+  ESP_LOGW(kTag, "Saved Wi-Fi credentials and provisioning state cleared");
+  return ESP_OK;
+}
+
 esp_err_t WifiService::persistStationConfig(const std::string& ssid, const std::string& password) {
   ESP_RETURN_ON_ERROR(saveStation(ssid, password), kTag, "persist station credentials failed");
   station_configured_ = true;

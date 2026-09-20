@@ -10,6 +10,13 @@ CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 CONFIG_BT_BLUEDROID_ENABLED=n
 
+# Espressif's Android client requests an ATT MTU of 512. Security Scheme 2's
+# initial 3072-bit SRP request is larger than the NimBLE default MTU (256),
+# which some Android stacks reject as GATT_INVALID_PDU instead of performing
+# a long write. Match the client's request so prov-session fits in one ATT
+# write and remains interoperable across Android vendors.
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=512
+
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
 CONFIG_WIFI_PROV_BLE_SEC_CONN=y

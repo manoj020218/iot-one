@@ -4,6 +4,8 @@
 #include <string>
 
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 
 namespace app::services {
 
@@ -38,10 +40,19 @@ class ProvisioningService {
   esp_err_t begin(Scheme scheme, const std::string& product_code, const std::string& pid,
                   WifiConnectedHandler on_wifi_connected, void* softap_httpd_handle = nullptr);
 
+  // Dispatches successful Wi-Fi handoff work from the application task. The
+  // native provisioning callback runs on ESP-IDF's small sys_evt stack and
+  // must not perform std::function, logging, or NVS work directly.
+  void tick();
+
   bool active() const { return active_; }
 
  private:
+  static void handleWifiConnected(const char* device_id, const char* ip, void* ctx);
+
   bool active_ = false;
+  WifiConnectedHandler wifi_connected_handler_;
+  QueueHandle_t pending_wifi_queue_ = nullptr;
 };
 
 }  // namespace app::services

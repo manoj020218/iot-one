@@ -26,6 +26,10 @@ enum class LedPattern {
   Off,
   HeartbeatBoot,
   SolidReady,
+  BlinkProvisioning,
+  BlinkFactoryResetHold,
+  BlinkFactoryResetComplete,
+  AlternateProvisioningIncomplete,
   BlinkSync,
   BlinkRtcInvalid,
   BlinkFatal

@@ -13,6 +13,9 @@ class WifiService {
   void setMdnsHostname(const std::string& hostname) { mdns_hostname_ = hostname; }
   esp_err_t init(const DeviceConfig& config);
   esp_err_t applyStationConfig(const std::string& ssid, const std::string& password);
+  // Erases both this service's credential copy and ESP-IDF's persisted Wi-Fi
+  // configuration so the next boot enters provisioning as a new device setup.
+  esp_err_t clearStationConfig();
   // Mirrors credentials the Wi-Fi stack already has live (e.g. just applied
   // by wifi_prov_mgr) into this service's own NVS namespace, without
   // reconfiguring or reconnecting the radio. Needed because hasStationConfig()
