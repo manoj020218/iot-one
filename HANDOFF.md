@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-09-05
+> Last updated: 2026-09-20
 
 ---
 
@@ -203,7 +203,15 @@ device behavior):
 1. Register your PID — one new exported constant in
    `packages/device-schemas/src/pid/pid.types.ts` (copy an existing
    blueprint's shape), or `POST /api/v1/admin/pids`.
-2. One new tile in `features/devices/deviceCatalog.ts`.
+2. One new tile in `features/devices/deviceCatalog.ts` (the Device
+   Management catalog grid) — **not the same thing** as the Home page's
+   own compact tile (`HomeDeviceSection.tsx`'s `COMPACT_TILE_COMPONENTS`
+   map), which is a separate required registration. See
+   [NEW_PRODUCT_LAUNCH_SOP.md](./NEW_PRODUCT_LAUNCH_SOP.md) — QRunlock,
+   Token Dispenser, and School Bell each independently shipped without
+   that Home-tile step (and, for a full routed package, a matching
+   tap-to-open route in `HomeDashboardPage.tsx`'s `openDevice()`) and had
+   to be fixed after the fact, because nothing here said it was required.
 3. One new route line in `PWA_APK/apps/web-pwa/src/app/AppRouter.tsx`.
 4. One new ownership-gated bottom-nav entry, following
    `features/qrunlock/useHasQrunlockDevice.ts`.
@@ -234,10 +242,59 @@ when quoted. For anything beyond a single pipe-free one-liner, write a
 `.sh` file, `pscp` it over, then run it with one simple
 `plink ... "bash /root/thefile.sh"` call.
 
-## 5. Feature Status (as of 2026-09-05)
+## 5. Feature Status (as of 2026-09-20)
 
 All of the below are **live and deployed** unless noted otherwise, most recent first:
 
+- **School Bell platform/provisioning session (2026-09-20)** — user
+  reported School Bell BLE provisioning failing end to end; root-caused
+  and fixed across firmware, backend, and frontend, one real bug at a
+  time (see the School Bell firmware's own `HANDOFF.md` for full
+  bench/serial-log detail on the firmware side):
+  1. **SRP6a Security Scheme 2 username mismatch** (`jenix` vs. the
+     platform's `wifiprov`) in `IOT_Device/_shared/jenix_provisioning` —
+     fixed, committed `2ebe198`.
+  2. **Wi-Fi credentials never persisted after successful provisioning** —
+     `WifiService` only trusted its own private `jenix_wifi` NVS
+     namespace for `hasStationConfig()`, but the provisioning-success
+     callback never wrote to it, so a freshly-provisioned device fell
+     back into BLE provisioning mode on its very next boot. Fixed with
+     `WifiService::persistStationConfig()`, committed `2ebe198`/`b9c629f`.
+  3. **School Bell's PID (`JNX-SB-S3-001`) was never registered** via
+     `POST /api/v1/admin/pids` — confirmed live (`GET /api/v1/pids/:pid`
+     404'd). This made `POST /api/v1/devices/register` fail for every
+     School Bell provisioning attempt. Registered live in production.
+  4. **That failure was invisible** — `registerProvisionedDevice()` (and
+     its sibling intent-registration calls) in
+     `provisioningApi.ts` caught *any* backend error, including a real
+     404, and silently fell back to a fake, ephemeral, in-memory-only
+     "success" record, so the app showed a false success screen instead
+     of the real error. Fixed: a new `ApiRequestError` class distinguishes
+     "server responded with a real error" from "genuinely unreachable,"
+     and only the latter falls back to the local/demo record now.
+     Committed `4962ee2`.
+  5. **`GATT_INVALID_PDU` on the first SRP6a BLE write** — NimBLE's
+     default ATT MTU (256) was smaller than Security Scheme 2's initial
+     SRP6a request; `CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=512` fixes the
+     transport-level symptom, though the firmware engineer was still
+     isolating whether the fix is complete as of this write-up — check
+     the firmware's own `HANDOFF.md` for the latest status before
+     assuming this is fully closed.
+  6. **Home page showed a fake Tank Guard gauge for School Bell, and
+     tapping it opened the generic admin page instead of School Bell's
+     own app** — the exact "Adding a New Device" gap called out in §5
+     above and now written up in
+     [NEW_PRODUCT_LAUNCH_SOP.md](./NEW_PRODUCT_LAUNCH_SOP.md). Fixed by
+     adding `SchoolBellHomeTile.tsx` to `COMPACT_TILE_COMPONENTS` and a
+     `/school-bell/:deviceId` branch to `openDevice()`. Committed `6d52b34`.
+  - Also built a new signed Android release (`versionCode` 7 /
+    `versionName` 1.0.6, bundling fixes 3-6 above) — **not yet uploaded to
+    Play Console**, that step is intentionally left for a human (see
+    `PWA_APK/apps/android/RELEASE_SIGNING.md`/`play-console/README.md`).
+  - All platform-side fixes (3, 4, 6) deployed live to the VPS; `main`
+    fast-forwarded to match `codex/smart-speaker-20260813` throughout
+    (verified no commits were ever lost — `main` was always a strict
+    ancestor of the feature branch before each merge).
 - **Permanent fix for devices getting stuck "online" forever** (commit
   `a632d53`) — root-caused as two separate structural gaps, on top of the
   deviceId bug below:

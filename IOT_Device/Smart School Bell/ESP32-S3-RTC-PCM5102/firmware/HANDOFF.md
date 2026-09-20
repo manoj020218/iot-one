@@ -1,3 +1,66 @@
+# GATT_INVALID_PDU on First SRP6a Write + Front-Panel Real Factory Reset - 2026-09-20
+
+This section supersedes the 2026-09-13 entry's "phone pairing" status
+below — the SRP6a username fix from that entry (`jenix` -> `wifiprov`) is
+confirmed still correct and live; what follows is what was found *after*
+that fix, once the platform-side PID/registration gaps (see the platform
+`HANDOFF.md`, not this one) were also fixed and pairing was retried for
+real against a live account.
+
+**New bug found via live `adb logcat` capture (phone on USB) during a
+retry**: BLE discovery, GATT connect, MTU negotiation (512, confirmed
+successful on both sides), and protocol-version/Security-2 selection all
+completed cleanly, but the very first SRP6a handshake write to the
+`prov-session` characteristic (`1775ff51-...`, 406 bytes) came back with
+raw ATT error `0x04` (`GATT_INVALID_PDU`), twice, on separate connection
+attempts. Traced the actual meaning of that status code into ESP-IDF's own
+`protocomm_nimble.c` (`gatt_svr_chr_access`, `BLE_GATT_ACCESS_OP_WRITE_CHR`
+case): it is returned deliberately, as a generic failure signal, whenever
+`protocomm_req_handle()` fails to process the write's contents — **not**
+necessarily a raw transport/MTU-size problem, despite that being a
+real, separately-documented NimBLE gotcha (see `CONFIG_BT_NIMBLE_ATT_
+PREFERRED_MTU=512` below, added for exactly that class of symptom). A
+clean rebuild (deleted `.pio/build/esp32-s3-schoolbell-prov` and the
+generated `sdkconfig.esp32-s3-schoolbell-prov` first, to rule out a stale
+cached sdkconfig not picking up the new default) reproduced the identical
+failure, confirming the MTU default fix alone was not sufficient.
+
+**Status at end of this session: still open.** The firmware engineer was
+capturing the ESP32's own serial log during one more controlled retry, to
+determine whether the write ever reaches `protocomm_req_handle`/
+`security2.c` at all (vs. dying earlier in NimBLE's own GATT write path),
+before applying "the smallest transport-only fix" — check for a newer
+entry above this one before assuming `GATT_INVALID_PDU` is resolved.
+
+**Also done this session, unrelated to the BLE bug above** (found already
+sitting uncommitted, reviewed, and committed together — see platform
+`HANDOFF.md` for the full session's platform-side fixes too):
+- `ButtonDriver` and `LedDriver` now each run their own dedicated FreeRTOS
+  task (20ms cadence) instead of being driven by the main loop's `tick()`
+  calls, keeping WS2812 rendering and button debounce responsive
+  regardless of main-loop jitter.
+- `LedDriver` drives the WS2812 over RMT (bit-accurate T0H/T0L/T1H/T1L
+  timing) instead of a plain GPIO toggle, with new patterns for
+  provisioning, factory-reset-hold, factory-reset-complete, and an
+  "provisioning incomplete" alternating state.
+- The button's long-press factory reset is real now (was a logged
+  placeholder): a 30-second hold (raised from 10s) with a release-grace
+  window, clearing both the JSON device config and `WifiService`'s
+  persisted station config (new `WifiService::clearStationConfig()`), then
+  rebooting into provisioning.
+- `ProvisioningService` now dispatches the Wi-Fi-connected handoff through
+  a 1-deep FreeRTOS queue drained by a new `tick()` call from the app task,
+  instead of invoking the `std::function` callback directly from
+  `jenix_provisioning`'s native event handler, which runs on ESP-IDF's
+  small `sys_evt` task stack and must not do `std::function`, logging, or
+  NVS work directly.
+
+Committed together as `4240c79` on `codex/smart-speaker-20260813` (and
+`main`), pushed. **Not yet confirmed working on hardware** for the
+`GATT_INVALID_PDU` fix specifically — see "Status" above.
+
+---
+
 # Provisioning Phone + S3 Front-Panel Validation - 2026-09-13
 
 This section supersedes the 2026-09-12 phone-pairing-not-yet-done note and
