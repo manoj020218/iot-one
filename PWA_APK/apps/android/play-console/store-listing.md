@@ -65,7 +65,19 @@ defensible for a multi-device IoT management app).
 
 ## What's new / release notes
 
-### versionCode 7 / versionName 1.0.6 (this build, 2026-09-19)
+### versionCode 8 / versionName 1.0.7 (this build, 2026-09-21)
+
+```
+• Smart School Bell now shows its own device tile and control screen on
+  the Home dashboard, instead of an unrelated generic tile.
+```
+
+(Supersedes the versionCode 7 draft below — that build was never
+uploaded, so its notes were folded in here rather than shipped separately.
+Draft — adjust to match whatever versionCode is actually live in Play
+Console right now before submitting.)
+
+### versionCode 7 / versionName 1.0.6 (2026-09-19, superseded — not uploaded)
 
 ```
 • Smart School Bell is now fully supported for setup — fixed a bug where a
