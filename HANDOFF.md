@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-09-20
+> Last updated: 2026-09-21
 
 ---
 
@@ -287,10 +287,18 @@ All of the below are **live and deployed** unless noted otherwise, most recent f
      [NEW_PRODUCT_LAUNCH_SOP.md](./NEW_PRODUCT_LAUNCH_SOP.md). Fixed by
      adding `SchoolBellHomeTile.tsx` to `COMPACT_TILE_COMPONENTS` and a
      `/school-bell/:deviceId` branch to `openDevice()`. Committed `6d52b34`.
-  - Also built a new signed Android release (`versionCode` 7 /
-    `versionName` 1.0.6, bundling fixes 3-6 above) — **not yet uploaded to
-    Play Console**, that step is intentionally left for a human (see
+  - Built two signed Android releases as the platform fixes landed:
+    `versionCode` 7/`versionName` 1.0.6 (fixes 3-4 only) was superseded
+    before ever being uploaded; `versionCode` 8/`versionName` 1.0.7
+    (fixes 3-6, i.e. also includes the Home-tile/routing fix) is the one
+    to actually ship. Both signed with the real upload key (SHA-1
+    verified against `RELEASE_SIGNING.md`). The ready-to-upload file is
+    `PWA_APK/apps/android/play-console/jenix-one-v1.0.7-8.aab` — **as of
+    this writing, not yet uploaded to Play Console**, that step is
+    intentionally left for a human (see
     `PWA_APK/apps/android/RELEASE_SIGNING.md`/`play-console/README.md`).
+    Check whether it's been uploaded yet before assuming this is still
+    open.
   - All platform-side fixes (3, 4, 6) deployed live to the VPS; `main`
     fast-forwarded to match `codex/smart-speaker-20260813` throughout
     (verified no commits were ever lost — `main` was always a strict
