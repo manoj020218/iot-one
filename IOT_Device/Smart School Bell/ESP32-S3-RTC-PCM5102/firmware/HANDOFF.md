@@ -1,5 +1,17 @@
 # Root Cause Found for GATT_INVALID_PDU + Cloud/MQTT Self-Enrollment - 2026-09-23
 
+**TL;DR for whoever builds/flashes this next:**
+1. `pio run -e esp32-s3-schoolbell-prov -t upload` from a no-space mirror (as always), flash the bench unit.
+2. Retry BLE pairing. Confirm `createSession` no longer fails with `GATT_INVALID_PDU` (the PSRAM fix below).
+3. Once Wi-Fi connects, watch serial for `"CloudEnrollment"`-tagged log lines — should show a fetch attempt, possibly a 404 retry if the app hasn't finished registering yet, then a success line with `home_id`/`mqtt_host`.
+4. Ask whoever has VPS access to `grep` the device's ID/username in Mosquitto's log on 154.61.69.200 for a `CONNECT` — that's the actual proof this worked. If serial shows "success" but nothing appears in Mosquitto, stop and report back rather than assuming it's fine.
+5. Neither change below has been compiled in this environment (sandboxed shell, `pio run` can't complete here — see the "Status" note below) — this is a from-source-review-only pass. Treat the very first build as the real test, not just a formality.
+
+Files touched, if you want to review before flashing:
+`include/services/cloud_enrollment_service.h`, `src/services/cloud_enrollment_service.cpp` (new), `include/app/app_main.h`, `src/app/app_main.cpp`, `src/app/app_runtime.cpp`, `include/app_config.h`, `sdkconfig.prov.defaults`.
+
+---
+
 This section supersedes the 2026-09-20 entry's "still open" status below.
 
 **Root cause found**: not the ATT MTU size (the earlier
