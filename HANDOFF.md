@@ -5,7 +5,7 @@
 > quirks) — read that second, as reference, not front-to-back. This file
 > is the orientation + "what's live, what's pending, what will bite you"
 > summary, kept short on purpose.
-> Last updated: 2026-09-21
+> Last updated: 2026-09-23
 
 ---
 
@@ -242,10 +242,68 @@ when quoted. For anything beyond a single pipe-free one-liner, write a
 `.sh` file, `pscp` it over, then run it with one simple
 `plink ... "bash /root/thefile.sh"` call.
 
-## 5. Feature Status (as of 2026-09-20)
+## 5. Feature Status (as of 2026-09-23)
 
 All of the below are **live and deployed** unless noted otherwise, most recent first:
 
+- **Device cloud/MQTT self-enrollment (2026-09-23)** — closes the follow-on
+  bug from the 2026-09-20 session below: a School Bell device could be
+  fully provisioned (BLE, Wi-Fi, backend registration) and still show
+  "offline" forever, because nothing ever pushed real `home_id`/MQTT
+  broker config onto the device after registration — every product
+  (QRunlock included) only ever got that through a manual, out-of-band,
+  per-device bench step. Confirmed live against Mosquitto: zero
+  connections ever from the device before this fix.
+  - New device-facing endpoint `POST /api/v1/devices/:deviceId/enrollment`
+    (`VPS/apps/api-server/src/modules/device-enrollment/`), gated by the
+    existing `requireDeviceIngestAuth` (`x-device-key`) convention — no new
+    auth scheme. Issues/returns a per-device MQTT credential (lazy,
+    idempotent) plus the device's real `tenantId` (returned as `homeId`,
+    matching the firmware's own local `/api/v1/cloud` schema) and the
+    public broker address. A 404 for an unregistered device is the
+    expected, normal case (the phone app may not have finished
+    `POST /register` yet), not an error.
+  - **Real incident caused and fixed in the same session**: deployed this
+    endpoint once via `deploy-iot-one.sh main` immediately after pushing
+    the merge to `main` in the background — the deploy's `git fetch` ran
+    before the background push had actually landed on GitHub, so it
+    silently redeployed the *previous* commit. The health check passed
+    (the old code is also healthy), so nothing looked wrong until a live
+    curl against the new route returned 401 instead of 404. **Lesson: a
+    passing health check after `deploy-iot-one.sh` only proves the
+    process restarted cleanly, not that it's running the commit you think
+    it is — confirm `git log -1` on `/root/repos/iot-one` on the VPS
+    itself before trusting a deploy, especially right after a backgrounded
+    push.** Re-ran the deploy once the push was confirmed landed; verified
+    live afterward with real curl calls (404 for an unregistered device,
+    200 with real credentials for the actual bench device, second call
+    returning the identical password — confirming persistence/idempotency).
+  - New School Bell firmware `CloudEnrollmentService`
+    (`include/services/cloud_enrollment_service.h`/`.cpp`) fetches this
+    config once Wi-Fi connects and applies it via `CloudService`'s
+    existing `saveCloudConfig()`/`saveDeviceCredential()` setters — zero
+    changes to `CloudService` itself. Runs on its own short-lived task
+    (same shape as `OtaService`'s own blocking download) with exponential
+    backoff + jitter, so a 404/network failure never stalls the main loop
+    or hammers the backend. **Not compile-tested** — same sandboxed-shell
+    `pio run` limitation as before (the compiler/ninja/cmake all run fine
+    invoked directly; only `pio run`'s own subprocess chain fails through
+    this environment). HTTP client usage was verified by hand against the
+    real ESP-IDF 5.3.1 headers instead of a real build. **Needs the
+    firmware engineer's actual build+flash+serial-log verification before
+    this is considered done on the device side** — the backend half is
+    live and verified; the firmware half (does a real device now actually
+    connect and show "online"?) is not yet confirmed on hardware.
+  - Explicitly out of scope, flagged not solved: real Mosquitto broker
+    ACL/password-file enforcement of the new per-device credentials (no
+    broker config exists in this repo — the credentials will very likely
+    let a device *connect* but its *publishes* may still be silently
+    dropped by the broker's ACL until someone adds a matching entry, per
+    the only in-repo clue about broker auth in QRunlock's
+    `CloudBridgeService.cpp`), and the full device-bound-keypair/signed-
+    license model in `MQTT_LICENSED_DEVICE_ACCESS_PLAN.md` (explicitly a
+    plan-only doc, Phase C/D/E-scale work — this is that doc's own
+    "Phase B: per-device credentials" at most).
 - **School Bell platform/provisioning session (2026-09-20)** — user
   reported School Bell BLE provisioning failing end to end; root-caused
   and fixed across firmware, backend, and frontend, one real bug at a

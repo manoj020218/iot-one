@@ -1,3 +1,46 @@
+# Root Cause Found for GATT_INVALID_PDU + Cloud/MQTT Self-Enrollment - 2026-09-23
+
+This section supersedes the 2026-09-20 entry's "still open" status below.
+
+**Root cause found**: not the ATT MTU size (the earlier
+`CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=512` fix is real and correct to keep,
+but wasn't the actual failure). Security Scheme 2's 3072-bit SRP6a exchange
+can fragment internal DRAM enough for mbedTLS's MPI allocation to fail
+during `createSession` — `protocomm_req_handle()` reports that failure
+generically as `BLE_ATT_ERR_INVALID_PDU`, exactly matching this device's
+symptom and exactly matching the 2026-09-20 entry's own tracing of that
+error code into `protocomm_nimble.c`'s "invalid content received, killing
+connection" branch. Fixed by routing mbedTLS's transient SRP allocations to
+this board's 8MB OPI PSRAM instead of internal DRAM
+(`CONFIG_SPIRAM=y` + `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y`, scoped to
+`sdkconfig.prov.defaults` only, not the shipping env). Committed alongside
+this session's other firmware work as `e914e81`.
+
+**Also added this session**: `CloudEnrollmentService` — fetches this
+device's `home_id`/MQTT broker config from the platform's new
+`POST /api/v1/devices/:deviceId/enrollment` endpoint once Wi-Fi connects,
+and applies it via `CloudService`'s existing `saveCloudConfig()`/
+`saveDeviceCredential()` setters. This is the fix for "device shows offline
+despite having internet" — see platform `HANDOFF.md`'s 2026-09-23 entry for
+the full design/backend half, which is live and verified against the real
+bench device. Zero changes to `CloudService` itself.
+
+**Status: neither of the two firmware changes above has been build+flash
++serial-log verified on real hardware as of this writing** — this
+session's environment could not run `pio run` at all (a sandboxed-shell
+subprocess limitation, not a code issue — see the platform HANDOFF.md
+entry for the fuller diagnosis), so both changes were written and manually
+cross-checked against ESP-IDF's real headers/Kconfig but never compiled.
+**Before treating either as done**: build `esp32-s3-schoolbell-prov`,
+flash the bench unit, and confirm via serial monitor that (1) a real BLE
+pairing attempt gets past `createSession` without `GATT_INVALID_PDU`, and
+(2) the new `"CloudEnrollment"`-tagged log lines show a successful fetch
+after Wi-Fi connects, followed by an actual MQTT `CONNECT` in the VPS's
+Mosquitto log (`grep` for the device's ID/username — same method used to
+originally confirm the "zero connections ever" baseline).
+
+---
+
 # GATT_INVALID_PDU on First SRP6a Write + Front-Panel Real Factory Reset - 2026-09-20
 
 This section supersedes the 2026-09-13 entry's "phone pairing" status
