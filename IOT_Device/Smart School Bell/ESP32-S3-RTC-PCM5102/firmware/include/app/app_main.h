@@ -9,6 +9,7 @@
 #include "drivers/sd_driver.h"
 #include "services/audio_service.h"
 #include "services/config_service.h"
+#include "services/cloud_enrollment_service.h"
 #include "services/cloud_service.h"
 #include "services/device_identity_service.h"
 #include "services/holiday_service.h"
@@ -58,6 +59,9 @@ class FirmwareApp {
   services::ProvisioningService provisioning_service_;
   services::OtaService ota_service_;
   services::CloudService cloud_service_{ota_service_};
+  // Real device ID is supplied later via init() in bootstrap(), not here --
+  // identity_service_ hasn't resolved one yet at construction time.
+  services::CloudEnrollmentService enrollment_service_{cloud_service_};
   services::SyncService sync_service_{log_service_};
   services::WebService web_service_{
       storage_service_, config_service_, schedule_service_, holiday_service_, log_service_, time_service_, wifi_service_, audio_service_, cloud_service_};

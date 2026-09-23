@@ -27,6 +27,12 @@ inline constexpr char kSetupApSsid[] = "JENIX-SCHOOL-BELL";
 inline constexpr char kSetupApPassword[] = "JenixBell@123";
 inline constexpr char kDefaultMqttHost[] = "mqtt.iotsoft.in";
 inline constexpr uint16_t kDefaultMqttPort = 1883;
+// Cloud/MQTT self-enrollment: fetched once from the backend after Wi-Fi
+// connects, applied via CloudService's existing saveCloudConfig()/
+// saveDeviceCredential() setters (see CloudEnrollmentService).
+inline constexpr char kBackendBaseUrl[] = "https://one.jenix.in/api";
+inline constexpr uint32_t kEnrollmentInitialBackoffMs = 5000;
+inline constexpr uint32_t kEnrollmentMaxBackoffMs = 300000;
 
 inline constexpr uint32_t kMainLoopIntervalMs = 1000;
 inline constexpr uint32_t kShortPressMinMs = 50;

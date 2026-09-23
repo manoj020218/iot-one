@@ -15,6 +15,7 @@ void FirmwareApp::loop() {
     provisioning_service_.tick();
     wifi_service_.tick();
     cloud_service_.tick(wifi_service_.isConnected());
+    enrollment_service_.tick(xTaskGetTickCount() * portTICK_PERIOD_MS, wifi_service_.isConnected());
     sync_service_.tick();
     audio_service_.tick();
     app_state_.setSyncInProgress(sync_service_.inProgress());
@@ -199,6 +200,10 @@ void FirmwareApp::onProvisioningWifiConnected(const std::string& device_id, cons
   } else {
     log_service_.warn("provisioning", "Could not read applied Wi-Fi config to persist");
   }
+
+  // Fire an enrollment attempt promptly rather than waiting out whatever
+  // backoff a previous, unrelated attempt had reached.
+  enrollment_service_.onWifiReconnected();
 }
 
 esp_err_t FirmwareApp::handleRingRequest(const RingRequest& request) {

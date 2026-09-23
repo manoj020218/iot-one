@@ -20,3 +20,19 @@ CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=512
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=n
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
 CONFIG_WIFI_PROV_BLE_SEC_CONN=y
+
+# Security Scheme 2 performs a 3072-bit SRP6a exchange. The full School Bell
+# runtime can fragment internal DRAM enough for mbedTLS MPI allocation to fail,
+# which drops BLE during createSession and is reported by Android as
+# GATT_INVALID_PDU. This N16R8 board has 8 MB OPI PSRAM; keep the change local
+# to the provisioning build and put mbedTLS's transient SRP allocations there.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=n
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_40M=n
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y
+CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=n
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y

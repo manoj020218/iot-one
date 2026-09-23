@@ -123,6 +123,11 @@ esp_err_t FirmwareApp::bootstrap() {
   err = cloud_service_.init(device_config.device_id, [this]() { return makeCloudStatus(); });
   if (err != ESP_OK) log_service_.warn("cloud", "Cloud bridge init failed; local bell remains available");
 
+  err = enrollment_service_.init(device_config.device_id);
+  if (err != ESP_OK) {
+    log_service_.warn("enrollment", "Cloud enrollment service init failed");
+  }
+
   sync_service_.init();
   app_state_.setSyncInProgress(sync_service_.inProgress());
 
