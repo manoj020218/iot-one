@@ -31,6 +31,7 @@ import { registerPublicDeviceCapabilities } from "./modules/api-access/public-de
 import { registerDeviceEventHandler } from "./infrastructure/mqtt/device-event-capabilities";
 import { authRouter } from "./modules/auth/auth.routes";
 import { billingDispenserRouter } from "./modules/billing-dispenser/billing-dispenser.routes";
+import { deviceEnrollmentRouter } from "./modules/device-enrollment/device-enrollment.routes";
 import { deviceRouter } from "./modules/devices/device.routes";
 import { healthRouter } from "./modules/health/health.routes";
 import { homeRouter } from "./modules/homes/home.routes";
@@ -97,6 +98,14 @@ export function createApp(): Express {
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/homes", requireAuthenticatedUser, homeRouter);
   app.use("/api/v1/api-keys", requireAuthenticatedUser, apiKeyRouter);
+  // Must be mounted BEFORE deviceRouter: deviceRouter's own internal chain
+  // ends in an unconditional `deviceRouter.use(requireAuthenticatedUser)`
+  // catch-all (device.routes.ts) that intercepts any path it doesn't
+  // explicitly declare a route for -- including this one -- and 401s
+  // before Express would ever try the next mounted router. Mounting this
+  // router first lets its one specific, device-key-gated route match and
+  // respond before deviceRouter's catch-all ever runs.
+  app.use("/api/v1/devices", deviceEnrollmentRouter);
   app.use("/api/v1/devices", deviceRouter);
   app.use("/api/v1/devices", nurseCallReceiverRouter);
   app.use("/api/v1/devices", smartRfTransmitterRouter);
